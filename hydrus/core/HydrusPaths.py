@@ -578,12 +578,53 @@ def ElideFilenameSafely( destination_directory: str, subdirs_elidable: str, base
     return ( subdirs_elided, base_filename )
     
 
+def _GetOverrideDBDir():
+    """Check override_paths.json in BASE_DIR for a db_dir override."""
+
+    import json
+
+    config_path = os.path.join( HC.BASE_DIR, 'override_paths.json' )
+
+    if not os.path.exists( config_path ):
+
+        return None
+
+
+    try:
+
+        with open( config_path, 'r' ) as f:
+
+            data = json.load( f )
+
+
+        db_dir = data.get( 'db_dir' )
+
+        if db_dir is not None:
+
+            return os.path.normpath( db_dir )
+
+
+    except Exception:
+
+        pass
+
+
+    return None
+
+
 def FigureOutDBDir( arg_db_dir: str ):
     
     switching_to_userpath_is_ok = False
-    
-    if arg_db_dir is None:
-        
+
+    # check for override_paths.json db_dir override
+    override_db_dir = _GetOverrideDBDir()
+
+    if override_db_dir is not None:
+
+        db_dir = override_db_dir
+
+    elif arg_db_dir is None:
+
         if HC.RUNNING_FROM_MACOS_APP:
             
             if HC.USERPATH_DB_DIR is None:

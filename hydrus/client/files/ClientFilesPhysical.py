@@ -11,6 +11,7 @@ from hydrus.core import HydrusPaths
 from hydrus.core.files import HydrusFilesPhysicalStorage
 
 from hydrus.client import ClientThreading
+from hydrus.client.files import ClientFilesMultiRoot
 
 # TODO: A 'FilePath' or 'FileLocation' or similar that holds the path or IO stream, and/or temp_path to use for import calcs, and hash once known, and the human description like 'this came from blah URL'
 # then we spam that all over the import pipeline and when we need a nice error, we ask that guy to describe himself
@@ -283,6 +284,26 @@ class FilesStorageBaseLocation( object ):
         # it may seem silly to wash these like this, but it is nice and certain about slashes and so on, which we like
         path = HydrusPaths.ConvertPortablePathToAbsPath( path )
         portable_path = HydrusPaths.ConvertAbsPathToPortablePath( path )
+
+        # apply override_paths.json remapping if configured
+        override_config = ClientFilesMultiRoot.GetConfig()
+
+        if override_config.IsActive():
+
+            from hydrus.core import HydrusGlobals as HG
+
+            try:
+
+                db_dir = HG.controller.GetDBDir()
+
+            except Exception:
+
+                db_dir = None
+
+
+            if db_dir is not None:
+
+                path = override_config.ResolveBaseLocationPath( path, db_dir )
         
         try:
             

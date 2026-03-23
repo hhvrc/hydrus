@@ -24,6 +24,7 @@ from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientPaths
 from hydrus.client import ClientThreading
 from hydrus.client.files import ClientFilesMaintenance
+from hydrus.client.files import ClientFilesMultiRoot
 from hydrus.client.files import ClientFilesPhysical
 
 class ClientFilesManager( object ):
@@ -49,6 +50,9 @@ class ClientFilesManager( object ):
         self._bad_error_occurred = False
         self._missing_subfolders = set()
         
+        self._multi_root_config = ClientFilesMultiRoot.GetConfig()
+        self._db_dir = controller.GetDBDir()
+
         self._Reinit()
         
         self._DoMissingLocationsCheck()
@@ -816,15 +820,42 @@ class ClientFilesManager( object ):
             if os.path.exists( potential_path ):
                 
                 return ( potential_path, potential_mime )
-                
-            
-        
+
+
+
+        # multi-root fallback: try alternative roots before giving up
+        if self._multi_root_config.IsActive():
+
+            subfolder = self._GetSubfolderForFile( hash, 'f' )
+            hash_encoded = hash.hex()
+
+            for potential_mime in HC.ALLOWED_MIMES:
+
+                filename = f'{hash_encoded}{HC.mime_ext_lookup[ potential_mime ]}'
+                original_path = subfolder.GetFilePath( filename )
+
+                for alt_path in self._multi_root_config.GetAlternativePaths( original_path, subfolder.base_location.path, self._db_dir ):
+
+                    if os.path.exists( alt_path ):
+
+                        return ( alt_path, potential_mime )
+
+
+
+
+
+
         subfolders = self._GetPossibleSubfoldersForFile( hash, 'f' )
         
         for subfolder in subfolders:
             
             if not subfolder.PathExists():
-                
+
+                if self._multi_root_config.IsActive() and self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir ):
+
+                    continue
+
+
                 raise HydrusExceptions.DirectoryMissingException( f'The directory {subfolder.path} was not found! Reconnect the missing location or shut down the client immediately!' )
                 
             
@@ -854,8 +885,18 @@ class ClientFilesManager( object ):
     def _RepopulateMissingLocationsReference( self ):
         
         # this would be faster if we did a scandir on the shared parents, but I tried it and it has bad worst case scenarios if we hit a granularity 2 with granularity 3 expectations
-        
-        self._missing_subfolders = { subfolder for subfolders in self._prefixes_to_client_files_subfolders.values() for subfolder in subfolders if not subfolder.PathExists() }
+
+        if self._multi_root_config.IsActive():
+
+            self._missing_subfolders = {
+                subfolder for subfolders in self._prefixes_to_client_files_subfolders.values()
+                for subfolder in subfolders
+                if not subfolder.PathExists() and not self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir )
+            }
+
+        else:
+
+            self._missing_subfolders = { subfolder for subfolders in self._prefixes_to_client_files_subfolders.values() for subfolder in subfolders if not subfolder.PathExists() }
         
     
     def _WaitOnWakeup( self ):
@@ -1390,9 +1431,25 @@ class ClientFilesManager( object ):
                 path = self._GenerateExpectedThumbnailPath( hash )
                 
                 thumb_missing = not os.path.exists( path )
-                
-            
-        
+
+                # multi-root fallback: check alternative roots for the thumbnail
+                if thumb_missing and self._multi_root_config.IsActive():
+
+                    subfolder = self._GetSubfolderForFile( hash, 't' )
+
+                    for alt_path in self._multi_root_config.GetAlternativePaths( path, subfolder.base_location.path, self._db_dir ):
+
+                        if os.path.exists( alt_path ):
+
+                            path = alt_path
+                            thumb_missing = False
+
+                            break
+
+
+
+
+
         if thumb_missing:
             
             self.RegenerateThumbnail( media_result )
@@ -1420,9 +1477,26 @@ class ClientFilesManager( object ):
         if HG.file_report_mode:
             
             HydrusData.ShowText( 'File path test: ' + path )
-            
-        
-        return os.path.exists( path )
+
+
+        if os.path.exists( path ):
+
+            return True
+
+
+        if self._multi_root_config.IsActive():
+
+            subfolder = self._GetSubfolderForFile( hash, 'f' )
+
+            for alt_path in self._multi_root_config.GetAlternativePaths( path, subfolder.base_location.path, self._db_dir ):
+
+                if os.path.exists( alt_path ):
+
+                    return True
+
+
+
+        return False
         
     
     def LocklessHasThumbnail( self, hash ):
@@ -1432,9 +1506,26 @@ class ClientFilesManager( object ):
         if HG.file_report_mode:
             
             HydrusData.ShowText( 'Thumbnail path test: ' + path )
-            
-        
-        return os.path.exists( path )
+
+
+        if os.path.exists( path ):
+
+            return True
+
+
+        if self._multi_root_config.IsActive():
+
+            subfolder = self._GetSubfolderForFile( hash, 't' )
+
+            for alt_path in self._multi_root_config.GetAlternativePaths( path, subfolder.base_location.path, self._db_dir ):
+
+                if os.path.exists( alt_path ):
+
+                    return True
+
+
+
+        return False
         
     
     def Rebalance( self, job_status ):
