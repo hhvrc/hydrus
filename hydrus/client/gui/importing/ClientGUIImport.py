@@ -43,6 +43,7 @@ from hydrus.client.importing.options import FileImportOptionsLegacy
 from hydrus.client.importing.options import NoteImportOptionsLegacy
 from hydrus.client.importing.options import TagImportOptionsLegacy
 from hydrus.client.metadata import ClientTags
+from hydrus.client.metadata import ClientTagSorting
 from hydrus.client.metadata import ClientMetadataMigrationExporters
 from hydrus.client.metadata import ClientMetadataMigrationImporters
 
@@ -1130,7 +1131,7 @@ class EditLocalImportFilenameTaggingPanel( ClientGUIScrolledPanels.EditPanel ):
             pretty_index = HydrusNumbers.ToHumanInt( index + 1 )
             
             pretty_path = path
-            pretty_strings = ', '.join( strings )
+            pretty_strings = ' | '.join( strings )
             
             return ( pretty_index, pretty_path, pretty_strings )
             
@@ -1171,15 +1172,78 @@ class EditLocalImportFilenameTaggingPanel( ClientGUIScrolledPanels.EditPanel ):
                 
                 processed_strings = router.GetStringProcessor().ProcessStrings( pre_processed_strings )
                 
+                processed_strings = list( processed_strings )
+                
+                HydrusText.HumanTextSort( processed_strings )
+                
                 exporter = router.GetExporter()
                 
                 if isinstance( exporter, ClientMetadataMigrationExporters.SingleFileMetadataExporterMediaTags ):
                     
-                    processed_strings = HydrusTags.CleanTags( processed_strings )
+                    try:
+                        
+                        service_name = CG.client_controller.services_manager.GetName( exporter.GetServiceKey() )
+                        
+                    except HydrusExceptions.DataMissing:
+                        
+                        service_name = 'unknown tag service!'
+                        
+                    
+                    clean_tags = list( HydrusTags.CleanTags( processed_strings ) )
+                    
+                    ClientTagSorting.SortTags( ClientTagSorting.TagSort.STATICGetTextASCDefault(), clean_tags )
+                    
+                    processed_strings = [ f'to "{service_name}": ' + ', '.join( clean_tags ) ]
                     
                 elif isinstance( exporter, ClientMetadataMigrationExporters.SingleFileMetadataExporterMediaNotes ):
                     
-                    processed_strings = [ f'note: {HydrusText.GetFirstLineSummary( s )}' for s in processed_strings ]
+                    if len( processed_strings ) == 1:
+                        
+                        processed_strings = [ '1 note: ' + HydrusText.ElideText( HydrusText.GetFirstLineSummary( processed_strings[0] ), 64  ) ]
+                        
+                    else:
+                        
+                        summaries = [ HydrusText.ElideText( HydrusText.GetFirstLineSummary( s ), 32 ) for s in processed_strings ]
+                        
+                        processed_strings = [ f'{HydrusNumbers.ToHumanInt(len( processed_strings ))} notes: ' + ', '.join( summaries ) ]
+                        
+                    
+                elif isinstance( exporter, ClientMetadataMigrationExporters.SingleFileMetadataExporterMediaURLs ):
+                    
+                    if len( processed_strings ) == 1:
+                        
+                        processed_strings = [ '1 URL: ' + HydrusText.ElideText( HydrusText.GetFirstLineSummary( processed_strings[0] ), 64  ) ]
+                        
+                    else:
+                        
+                        summaries = [ HydrusText.ElideText( HydrusText.GetFirstLineSummary( s ), 32 ) for s in processed_strings ]
+                        
+                        processed_strings = [ f'{HydrusNumbers.ToHumanInt(len( processed_strings ))} URLs: ' + ', '.join( summaries ) ]
+                        
+                    
+                elif isinstance( exporter, ClientMetadataMigrationExporters.SingleFileMetadataExporterMediaTimestamps ):
+                    
+                    timestamp_data_stub = exporter.GetTimestampDataStub()
+                    
+                    pretty_timestamp_data_stub = timestamp_data_stub.ToString()
+                    
+                    if len( processed_strings ) == 1:
+                        
+                        try:
+                            
+                            pretty_time = HydrusTime.TimestampToPrettyTime( float( processed_strings[0] ) )
+                            
+                        except Exception as e:
+                            
+                            pretty_time = f'Could not parse time! {e}'
+                            
+                        
+                        processed_strings = [ f'{pretty_timestamp_data_stub}: {pretty_time}' ]
+                        
+                    else:
+                        
+                        processed_strings = [ f'{pretty_timestamp_data_stub}: {HydrusNumbers.ToHumanInt( len( processed_strings ))} times?' ]
+                        
                     
                 
                 strings.extend( sorted( processed_strings ) )
@@ -1587,7 +1651,7 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
         
     
 
-def SelectGUGKeyAndName( win: QW.QWidget, gug_key_and_name ):
+def SelectGUGKeyAndName( win: QW.QWidget, gug_key_and_name, for_new_sub = False ):
     
     domain_manager = CG.client_controller.network_engine.domain_manager
     
@@ -1598,6 +1662,25 @@ def SelectGUGKeyAndName( win: QW.QWidget, gug_key_and_name ):
     
     gugs = list( domain_manager.GetGUGs() )
     gug_keys_to_display = domain_manager.GetGUGKeysToDisplay()
+    
+    if len( gugs ) == 0:
+        
+        if for_new_sub:
+            
+            message = 'Hey, you do not have any downloaders set up in this client, so you cannot create a new subscription yet!'
+            
+        else:
+            
+            message = 'Hey, you do not have any downloaders set up in this client, so there is nothing to select!'
+            
+        
+        message += '\n\n'
+        message += 'Check the _network->downloaders_ menu to find downloaders made by users.'
+        
+        ClientGUIDialogsMessage.ShowWarning( win, message )
+        
+        raise HydrusExceptions.CancelledException()
+        
     
     gugs.sort( key = lambda g: g.GetName() )
     
@@ -1669,15 +1752,18 @@ class GUGKeyAndNameSelector( ClientGUICommon.BetterButton ):
     
     valueChanged = QC.Signal()
     
-    def __init__( self, parent, gug_key_and_name, update_callable = None ):
+    def __init__( self, parent, gug_key_and_name: tuple[ bytes, str ] | None = None, update_callable = None ):
         
         super().__init__( parent, 'gallery selector', self._Edit )
         
-        gug = CG.client_controller.network_engine.domain_manager.GetGUG( gug_key_and_name )
-        
-        if gug is not None:
+        if gug_key_and_name is not None:
             
-            gug_key_and_name = gug.GetGUGKeyAndName()
+            gug = CG.client_controller.network_engine.domain_manager.GetGUG( gug_key_and_name )
+            
+            if gug is not None:
+                
+                gug_key_and_name = gug.GetGUGKeyAndName()
+                
             
         
         self._gug_key_and_name = gug_key_and_name
@@ -1702,19 +1788,26 @@ class GUGKeyAndNameSelector( ClientGUICommon.BetterButton ):
     
     def _SetLabel( self ):
         
-        label = self._gug_key_and_name[1]
-        
-        gug = CG.client_controller.network_engine.domain_manager.GetGUG( self._gug_key_and_name )
-        
-        if gug is None:
+        if self._gug_key_and_name is None or self._gug_key_and_name[1] == '':
             
-            label = 'not found: ' + label
+            label = 'no downloader set'
+            
+        else:
+            
+            label = self._gug_key_and_name[1]
+            
+            gug = CG.client_controller.network_engine.domain_manager.GetGUG( self._gug_key_and_name )
+            
+            if gug is None:
+                
+                label = 'not found: ' + label
+                
             
         
         self.setText( label )
         
     
-    def _SetValue( self, gug_key_and_name ):
+    def _SetValue( self, gug_key_and_name: tuple[ bytes, str ] | None ):
         
         self._gug_key_and_name = gug_key_and_name
         
@@ -1730,14 +1823,22 @@ class GUGKeyAndNameSelector( ClientGUICommon.BetterButton ):
     
     def GetValue( self ):
         
-        return self._gug_key_and_name
+        if self._gug_key_and_name is None or self._gug_key_and_name[1] == '':
+            
+            return None
+            
+        else:
+            
+            return self._gug_key_and_name
+            
         
     
-    def SetValue( self, gug_key_and_name ):
+    def SetValue( self, gug_key_and_name: tuple[ bytes, str ] | None ):
         
         self._SetValue( gug_key_and_name )
         
     
+
 class WatcherReviewPanel( ClientGUICommon.StaticBox ):
     
     importOptionsChanged = QC.Signal()

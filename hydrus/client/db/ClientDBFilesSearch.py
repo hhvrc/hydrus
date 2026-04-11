@@ -447,7 +447,7 @@ class ClientDBFilesSearchTags( ClientDBModule.ClientDBModule ):
             
             for file_service_key in file_service_keys:
                 
-                # just as a legacy note, this is where we used to do the "'samus aran' gets 'character:samus aran'" code. now, that stuff works through wildcards if user explicitly enters '*:samus aran'
+                # just as a legacy note, this is where we used to do the "'dave' gets 'character:dave'" code. now, that stuff works through wildcards if user explicitly enters '*:dave'
                 
                 tag_ids = ( ideal_tag_id, )
                 
@@ -1526,8 +1526,6 @@ class ClientDBFilesQuery( ClientDBModule.ClientDBModule ):
             
             query_hash_ids = set()
             
-        
-        query_hash_ids = typing.cast( set[ int ], query_hash_ids )
         
         # this was bodged in here during a rewrite; there is probably a nicer 'if cross-referenced already, do above, else this', but this is fine for now
         if search_state.there_are_simple_files_info_preds_to_search_for and not search_state.done_files_info_predicates:

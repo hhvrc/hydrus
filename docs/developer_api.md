@@ -18,19 +18,19 @@ In general, the API deals with standard UTF-8 JSON. POST requests and 200 OK res
 *   Your list of tags:
     
     ```
-    [ 'character:samus aran', 'creator:青い桜', 'system:height > 2000' ]
+    [ 'character:space bounty hunter', 'creator:青い桜', 'system:height > 2000' ]
     ```
     
 *   JSON-encoded:
     
     ```json
-    ["character:samus aran", "creator:\\u9752\\u3044\\u685c", "system:height > 2000"]
+    ["character:space bounty hunter", "creator:\\u9752\\u3044\\u685c", "system:height > 2000"]
     ```
     
 *   Then URL-encoded:
     
     ```
-    %5B%22character%3Asamus%20aran%22%2C%20%22creator%3A%5Cu9752%5Cu3044%5Cu685c%22%2C%20%22system%3Aheight%20%3E%202000%22%5D
+    %5B%22character%3Aspace%20bounty%20hunter%22%2C%20%22creator%3A%5Cu9752%5Cu3044%5Cu685c%22%2C%20%22system%3Aheight%20%3E%202000%22%5D
     ```
     
 *   In python, converting your tag list to the URL-encoded string would be:
@@ -42,7 +42,7 @@ In general, the API deals with standard UTF-8 JSON. POST requests and 200 OK res
 *   Full URL path example:
     
     ```
-    /get_files/search_files?file_sort_type=6&file_sort_asc=false&tags=%5B%22character%3Asamus%20aran%22%2C%20%22creator%3A%5Cu9752%5Cu3044%5Cu685c%22%2C%20%22system%3Aheight%20%3E%202000%22%5D
+    /get_files/search_files?file_sort_type=6&file_sort_asc=false&tags=%5B%22character%3Aspace%20bounty%20hunter%22%2C%20%22creator%3A%5Cu9752%5Cu3044%5Cu685c%22%2C%20%22system%3Aheight%20%3E%202000%22%5D
     ```
     
 
@@ -241,66 +241,69 @@ When it does this, it gives you this structure, typically under a `services` key
     "show_in_thumbnail" : true,
     "show_in_thumbnail_even_when_null" : true,
     "colours": {
-        "dislike": {
-            "brush": "#FFFFFF",
-            "pen": "#000000"
-        },
-        "like": {
-            "brush": "#50C878",
-            "pen": "#000000"
-        },
-        "mixed": {
-            "brush": "#5F5F5F",
-            "pen": "#000000"
-        },
-        "null": {
-            "brush": "#BFBFBF",
-            "pen": "#000000"
-        }
+      "dislike": {
+        "brush": "#FFFFFF",
+        "pen": "#000000"
+      },
+      "like": {
+        "brush": "#50C878",
+        "pen": "#000000"
+      },
+      "mixed": {
+        "brush": "#5F5F5F",
+        "pen": "#000000"
+      },
+      "null": {
+        "brush": "#BFBFBF",
+        "pen": "#000000"
+      }
+    },
   },
   "90769255dae5c205c975fc4ce2efff796b8be8a421f786c1737f87f98187ffaf" : {
-    "name" : "example local rating numerical service",
-    "type" : 6,
-    "type_pretty" : "local numerical rating service",
-    "star_shape" : "fat star",
-    "allows_zero" : false,
-    "min_stars" : 1,
-    "max_stars" : 5,
-    "show_in_thumbnail" : true,
-    "show_in_thumbnail_even_when_null" : false,
+    "name": "example local rating numerical service",
+    "type": 6,
+    "type_pretty": "local numerical rating service",
+    "star_shape": "fat star",
+    "allows_zero": false,
+    "min_stars": 1,
+    "max_stars": 5,
+    "show_in_thumbnail": true,
+    "show_in_thumbnail_even_when_null": false,
     "colours": {
-        "dislike": {
-            "brush": "#FFFFFF",
-            "pen": "#000000"
-        },
-        "like": {
-            "brush": "#50C878",
-            "pen": "#000000"
-        },
-        "mixed": {
-            "brush": "#5F5F5F",
-            "pen": "#000000"
-        },
-        "null": {
-            "brush": "#BFBFBF",
-            "pen": "#000000"
-        }
+      "dislike": {
+        "brush": "#FFFFFF",
+        "pen": "#000000"
+      },
+      "like": {
+        "brush": "#50C878",
+        "pen": "#000000"
+      },
+      "mixed": {
+        "brush": "#5F5F5F",
+        "pen": "#000000"
+      },
+      "null": {
+        "brush": "#BFBFBF",
+        "pen": "#000000"
+      }
+    }
   },
   "b474e0cbbab02ca1479c12ad985f1c680ea909a54eb028e3ad06750ea40d4106" : {
-    "name" : "example local rating inc/dec service",
-    "type" : 22,
-    "type_pretty" : "local inc/dec rating service",
-    "show_in_thumbnail" : false,
-    "show_in_thumbnail_even_when_null" : false,
+    "name": "example local rating inc/dec service",
+    "type": 22,
+    "type_pretty": "local inc/dec rating service",
+    "show_in_thumbnail": false,
+    "show_in_thumbnail_even_when_null": false,
     "colours": {
-        "like": {
-            "brush": "#50C878",
-            "pen": "#000000"
-        },
-        "mixed": {
-            "brush": "#5F5F5F",
-            "pen": "#000000"
-        }
+      "like": {
+        "brush": "#50C878",
+        "pen": "#000000"
+      },
+      "mixed": {
+        "brush": "#5F5F5F",
+        "pen": "#000000"
+      }
+    }
   },
   "7472617368" : {
     "name" : "trash",
@@ -932,7 +935,7 @@ Response:
 }
 ```
 
-The `url_file_statuses` is a list of zero-to-n JSON Objects, each representing a file match the client found in its database for the URL. Typically, it will be of length 0 (for as-yet-unvisited URLs or Gallery/Watchable URLs that are not attached to files) or 1, but sometimes multiple files are given the same URL (sometimes by mistaken misattribution, sometimes by design, such as pixiv manga pages). Handling n files per URL is a pain but an unavoidable issue you should account for.
+The `url_file_statuses` is a list of zero-to-n JSON Objects, each representing a file match the client found in its database for the URL. Typically, it will be of length 0 (for as-yet-unvisited URLs or Gallery/Watchable URLs that are not attached to files) or 1, but sometimes multiple files are given the same URL (sometimes by mistaken misattribution, sometimes by design, such as a mini-manga Post URL that hosts 4 files). Handling n files per URL is a pain but an unavoidable issue you should account for.
 
 `status` mas the same mapping as for `/add_files/add_file`, but the possible results are different:
 
@@ -971,7 +974,7 @@ Response:
   "normalised_url" : "https://someimageboard.org/cool/thread/123456",
   "url_type" : 4,
   "url_type_string" : "watchable url",
-  "match_name" : "8chan thread",
+  "match_name" : "Some Imageboard thread",
   "can_parse" : true
 }
 ```
@@ -1040,7 +1043,7 @@ filterable_tags works like the tags parsed by a hydrus downloader. It is just a 
   "filterable_tags" : [
     "1girl",
     "artist name",
-    "creator:azto dio",
+    "creator:some guy",
     "blonde hair",
     "blue eyes",
     "breasts",
@@ -1058,12 +1061,12 @@ filterable_tags works like the tags parsed by a hydrus downloader. It is just a 
     "long hair",
     "long sleeves",
     "looking at viewer",
-    "series:metroid",
+    "series:bountyvania",
     "mole",
     "mole under mouth",
     "patreon username",
     "ponytail",
-    "character:samus aran",
+    "character:space bounty hunter",
     "solo",
     "standing",
     "suit",
@@ -1135,16 +1138,16 @@ Arguments (in percent-encoded JSON):
 *   `tags`: (a list of the tags you want cleaned)
 
 Example request:
-:   Given tags `#!json [ " bikini ", "blue    eyes", " character : samus aran ", " :)", "   ", "", "10", "11", "9", "system:wew", "-flower" ]`:
+:   Given tags `#!json [ " bikini ", "blue    eyes", " character : space bounty hunter ", " :)", "   ", "", "10", "11", "9", "system:wew", "-flower" ]`:
     ```
-    /add_tags/clean_tags?tags=%5B%22%20bikini%20%22%2C%20%22blue%20%20%20%20eyes%22%2C%20%22%20character%20%3A%20samus%20aran%20%22%2C%20%22%3A%29%22%2C%20%22%20%20%20%22%2C%20%22%22%2C%20%2210%22%2C%20%2211%22%2C%20%229%22%2C%20%22system%3Awew%22%2C%20%22-flower%22%5D
+    /add_tags/clean_tags?tags=%5B%22%20bikini%20%22%2C%20%22blue%20%20%20%20eyes%22%2C%20%22%20character%20%3A%20space%20bounty%20hunter%20%22%2C%20%22%3A%29%22%2C%20%22%20%20%20%22%2C%20%22%22%2C%20%2210%22%2C%20%2211%22%2C%20%229%22%2C%20%22system%3Awew%22%2C%20%22-flower%22%5D
     ```
 
 Response: 
 :  The tags cleaned according to hydrus rules. They will also be in hydrus human-friendly sorting order.
 ```json title="Example response"
 {
-  "tags" : ["9", "10", "11", " ::)", "bikini", "blue eyes", "character:samus aran", "flower", "wew"]
+  "tags" : ["9", "10", "11", " ::)", "bikini", "blue eyes", "character:space bounty hunter", "flower", "wew"]
 }
 ```
 
@@ -1193,9 +1196,9 @@ Arguments (in percent-encoded JSON):
 *   `tags`: (a list of the tags you want info on)
 
 Example request:
-:   Given tags `#!json [ "blue eyes", "samus aran" ]`:
+:   Given tags `#!json [ "blue eyes", "space bounty hunter" ]`:
     ```
-    /add_tags/get_siblings_and_parents?tags=%5B%22blue%20eyes%22%2C%20%22samus%20aran%22%5D
+    /add_tags/get_siblings_and_parents?tags=%5B%22blue%20eyes%22%2C%20%22space%20bounty%20hunter%22%5D
     ```
 
 Response: 
@@ -1225,31 +1228,31 @@ Response:
         "ancestors" : []
       }
     },
-    "samus aran" : {
+    "space bounty hunter" : {
       "6c6f63616c2074616773" : {
-        "ideal_tag" : "character:samus aran",
+        "ideal_tag" : "character:space bounty hunter",
         "siblings" : [
-          "samus aran",
-          "samus_aran",
-          "character:samus aran"
+          "space bounty hunter",
+          "space_bounty_hunter",
+          "character:space bounty hunter"
         ],
         "descendants" : [
-          "character:samus aran (zero suit)"
-          "cosplay:samus aran"
+          "character:space bounty hunter (zero suit)"
+          "cosplay:space bounty hunter"
         ],
         "ancestors" : [
-          "series:metroid",
-          "studio:nintendo"
+          "series:bountyvania",
+          "studio:cool project house"
         ]
       },
       "877bfcf81f56e7e3e4bc3f8d8669f92290c140ba0acfd6c7771c5e1dc7be62d7": {
-        "ideal_tag" : "samus aran",
+        "ideal_tag" : "space bounty hunter",
         "siblings" : [
-          "samus aran"
+          "space bounty hunter"
         ],
         "descendants" : [
-          "zero suit samus",
-          "samus_aran_(cosplay)"
+          "zero suit space bounty hunter",
+          "space_bounty_hunter_(cosplay)"
         ],
         "ancestors" : []
       }
@@ -1705,13 +1708,15 @@ If you send `null` timestamp time, then this will instruct to delete the existin
 *   7 - File originally imported time
 
 !!! warning "Adding or Deleting"
-    You can add or delete type 0 (web domain) timestamps, but you can only edit existing instances of all the others. This is broadly how the _manage times_ dialog works, also. Stuff like 'last viewed' is tied up with other numbers like viewtime and num_views, so if that isn't already in the database, then we can't just add the timestamp on its own. Same with 'deleted time' for a file that isn't deleted! So, in general, other than web domain stuff, you can only edit times you already see in [/get\_files/file\_metadata](#get_files_file_metadata).
+    You can add or delete type 0 (web domain) timestamps and set an archived time with no previous record, but you can only edit existing instances of all the others. This is broadly how the _manage times_ dialog works, also. Stuff like 'last viewed' is tied up with other numbers like viewtime and num_views, so if that isn't already in the database, then we can't just add the timestamp on its own. Same with 'deleted time' for a file that isn't deleted! So, in general, other than web domain stuff, you can only edit times you already see in [/get\_files/file\_metadata](#get_files_file_metadata).
 
 If you select 0, you have to include a `domain`, which will usually be a web domain, but you can put anything in there.
 
 If you select 1, the client will _not_ alter the modified time on your hard disk, only the database record. This is unlike the dialog. Let's let this system breathe a bit before we try to get too clever.
 
 If you select 3, 4, or 7, you have to include a `file_service_key`. The 'previously imported' time is for deleted files only; it records when the file was originally imported so if the user hits 'undo', the database knows what import time to give back to it.
+
+If you select 5 and the file is currently in the inbox, it will be archived!
 
 If you select 6, you have to include a `canvas_type`, which is:
 
@@ -1940,12 +1945,12 @@ Please test out the system predicates you want to send. If you are in _help-&gt;
 
 Also, OR predicates are now supported! Just nest within the tag list, and it'll be treated like an OR. For instance:
 
-*   `#!json [ "skirt", [ "samus aran", "lara croft" ], "system:height > 1000" ]`
+*   `#!json [ "skirt", [ "space bounty hunter", "jane raider" ], "system:height > 1000" ]`
 
 Makes:
 
 *   skirt
-*   samus aran OR lara croft
+*   space bounty hunter OR jane raider
 *   system:height > 1000
 
 The file and tag services are for search domain selection, just like clicking the buttons in the client. They are optional--default is 'combined local file domains' and 'all known tags'.
@@ -2214,6 +2219,7 @@ Response:
       "num_frames" : 102,
       "num_words" : null,
       "is_inbox" : false,
+      "time_archived" : 1641044542,
       "is_local" : true,
       "is_trashed" : false,
       "is_deleted" : false,
@@ -2224,7 +2230,7 @@ Response:
       "known_urls" : [
         "https://somebooru.org/index.php?page=post&s=view&id=12345",
         "https://cdn.somebooru.org/images/4d/7f/4d7f62bb8675cef84760d6263e4c254c5129ef56.jpg",
-        "http://somegallerysite.com/post/123456/samus_is_cool.jpg"
+        "http://somegallerysite.com/post/123456/space bounty hunter_is_cool.jpg"
       ],
       "ratings" : {
         "74d52c6238d25f846d579174c11856b1aaccdb04a185cb2c79f0d0e499284f2c" : true,
@@ -2234,11 +2240,11 @@ Response:
       "tags" : {
         "6c6f63616c2074616773" : {
           "storage_tags" : {
-            "0" : ["samus favourites"],
+            "0" : ["space bounty hunter favourites"],
             "2" : ["process this later"]
           },
           "display_tags" : {
-            "0" : ["samus favourites", "favourites"],
+            "0" : ["space bounty hunter favourites", "favourites"],
             "2" : ["process this later"]
           }
         },
@@ -2254,11 +2260,11 @@ Response:
         },
         "616c6c206b6e6f776e2074616773" : {
           "storage_tags" : {
-            "0" : ["samus favourites", "blonde_hair", "blue_eyes", "looking_at_viewer"],
+            "0" : ["space bounty hunter favourites", "blonde_hair", "blue_eyes", "looking_at_viewer"],
             "1" : ["bodysuit"]
           },
           "display_tags" : {
-            "0" : ["samus favourites", "favourites", "blonde hair", "blue_eyes", "looking at viewer"],
+            "0" : ["space bounty hunter favourites", "favourites", "blonde hair", "blue_eyes", "looking at viewer"],
             "1" : ["bodysuit", "clothing"]
           }
         }

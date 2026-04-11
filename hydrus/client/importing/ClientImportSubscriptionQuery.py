@@ -664,6 +664,16 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
         return result
         
     
+    def IsCapableOfWorking( self ):
+        
+        if self.IsPaused() or not self.IsLogContainerOK():
+            
+            return False
+            
+        
+        return True
+        
+    
     def IsCheckingNow( self ):
         
         return self._check_now
@@ -676,7 +686,10 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
     
     def IsExpectingToWorkInFuture( self ):
         
-        if self.IsPaused() or self.IsDead() or not self.IsLogContainerOK():
+        no_work_expected = self.IsDead() and not self.HasFileWorkToDo()
+        cannot_work = not self.IsCapableOfWorking()
+        
+        if cannot_work or no_work_expected:
             
             return False
             
@@ -706,7 +719,7 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
             HydrusData.ShowText( 'Query "' + self._query_text + '" IsSyncDue test. Paused/dead/container status is {}/{}/{}, check time due is {}, and check_now is {}.'.format( self._paused, self.IsDead(), self.IsLogContainerOK(), HydrusTime.TimeHasPassed( self._next_check_time ), self._check_now ) )
             
         
-        if not self.IsExpectingToWorkInFuture():
+        if self.IsDead():
             
             return False
             
