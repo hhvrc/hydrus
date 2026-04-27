@@ -5,14 +5,16 @@ from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusSerialisable
 
+from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
-from hydrus.client.importing.options.FileFilteringImportOptions import FileFilteringImportOptions
-from hydrus.client.importing.options.LocationImportOptions import LocationImportOptions
-from hydrus.client.importing.options.NoteImportOptions import NoteImportOptions
-from hydrus.client.importing.options.PrefetchImportOptions import PrefetchImportOptions
-from hydrus.client.importing.options.PresentationImportOptions import PresentationImportOptions
-from hydrus.client.importing.options.TagFilteringImportOptions import TagFilteringImportOptions
-from hydrus.client.importing.options.TagImportOptions import TagImportOptions
+from hydrus.client import ClientLocation
+from hydrus.client.importing.options import FileFilteringImportOptions
+from hydrus.client.importing.options import LocationImportOptions
+from hydrus.client.importing.options import NoteImportOptions
+from hydrus.client.importing.options import PrefetchImportOptions
+from hydrus.client.importing.options import PresentationImportOptions
+from hydrus.client.importing.options import TagFilteringImportOptions
+from hydrus.client.importing.options import TagImportOptions
 
 IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT = 0
 IMPORT_OPTIONS_CALLER_TYPE_POST_URLS = 1
@@ -96,7 +98,7 @@ import_options_type_desc_lookup = {
     IMPORT_OPTIONS_TYPE_LOCATIONS : 'If you have multiple local file services, you can choose to place incoming files in a different location than your default (probably "my files"). You can also send them to multiple locations.',
     IMPORT_OPTIONS_TYPE_TAGS : 'A file may pick up tags through the downloading and parsing process. Here you choose where to send any parsed tags.',
     IMPORT_OPTIONS_TYPE_NOTES : 'A file may pick up notes through the downloading and parsing process. Here you choose what to do with these notes. Default options are usually fine unless you have particular needs.',
-    IMPORT_OPTIONS_TYPE_PRESENTATION : 'When files are imported, the associated downloader or subscription will want to show them, whether than is adding thumbnails to a page or publishing items to a popup button. You can shape which files are actually "presented". Selecting "only new" or "only inbox" are often useful to remove clutter.',
+    IMPORT_OPTIONS_TYPE_PRESENTATION : 'When files are imported, the associated downloader or subscription will want to show them, whether that is adding thumbnails to a page or publishing files to a popup button. Here you can filter which files are actually presented. Selecting "only new" or "only inbox" are often useful to remove clutter.',
 }
 
 IMPORT_OPTIONS_TYPES_DOWNLOADER_ONLY = {
@@ -227,20 +229,20 @@ def GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller
         preference_stack.append( import_options_caller_type_str_lookup[ IMPORT_OPTIONS_CALLER_TYPE_POST_URLS ] )
         preference_stack.append( import_options_caller_type_str_lookup[ import_options_caller_type ] )
         preference_stack.append( 'any matching URL Class' )
-        preference_stack.append( 'specific import options for the particular subscription' )
+        preference_stack.append( 'any custom import options for the particular subscription' )
         
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_POST_URLS:
         
         preference_stack.append( import_options_caller_type_str_lookup[ import_options_caller_type ] )
         preference_stack.append( 'maybe "subscription"' )
         preference_stack.append( 'any matching URL Class' )
-        preference_stack.append( 'specific import options for the particular downloader page or subscription' )
+        preference_stack.append( 'any custom import options for the particular downloader page or subscription' )
         
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS:
         
         preference_stack.append( import_options_caller_type_str_lookup[ import_options_caller_type ] )
         preference_stack.append( 'any matching URL Class' )
-        preference_stack.append( 'specific import options for the particular watcher page' )
+        preference_stack.append( 'any custom import options for the particular watcher page' )
         
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS:
         
@@ -275,14 +277,14 @@ def GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller
                 
                 preference_stack.append( import_options_caller_type_str_lookup[ IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS ] )
                 preference_stack.append( url_class_name )
-                preference_stack.append( 'specific import options for the particular watcher page' )
+                preference_stack.append( 'any custom import options for the particular watcher page' )
                 
             else:
                 
                 preference_stack.append( import_options_caller_type_str_lookup[ IMPORT_OPTIONS_CALLER_TYPE_POST_URLS ] )
                 preference_stack.append( 'maybe "subscription"' )
                 preference_stack.append( url_class_name )
-                preference_stack.append( 'specific import options for the particular downloader page or subscription' )
+                preference_stack.append( 'any custom import options for the particular downloader page or subscription' )
                 
             
         else:
@@ -290,14 +292,14 @@ def GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller
             preference_stack.append( 'a gallery/post or watcher url' )
             preference_stack.append( 'maybe "subscription", if it is a gallery/post url class' )
             preference_stack.append( url_class_name )
-            preference_stack.append( 'specific import options for the particular watcher page, downloader page, or subscription' )
+            preference_stack.append( 'any custom import options for the particular watcher page, downloader page, or subscription' )
             
         
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT_FOLDER:
         
         preference_stack.append( import_options_caller_type_str_lookup[ IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT ] )
         preference_stack.append( import_options_caller_type_str_lookup[ import_options_caller_type ] )
-        preference_stack.append( 'specific import options for the particular import folder' )
+        preference_stack.append( 'any custom import options for the particular import folder' )
         
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_CLIENT_API:
         
@@ -306,7 +308,7 @@ def GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller
     elif import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT:
         
         preference_stack.append( import_options_caller_type_str_lookup[ import_options_caller_type ] )
-        preference_stack.append( 'specific import options for the particular local import page' )
+        preference_stack.append( 'any custom import options for the particular local import page' )
         
     
     preference_stack.reverse()
@@ -425,6 +427,17 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
         with self._lock:
             
             self._AddFavourite( name, import_options_container )
+            
+        
+    
+    def DeleteDefaultImportOptionsContainerForURLClass( self, url_class_key: bytes ):
+        
+        with self._lock:
+            
+            if url_class_key in self._url_class_keys_to_default_import_options_containers:
+                
+                del self._url_class_keys_to_default_import_options_containers[ url_class_key ]
+                
             
         
     
@@ -547,15 +560,13 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
         
     
     @staticmethod
-    def GetDefaultInitialisedManager() -> "ImportOptionsManager":
+    def STATICGetDefaultInitialisedManager() -> "ImportOptionsManager":
             
             import_options_manager = ImportOptionsManager.STATICGetEmptyButValidManager()
             
+            ImportOptionsManager.STATICPopulateManagerWithDefaultDefaults( import_options_manager )
+            ImportOptionsManager.STATICPopulateManagerWithDefaultURLClassDefaults( import_options_manager )
             ImportOptionsManager.STATICPopulateManagerWithDefaultFavourites( import_options_manager )
-            
-            # loud settings for global
-            # quiet filters for the three others
-            # post/watchable tag parsing
             
             return import_options_manager
             
@@ -564,7 +575,7 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
     @staticmethod
     def STATICGetEmptyButValidManager() -> "ImportOptionsManager":
             
-            manager = ImportOptionsManager()
+            import_options_manager = ImportOptionsManager()
             
             for import_options_caller_type in IMPORT_OPTIONS_CALLER_TYPES_EDITABLE_CANONICAL_ORDER:
                 
@@ -572,20 +583,100 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
                 
                 if import_options_caller_type == IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
                     
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_FILE_FILTERING, FileFilteringImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_LOCATIONS, LocationImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_NOTES, NoteImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PREFETCH, PrefetchImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PRESENTATION, PresentationImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAG_FILTERING, TagFilteringImportOptions() )
-                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAGS, TagImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_FILE_FILTERING, FileFilteringImportOptions.FileFilteringImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_LOCATIONS, LocationImportOptions.LocationImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_NOTES, NoteImportOptions.NoteImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PREFETCH, PrefetchImportOptions.PrefetchImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PRESENTATION, PresentationImportOptions.PresentationImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAG_FILTERING, TagFilteringImportOptions.TagFilteringImportOptions() )
+                    import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAGS, TagImportOptions.TagImportOptions() )
                     
                 
-                manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, import_options_container )
+                import_options_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, import_options_container )
                 
             
-            return manager
+            return import_options_manager
             
+        
+    
+    @staticmethod
+    def STATICPopulateManagerWithDefaultDefaults( import_options_manager: "ImportOptionsManager" ):
+        
+        prefetch_import_options = PrefetchImportOptions.PrefetchImportOptions()
+        
+        prefetch_import_options.SetPreImportHashCheckType( PrefetchImportOptions.DO_CHECK_AND_MATCHES_ARE_DISPOSITIVE )
+        prefetch_import_options.SetPreImportURLCheckType( PrefetchImportOptions.DO_CHECK )
+        prefetch_import_options.SetPreImportURLCheckLooksForNeighbourSpam( True )
+        
+        file_filtering_import_options = FileFilteringImportOptions.FileFilteringImportOptions()
+        
+        file_filtering_import_options.SetAllowsDecompressionBombs( True )
+        file_filtering_import_options.SetExcludesDeleted( True )
+        
+        location_import_options = LocationImportOptions.LocationImportOptions()
+        
+        location_import_options.SetAutomaticallyArchives( False )
+        location_import_options.SetShouldAssociatePrimaryURLs( True )
+        location_import_options.SetShouldAssociateSourceURLs( True )
+        location_import_options.SetDestinationLocationContext( ClientLocation.LocationContext.STATICCreateSimple( CC.LOCAL_FILE_SERVICE_KEY ) )
+        
+        import_options_container = ImportOptionsContainer()
+        
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_FILE_FILTERING, file_filtering_import_options )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_LOCATIONS, location_import_options )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_NOTES, NoteImportOptions.NoteImportOptions() )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PREFETCH, prefetch_import_options )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PRESENTATION, PresentationImportOptions.PresentationImportOptions() )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAG_FILTERING, TagFilteringImportOptions.TagFilteringImportOptions() )
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAGS, TagImportOptions.TagImportOptions() )
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_GLOBAL, import_options_container )
+        
+        #
+        
+        quiet_presentation_import_options = PresentationImportOptions.PresentationImportOptions()
+        
+        quiet_presentation_import_options.SetPresentationStatus( PresentationImportOptions.PRESENTATION_STATUS_NEW_ONLY )
+        
+        quiet_import_options_container = ImportOptionsContainer()
+        
+        quiet_import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_PRESENTATION, quiet_presentation_import_options )
+        
+        #
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION, quiet_import_options_container.Duplicate() )
+        
+        #
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_CLIENT_API, quiet_import_options_container.Duplicate() )
+        
+        #
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT_FOLDER, quiet_import_options_container.Duplicate() )
+        
+        #
+        
+        service_tag_import_options = TagImportOptions.ServiceTagImportOptions( get_tags = True )
+        
+        service_keys_to_service_tag_import_options = { CC.DEFAULT_LOCAL_DOWNLOADER_TAG_SERVICE_KEY : service_tag_import_options }
+        
+        tag_import_options = TagImportOptions.TagImportOptions( service_keys_to_service_tag_import_options = service_keys_to_service_tag_import_options )
+        
+        import_options_container = ImportOptionsContainer()
+        
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAGS, tag_import_options )
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, import_options_container )
+        
+        #
+        
+        tag_import_options = TagImportOptions.TagImportOptions()
+        
+        import_options_container = ImportOptionsContainer()
+        
+        import_options_container.SetImportOptions( IMPORT_OPTIONS_TYPE_TAGS, tag_import_options )
+        
+        import_options_manager.SetDefaultImportOptionsContainerForCallerType( IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS, import_options_container )
         
     
     @staticmethod
@@ -620,10 +711,17 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
         )
         
     
+    @staticmethod
+    def STATICPopulateManagerWithDefaultURLClassDefaults( import_options_manager: "ImportOptionsManager" ):
+        
+        # no url class defaults right now
+        pass
+        
+    
 
 HydrusSerialisable.SERIALISABLE_TYPES_TO_OBJECT_TYPES[ HydrusSerialisable.SERIALISABLE_TYPE_IMPORT_OPTIONS_MANAGER ] = ImportOptionsManager
 
-ImportOptionsMetatype = PrefetchImportOptions | FileFilteringImportOptions | TagFilteringImportOptions | LocationImportOptions | TagImportOptions | NoteImportOptions | PresentationImportOptions
+ImportOptionsMetatype = PrefetchImportOptions.PrefetchImportOptions | FileFilteringImportOptions.FileFilteringImportOptions | TagFilteringImportOptions.TagFilteringImportOptions | LocationImportOptions.LocationImportOptions | TagImportOptions.TagImportOptions | NoteImportOptions.NoteImportOptions | PresentationImportOptions.PresentationImportOptions
 
 class ImportOptionsContainer( HydrusSerialisable.SerialisableBase ):
     
@@ -744,25 +842,75 @@ class ImportOptionsContainer( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetSourceLabel( self, import_options_type: int ) -> str:
+    def GetDuplicateWithJustTheseOptionTypes( self, import_options_types: list[ int ] ):
         
-        if self._should_be_full:
+        with self._lock:
             
-            default_label = 'global'
+            new_import_options_container = ImportOptionsContainer()
             
-        else:
-            
-            default_label = 'not a default; specifically set; you should not see this'
+            for import_options_type in import_options_types:
+                
+                import_options = self._GetImportOptions( import_options_type )
+                
+                if import_options is not None:
+                    
+                    source_label = self._import_option_types_to_source_labels.get( import_options_type, None )
+                    
+                    new_import_options_container.SetImportOptions( import_options_type, self._GetImportOptions( import_options_type ), source_label = source_label )
+                    
+                
             
         
-        return self._import_option_types_to_source_labels.get( import_options_type, default_label )
+        return new_import_options_container
         
     
-    def GetImportOptions( self, import_options_type: int ) -> ImportOptionsMetatype:
+    def GetFileFilteringImportOptions( self ) -> FileFilteringImportOptions.FileFilteringImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_FILE_FILTERING )
+        
+    
+    def GetImportOptions( self, import_options_type: int ) -> ImportOptionsMetatype | None:
         
         with self._lock:
             
             return self._GetImportOptions( import_options_type )
+            
+        
+    
+    def GetLocationImportOptions( self ) -> LocationImportOptions.LocationImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_LOCATIONS )
+        
+    
+    def GetNoteImportOptions( self ) -> NoteImportOptions.NoteImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_NOTES )
+        
+    
+    def GetPrefetchImportOptions( self ) -> PrefetchImportOptions.PrefetchImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_PREFETCH )
+        
+    
+    def GetPresentationImportOptions( self ) -> PresentationImportOptions.PresentationImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_PRESENTATION )
+        
+    
+    def GetSourceLabel( self, import_options_type: int ) -> str:
+        
+        with self._lock:
+            
+            if self._should_be_full:
+                
+                default_label = 'global'
+                
+            else:
+                
+                default_label = 'not a default; specifically set; you should not see this'
+                
+            
+            return self._import_option_types_to_source_labels.get( import_options_type, default_label )
             
         
     
@@ -802,12 +950,45 @@ class ImportOptionsContainer( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def GetTagFilteringImportOptions( self ) -> TagFilteringImportOptions.TagFilteringImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_TAG_FILTERING )
+        
+    
+    def GetTagImportOptions( self ) -> TagImportOptions.TagImportOptions:
+        
+        return self.GetImportOptions( IMPORT_OPTIONS_TYPE_TAGS )
+        
+    
     def HasImportOptions( self, import_options_type: int ):
         
         with self._lock:
             
             return import_options_type in self._import_options_types_to_import_options
             
+        
+    
+    def ImportOptionsDiffer( self, other_import_options_container: "ImportOptionsContainer", import_options_type: int ):
+        
+        my_import_options = self.GetImportOptions( import_options_type )
+        other_import_options = other_import_options_container.GetImportOptions( import_options_type )
+        
+        if my_import_options is None or other_import_options is None:
+            
+            if my_import_options is not None or other_import_options is not None:
+                
+                return True
+                
+            
+        else:
+            
+            if my_import_options.DumpToString() != other_import_options.DumpToString():
+                
+                return True
+                
+            
+        
+        return False
         
     
     def IsEmpty( self ):

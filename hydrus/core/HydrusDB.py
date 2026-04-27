@@ -432,7 +432,11 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         self._RepairDB( version )
         
+        did_updates = False
+        
         while version < HC.SOFTWARE_VERSION:
+            
+            did_updates = True
             
             time.sleep( self.UPDATE_WAIT )
             
@@ -473,6 +477,8 @@ class HydrusDB( HydrusDBBase.DBBase ):
             
             ( version, ) = self._Execute( 'SELECT version FROM version;' ).fetchone()
             
+        
+        # I did have _UpdateDBFolderWithSupplementaryUpdates here, on a did_updates, but decided against it
         
         self._CloseDBConnection()
         
@@ -702,27 +708,9 @@ class HydrusDB( HydrusDBBase.DBBase ):
                 
                 self._is_first_start = True
                 
-                if self._db_dir != HC.CONTENT_DB_DIR:
-                    
-                    # we are creating a new db dir outside of the default structure, so let's copy the help stuff over
-                    
-                    for filename in os.listdir( HC.CONTENT_DB_DIR ):
-                        
-                        source_path = os.path.join( HC.CONTENT_DB_DIR, filename )
-                        
-                        if os.path.isfile( source_path ):
-                            
-                            if filename.endswith( '.txt' ) or ( HC.PLATFORM_WINDOWS and filename == 'sqlite3.exe' ):
-                                
-                                dest_path = os.path.join( self._db_dir, filename )
-                                
-                                HydrusPaths.MirrorFile( source_path, dest_path )
-                                
-                            
-                        
-                    
-                
                 self._CreateDB()
+                
+                self._UpdateDBFolderWithSupplementaryFiles()
                 
                 self._cursor_transaction_wrapper.CommitAndBegin()
                 
@@ -1010,6 +998,40 @@ class HydrusDB( HydrusDBBase.DBBase ):
     def _UpdateDB( self, version ):
         
         raise NotImplementedError()
+        
+    
+    def _UpdateDBFolderWithSupplementaryFiles( self ):
+        
+        from hydrus.core import HydrusStaticDir
+        
+        db_files_dir = os.path.join( HydrusStaticDir.INSTALL_STATIC_DIR, 'db_files' )
+        
+        if os.path.exists( db_files_dir ) and os.path.isdir( db_files_dir ):
+            
+            for filename in os.listdir( db_files_dir ):
+                
+                source_path = os.path.join( db_files_dir, filename )
+                
+                if filename.endswith( '.txt' ) and os.path.isfile( source_path ):
+                    
+                    dest_path = os.path.join( self._db_dir, filename )
+                    
+                    HydrusPaths.MirrorFile( source_path, dest_path )
+                    
+                
+            
+        
+        if HC.PLATFORM_WINDOWS:
+            
+            sqlite_exe_path = os.path.join( HydrusStaticDir.INSTALL_STATIC_DIR, 'build_files', 'windows', 'sqlite3.exe' )
+            
+            if os.path.exists( sqlite_exe_path ) and os.path.isfile( sqlite_exe_path ):
+                
+                dest_path = os.path.join( self._db_dir, 'sqlite3.exe' )
+                
+                HydrusPaths.MirrorFile( sqlite_exe_path, dest_path )
+                
+            
         
     
     def _Write( self, action, *args, **kwargs ):

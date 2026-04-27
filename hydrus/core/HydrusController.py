@@ -14,7 +14,6 @@ from hydrus.core import HydrusPaths
 from hydrus.core import HydrusPubSub
 from hydrus.core import HydrusTemp
 from hydrus.core import HydrusTime
-from hydrus.core.networking import HydrusNATPunch
 from hydrus.core.processes import HydrusProcess
 from hydrus.core.processes import HydrusSubprocess
 from hydrus.core.processes import HydrusThreading
@@ -47,8 +46,6 @@ class HydrusController( object ):
         self._slow_job_scheduler = None
         
         self._thread_slots = {}
-        
-        self._thread_slots[ 'misc' ] = ( 0, 10 )
         
         self._thread_slot_lock = threading.Lock()
         
@@ -155,11 +152,6 @@ class HydrusController( object ):
             
             return self._slow_job_scheduler
             
-        
-    
-    def _GetUPnPServices( self ):
-        
-        return []
         
     
     def _GetWakeDelayPeriodMS( self ):
@@ -640,14 +632,6 @@ class HydrusController( object ):
         
         self._daemon_jobs[ 'maintain_memory_slow' ] = job
         
-        upnp_services = self._GetUPnPServices()
-        
-        self.services_upnp_manager = HydrusNATPunch.ServicesUPnPManager( upnp_services )
-        
-        job = self.CallRepeating( 10.0, 43200.0, self.services_upnp_manager.RefreshUPnP )
-        
-        self._daemon_jobs[ 'services_upnp' ] = job
-        
     
     def IsFirstStart( self ):
         
@@ -716,7 +700,7 @@ class HydrusController( object ):
             
             ( current_threads, max_threads ) = self._thread_slots[ thread_type ]
             
-            self._thread_slots[ thread_type ] = ( current_threads - 1, max_threads )
+            self._thread_slots[ thread_type ] = ( max( 0, current_threads - 1 ), max_threads )
             
         
     

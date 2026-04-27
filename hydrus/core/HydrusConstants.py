@@ -56,7 +56,6 @@ HELP_DIR = os.path.join( CONTENT_BASE_DIR, 'help' )
 LICENSE_PATH = os.path.join( CONTENT_BASE_DIR, 'license.txt' )
 
 DEFAULT_DB_DIR = os.path.join( BASE_DIR, 'db' )
-CONTENT_DB_DIR = os.path.join( CONTENT_BASE_DIR, 'db' )
 
 #
 
@@ -126,8 +125,8 @@ options = {}
 # Misc
 
 NETWORK_VERSION = 20
-SOFTWARE_VERSION = 667
-CLIENT_API_VERSION = 89
+SOFTWARE_VERSION = 669
+CLIENT_API_VERSION = 90
 
 SERVER_THUMBNAIL_DIMENSIONS = ( 200, 200 )
 

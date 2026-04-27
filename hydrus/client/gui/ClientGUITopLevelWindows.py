@@ -19,7 +19,7 @@ FUZZY_PADDING = 10
 
 # saw a ( 24, -14 ) child position off a top-left corner, which means the frameGeometry topleft was ( 0, -38 )????
 # let's see what happens if we forgive such madness
-FORGIVE_FRAME_GUBBINS_FUZZY_PADDING = 40
+#FORGIVE_FRAME_GUBBINS_FUZZY_PADDING = 40 #now global user controlled. leaving this and above for posterity
 
 def GetSafePosition( position: QC.QPoint, frame_key ):
     
@@ -28,10 +28,19 @@ def GetSafePosition( position: QC.QPoint, frame_key ):
         return ( position, None )
         
     
+    if frame_key == 'media_window_size_self_to_media':
+        
+        do_fuzzy_relocate = CG.client_controller.new_options.GetBoolean( 'fuzzy_relocate_on_get_safe_position_test_only_for_self_sizing_media_viewer_canvas' )
+        
+    else:
+        
+        do_fuzzy_relocate = CG.client_controller.new_options.GetBoolean( 'fuzzy_relocate_on_get_safe_position_test' )
+        
+    
     # some window managers size the windows just off screen to cut off borders
     # so choose a test position that's a little more lenient
-    
-    fuzzy_point = QC.QPoint( FORGIVE_FRAME_GUBBINS_FUZZY_PADDING, FORGIVE_FRAME_GUBBINS_FUZZY_PADDING )
+    fuzzy_padding = CG.client_controller.new_options.GetInteger( 'forgive_frame_gubbins_fuzzy_padding' )
+    fuzzy_point = QC.QPoint( fuzzy_padding, fuzzy_padding )
     
     test_position = position + fuzzy_point
     
@@ -46,7 +55,12 @@ def GetSafePosition( position: QC.QPoint, frame_key ):
             
             first_display = QW.QApplication.screens()[0]
             
-            rescue_position = first_display.availableGeometry().topLeft() + fuzzy_point
+            rescue_position = first_display.availableGeometry().topLeft()
+            
+            if do_fuzzy_relocate:
+                
+                rescue_position += fuzzy_point
+                
             
             rescue_screen = QW.QApplication.screenAt( rescue_position )
             
@@ -399,6 +413,12 @@ def SetInitialTLWSizeAndPosition( tlw: QW.QWidget, frame_key ):
             
             desired_position = parent_window.frameGeometry().center() - tlw.rect().center()
             
+        
+    elif default_position == 'mouse':
+        
+        current_mouse_pos = QG.QCursor.pos()
+        
+        desired_position = current_mouse_pos - tlw.rect().center()
         
     
     ( safe_position, position_message ) = GetSafePosition( desired_position, frame_key )
