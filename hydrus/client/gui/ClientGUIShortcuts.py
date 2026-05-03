@@ -79,6 +79,18 @@ SHORTCUT_KEY_SPECIAL_MEDIA_VOLUME_UP = 33
 SHORTCUT_KEY_SPECIAL_MEDIA_VOLUME_MUTE_UNMUTE = 34
 SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER = 35
 SHORTCUT_KEY_SPECIAL_BACKTAB = 36
+SHORTCUT_KEY_SPECIAL_F13 = 37
+SHORTCUT_KEY_SPECIAL_F14 = 38
+SHORTCUT_KEY_SPECIAL_F15 = 39
+SHORTCUT_KEY_SPECIAL_F16 = 40
+SHORTCUT_KEY_SPECIAL_F17 = 41
+SHORTCUT_KEY_SPECIAL_F18 = 42
+SHORTCUT_KEY_SPECIAL_F19 = 43
+SHORTCUT_KEY_SPECIAL_F20 = 44
+SHORTCUT_KEY_SPECIAL_F21 = 45
+SHORTCUT_KEY_SPECIAL_F22 = 46
+SHORTCUT_KEY_SPECIAL_F23 = 47
+SHORTCUT_KEY_SPECIAL_F24 = 48
 
 if HC.PLATFORM_MACOS:
     
@@ -133,7 +145,19 @@ special_key_shortcut_enum_lookup = {
     QC.Qt.Key.Key_Control : SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER,
     QC.Qt.Key.Key_Shift : SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER,
     QC.Qt.Key.Key_Alt : SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER,
-    QC.Qt.Key.Key_Meta : SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER
+    QC.Qt.Key.Key_Meta : SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER,
+    QC.Qt.Key.Key_F13 : SHORTCUT_KEY_SPECIAL_F13,
+    QC.Qt.Key.Key_F14 : SHORTCUT_KEY_SPECIAL_F14,
+    QC.Qt.Key.Key_F15 : SHORTCUT_KEY_SPECIAL_F15,
+    QC.Qt.Key.Key_F16 : SHORTCUT_KEY_SPECIAL_F16,
+    QC.Qt.Key.Key_F17 : SHORTCUT_KEY_SPECIAL_F17,
+    QC.Qt.Key.Key_F18 : SHORTCUT_KEY_SPECIAL_F18,
+    QC.Qt.Key.Key_F19 : SHORTCUT_KEY_SPECIAL_F19,
+    QC.Qt.Key.Key_F20 : SHORTCUT_KEY_SPECIAL_F20,
+    QC.Qt.Key.Key_F21 : SHORTCUT_KEY_SPECIAL_F21,
+    QC.Qt.Key.Key_F22 : SHORTCUT_KEY_SPECIAL_F22,
+    QC.Qt.Key.Key_F23 : SHORTCUT_KEY_SPECIAL_F23,
+    QC.Qt.Key.Key_F24 : SHORTCUT_KEY_SPECIAL_F24
 }
 
 special_key_shortcut_str_lookup = {
@@ -173,7 +197,19 @@ special_key_shortcut_str_lookup = {
     SHORTCUT_KEY_SPECIAL_MEDIA_VOLUME_DOWN : 'volume down',
     SHORTCUT_KEY_SPECIAL_MEDIA_VOLUME_UP : 'volume up',
     SHORTCUT_KEY_SPECIAL_MEDIA_VOLUME_MUTE_UNMUTE : 'volume mute/unmute',
-    SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER : 'nothing'
+    SHORTCUT_KEY_SPECIAL_EMPTY_MODIFIER : 'nothing',
+    SHORTCUT_KEY_SPECIAL_F13 : 'f13',
+    SHORTCUT_KEY_SPECIAL_F14 : 'f14',
+    SHORTCUT_KEY_SPECIAL_F15 : 'f15',
+    SHORTCUT_KEY_SPECIAL_F16 : 'f16',
+    SHORTCUT_KEY_SPECIAL_F17 : 'f17',
+    SHORTCUT_KEY_SPECIAL_F18 : 'f18',
+    SHORTCUT_KEY_SPECIAL_F19 : 'f19',
+    SHORTCUT_KEY_SPECIAL_F20 : 'f20',
+    SHORTCUT_KEY_SPECIAL_F21 : 'f21',
+    SHORTCUT_KEY_SPECIAL_F22 : 'f22',
+    SHORTCUT_KEY_SPECIAL_F23 : 'f23',
+    SHORTCUT_KEY_SPECIAL_F24 : 'f24'
 }
 
 SHORTCUT_MOUSE_LEFT = 0
@@ -780,6 +816,8 @@ def ConvertMouseEventToShortcut( event: QG.QMouseEvent | QG.QWheelEvent ):
         
     elif event.type() == QC.QEvent.Type.Wheel:
         
+        event = typing.cast( QG.QWheelEvent, event )
+        
         angle_delta_point = event.angleDelta()
         
         if angle_delta_point is None:
@@ -882,7 +920,7 @@ def IShouldCatchShortcutEvent( event_handler_owner: QC.QObject, event_catcher: Q
             # don't pass wheels that happen to legit controls that want to eat it, like a list, when the catcher is a window
             if event.type() == QC.QEvent.Type.Wheel:
                 
-                widget_under_mouse = event_catcher.childAt( event_catcher.mapFromGlobal( QG.QCursor.pos() ) )
+                widget_under_mouse = ClientGUIFunctions.GetMouseWidget()
                 
                 if widget_under_mouse is not None:
                     
@@ -1948,10 +1986,10 @@ class ShortcutsManager( QC.QObject ):
     def GetCommand( self, shortcuts_names: collections.abc.Iterable[ str ], shortcut: Shortcut ):
         
         # process more specific shortcuts with higher priority
-        shortcuts_names = list( shortcuts_names )
-        shortcuts_names.reverse()
+        shortcuts_names_list = list( shortcuts_names )
+        shortcuts_names_list.reverse()
         
-        for name in shortcuts_names:
+        for name in shortcuts_names_list:
             
             if name in self._names_to_shortcut_sets:
                 
