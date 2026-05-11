@@ -1633,7 +1633,7 @@ class ReviewNetworkSessionsPanel( ClientGUIScrolledPanels.ReviewPanel ):
                 
                 session = self._session_manager.GetSessionForDomain( cookie.domain )
                 
-                ClientNetworkingSessions.AddCookieToSessionActualCookie( cookie )
+                ClientNetworkingSessions.AddCookieToSessionActualCookie( session, cookie )
                 
                 num_added += 1
                 
