@@ -17,7 +17,7 @@ from hydrus.client.gui import ClientGUITopLevelWindowsPanels
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.importing import ClientGUIFileSeedCache
 from hydrus.client.gui.importing import ClientGUIImport
-from hydrus.client.gui.importing import ClientGUIImportOptionsLegacy
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainerButton
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
 from hydrus.client.gui.metadata import ClientGUIMetadataMigration
@@ -28,6 +28,7 @@ from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIPathWidgets
 from hydrus.client.importing import ClientImportLocal
 from hydrus.client.importing.options import FilenameTaggingOptions
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.metadata import ClientMetadataMigrationExporters
 from hydrus.client.metadata import ClientMetadataMigrationImporters
 
@@ -200,7 +201,7 @@ class EditImportFolderPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._import_folder = import_folder
         
-        ( name, path, file_import_options, tag_import_options, tag_service_keys_to_filename_tagging_options, actions, action_locations, period, check_regularly, paused, check_now, show_working_popup, publish_files_to_popup_button, publish_files_to_page ) = self._import_folder.ToTuple()
+        ( name, path, import_options_container, tag_service_keys_to_filename_tagging_options, actions, action_locations, period, check_regularly, paused, check_now, show_working_popup, publish_files_to_popup_button, publish_files_to_page ) = self._import_folder.ToTuple()
         
         self._folder_box = ClientGUICommon.StaticBox( self, 'folder options' )
         
@@ -230,13 +231,7 @@ class EditImportFolderPanel( ClientGUIScrolledPanels.EditPanel ):
         
         #
         
-        show_downloader_options = False
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT_FOLDER, import_options_container )
         
         #
         
@@ -401,7 +396,7 @@ class EditImportFolderPanel( ClientGUIScrolledPanels.EditPanel ):
         vbox = QP.VBoxLayout()
         
         QP.AddToLayout( vbox, self._folder_box, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._file_box, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._filename_tagging_options_box, CC.FLAGS_EXPAND_BOTH_WAYS )
         
@@ -694,8 +689,7 @@ class EditImportFolderPanel( ClientGUIScrolledPanels.EditPanel ):
         
         name = self._name.text()
         path = self._path.GetPath()
-        file_import_options = self._import_options_button.GetFileImportOptions()
-        tag_import_options = self._import_options_button.GetTagImportOptions()
+        import_options_container = self._import_options_container_button.GetValue()
         
         actions = {}
         action_locations = {}
@@ -738,7 +732,7 @@ class EditImportFolderPanel( ClientGUIScrolledPanels.EditPanel ):
         
         tag_service_keys_to_filename_tagging_options = dict( self._filename_tagging_options.GetData() )
         
-        edited_import_folder.SetTuple( name, path, file_import_options, tag_import_options, tag_service_keys_to_filename_tagging_options, actions, action_locations, period, check_regularly, paused, check_now, show_working_popup, publish_files_to_popup_button, publish_files_to_page )
+        edited_import_folder.SetTuple( name, path, import_options_container, tag_service_keys_to_filename_tagging_options, actions, action_locations, period, check_regularly, paused, check_now, show_working_popup, publish_files_to_popup_button, publish_files_to_page )
         
         edited_import_folder.SetLastModifiedTimeSkipPeriod( self._last_modified_time_skip_period.GetValue() )
         

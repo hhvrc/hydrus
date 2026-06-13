@@ -209,7 +209,7 @@ class TagImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
         return self._tag_import_options
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         if self._is_default:
             
@@ -220,11 +220,11 @@ class TagImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
         
         #
         
-        statements.append( self._tag_filtering_import_options.GetSummary( show_downloader_options) )
+        statements.append( self._tag_filtering_import_options.GetSummary( import_options_caller_type ) )
         
         #
         
-        statements.append( self._tag_import_options.GetSummary( show_downloader_options ) )
+        statements.append( self._tag_import_options.GetSummary( import_options_caller_type ) )
         
         #
         

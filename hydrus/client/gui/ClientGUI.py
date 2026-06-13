@@ -80,7 +80,6 @@ from hydrus.client.gui.pages import ClientGUISession
 from hydrus.client.gui.panels import ClientGUIFilesPhysicalStoragePanels
 from hydrus.client.gui.panels import ClientGUILocalFileImports
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
-from hydrus.client.gui.panels import ClientGUIScrolledPanelsEdit
 from hydrus.client.gui.panels import ClientGUIScrolledPanelsReview
 from hydrus.client.gui.panels import ClientGUISerialisableImport
 from hydrus.client.gui.panels import ClientGUIURLClass
@@ -92,6 +91,8 @@ from hydrus.client.gui.services import ClientGUIModalClientsideServiceActions
 from hydrus.client.gui.services import ClientGUIModalServersideServiceActions
 from hydrus.client.gui.services import ClientGUIServersideServices
 from hydrus.client.gui.widgets import ClientGUICommon
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.media import ClientMediaResult
 from hydrus.client.media import ClientMediaResultAPI
 from hydrus.client.metadata import ClientContentUpdates
@@ -1490,21 +1491,11 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         
         job_status.SetStatusTitle( 'sub gap downloader test' )
         
-        from hydrus.client.importing.options import FileImportOptionsLegacy
+        from hydrus.client.importing.options import ImportOptionsContainer
         
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        file_import_options.SetIsDefault( True )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        from hydrus.client.importing.options import TagImportOptionsLegacy
-        
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        
-        from hydrus.client.importing.options import NoteImportOptionsLegacy
-        
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
-        
-        call = HydrusData.Call( CG.client_controller.pub, 'make_new_subscription_gap_downloader', ( b'', 'booru tag search' ), 'skirt', file_import_options, tag_import_options, note_import_options, 2 )
+        call = HydrusData.Call( CG.client_controller.pub, 'make_new_subscription_gap_downloader', ( b'', 'booru tag search' ), 'skirt', import_options_container, 2 )
         
         call.SetLabel( 'start a new downloader for this to fill in the gap!' )
         
@@ -1584,6 +1575,38 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
             
         
         self._controller.column_list_manager.ResetToDefaults()
+        
+    
+    def _DebugScanStorage( self ):
+        
+        try:
+            
+            path = ClientGUIDialogsQuick.PickDirectory( self, 'Select directory', CG.client_controller.GetDBDir() )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        from hydrus.client.db import ClientDBFilesPhysicalStorage
+        from hydrus.client.files import ClientFilesPhysical
+        
+        ( current_granularity, subfolders ) = self._controller.Read( 'client_files_subfolders' )
+        
+        location = ClientFilesPhysical.FilesStorageBaseLocation( path, 1, None )
+        
+        time_started = HydrusTime.GetNowFloat()
+        
+        try:
+            
+            result = ClientDBFilesPhysicalStorage.TryToGetPresumptiveSubfolderPathsBeneathLocation( location, current_granularity )
+            
+            HydrusData.ShowText( f'It found {HydrusNumbers.ToHumanInt(len( result ))} subfolders and took {HydrusTime.TimeDeltaToPrettyTimeDelta( HydrusTime.GetNowFloat() - time_started)}' )
+            
+        except HydrusExceptions.CancelledException as e:
+            
+            HydrusData.ShowText( f'It cancelled: {e}' )
+            
         
     
     def _DebugShowMemoryUseDifferences( self ):
@@ -1985,50 +2008,6 @@ QMenuBar::item { padding: 2px 8px; margin: 0px; }'''
             
         
     
-    def _FlipCurlCFFITestMode( self ):
-        
-        from hydrus.client.networking import ClientNetworkingCurlCFFI
-        from hydrus.client.networking import ClientNetworkingSessions
-        
-        if not ClientNetworkingCurlCFFI.CURL_CFFI_OK:
-            
-            ClientGUIDialogsMessage.ShowWarning( self, 'Sorry, you do not seem to have curl_cffi! Check the _help->about_ window!' )
-            
-            return
-            
-        
-        if not ClientNetworkingSessions.DOING_CURL_CFFI_TEST:
-            
-            try:
-                
-                choice = ClientGUIDialogsQuick.EnterText( self, 'Enter a browser name as curl_cffi supports.', default = ClientNetworkingSessions.CURL_CFFI_DEFINITION, suggestions = [ 'chrome', 'edge', 'firefox', 'safari' ] )
-                
-                ClientNetworkingSessions.CURL_CFFI_DEFINITION = choice
-                
-            except HydrusExceptions.CancelledException:
-                
-                return
-                
-            
-            try:
-                
-                choice_tuples = [ ( text, data, text ) for ( data, text ) in sorted( ClientNetworkingCurlCFFI.curl_cffi_http_versions_to_str_lookup.items() ) ]
-                
-                choice = ClientGUIDialogsQuick.SelectFromListButtons( self, 'Select http version', choice_tuples )
-                
-                ClientNetworkingSessions.CURL_CFFI_HTTP_VERSION = choice
-                
-            except HydrusExceptions.CancelledException:
-                
-                return
-                
-            
-        
-        ClientNetworkingSessions.DOING_CURL_CFFI_TEST = not ClientNetworkingSessions.DOING_CURL_CFFI_TEST
-        
-        CG.client_controller.network_engine.session_manager.ReinitialiseSessions()
-        
-    
     def _FlipMinimiseRestore( self ):
         
         if not self._currently_minimised_to_system_tray:
@@ -2363,13 +2342,41 @@ ATTACH "client.mappings.db" as external_mappings;'''
             raise HydrusExceptions.URLClassException( message )
             
         
+        destination_import_options_container = None
+        
+        if destination_location_context is not None:
+            
+            if url_type == HC.URL_TYPE_WATCHABLE and allow_watchers:
+                
+                import_options_caller_type = IOC.IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS
+                
+            else:
+                
+                import_options_caller_type = IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS
+                
+            
+            import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+            
+            full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, import_options_caller_type, urls = [ url ] )
+            
+            locations_import_options = full_import_options_container.GetLocationImportOptions()
+            
+            locations_import_options = locations_import_options.Duplicate()
+            
+            locations_import_options.SetDestinationLocationContext( destination_location_context )
+            
+            destination_import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+            
+            destination_import_options_container.SetImportOptions( locations_import_options )
+            
+        
         url_caught = False
         
         if ( url_type == HC.URL_TYPE_UNKNOWN and allow_unrecognised_urls ) or ( url_type in ( HC.URL_TYPE_FILE, HC.URL_TYPE_POST, HC.URL_TYPE_GALLERY ) and allow_other_recognised_urls ):
             
             url_caught = True
             
-            page = self._notebook.GetOrMakeURLImportPage( desired_page_name = destination_page_name, desired_page_key = destination_page_key, select_page = show_destination_page, destination_location_context = destination_location_context )
+            page = self._notebook.GetOrMakeURLImportPage( desired_page_name = destination_page_name, desired_page_key = destination_page_key, select_page = show_destination_page, destination_import_options_container = destination_import_options_container )
             
             if page is not None:
                 
@@ -2389,7 +2396,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
             
             url_caught = True
             
-            page = self._notebook.GetOrMakeMultipleWatcherPage( desired_page_name = destination_page_name, desired_page_key = destination_page_key, select_page = show_destination_page )
+            page = self._notebook.GetOrMakeMultipleWatcherPage( desired_page_name = destination_page_name, desired_page_key = destination_page_key, select_page = show_destination_page, destination_import_options_container = destination_import_options_container )
             
             if page is not None:
                 
@@ -3657,6 +3664,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'pubsub report mode', 'Report info about every pubsub processed.', HG.pubsub_report_mode, self._SwitchBoolean, 'pubsub_report_mode' )
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'similar files metadata generation report mode', 'Have the perceptual_hash generation routine report its progress.', HG.phash_generation_report_mode, self._SwitchBoolean, 'phash_generation_report_mode' )
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'shortcut report mode', 'Have the new shortcut system report what shortcuts it catches and whether it matches an action.', HG.shortcut_report_mode, self._SwitchBoolean, 'shortcut_report_mode' )
+        ClientGUIMenus.AppendMenuCheckItem( report_modes, 'shutdown report mode', 'Report as threads shut down so we can catch what is not checking in properly.', HG.shutdown_report_mode, self._SwitchBoolean, 'shutdown_report_mode' )
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'subprocess report mode', 'Report whenever an external process is called.', HG.subprocess_report_mode, self._SwitchBoolean, 'subprocess_report_mode' )
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'subscription report mode', 'Have the subscription system report what it is doing.', HG.subscription_report_mode, self._SwitchBoolean, 'subscription_report_mode' )
         
@@ -3708,6 +3716,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuItem( data_actions, 'flush log', 'Command the log to write any buffered contents to hard drive.', HydrusData.DebugPrint, 'Flushing log' )
         ClientGUIMenus.AppendMenuItem( data_actions, 'force database commit', 'Command the database to flush all pending changes to disk.', CG.client_controller.ForceDatabaseCommit )
         ClientGUIMenus.AppendMenuItem( data_actions, 'review threads', 'Show current threads and what they are doing.', self._ReviewThreads )
+        ClientGUIMenus.AppendMenuItem( data_actions, 'scan file storage folders', 'Test out that thing.', self._DebugScanStorage )
         ClientGUIMenus.AppendMenuItem( data_actions, 'show env', 'Print your current environment variables.', HydrusEnvironment.DumpEnv )
         ClientGUIMenus.AppendMenuItem( data_actions, 'show scheduled jobs', 'Print some information about the currently scheduled jobs log.', self._DebugShowScheduledJobs )
         ClientGUIMenus.AppendMenuItem( data_actions, 'subscription manager snapshot', 'Have the subscription system show what it is doing.', self._controller.subscriptions_manager.ShowSnapshot )
@@ -3737,11 +3746,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendMenuItem( network_actions, 'review current network jobs', 'Review the jobs currently running in the network engine.', self._ReviewNetworkJobs )
         ClientGUIMenus.AppendMenuItem( network_actions, 'fetch a url', 'Fetch a URL using the network engine as per normal.', self._DebugFetchAURL )
-        ClientGUIMenus.AppendSeparator( network_actions )
-        
-        from hydrus.client.networking import ClientNetworkingSessions
-        
-        ClientGUIMenus.AppendMenuCheckItem( network_actions, 'curl_cffi test mode', 'Turn on the curl_cffi test mode!', ClientNetworkingSessions.DOING_CURL_CFFI_TEST, self._FlipCurlCFFITestMode )
         
         ClientGUIMenus.AppendMenu( debug_menu, network_actions, 'network actions' )
         
@@ -3878,7 +3882,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendSeparator( submenu )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage default import options' + HC.UNICODE_ELLIPSIS, 'Change the default import options for each of your linked url matches.', self._ManageDefaultImportOptions )
         ClientGUIMenus.AppendMenuItem( submenu, 'manage downloader and url display' + HC.UNICODE_ELLIPSIS, 'Configure how downloader objects present across the client.', self._ManageDownloaderDisplay )
         
         ClientGUIMenus.AppendSeparator( submenu )
@@ -4296,55 +4299,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
                     
                 
                 self._controller.CallToThread( do_it )
-                
-            
-        
-    
-    def _ManageDefaultImportOptions( self ):
-        
-        title = 'edit default import options'
-        
-        with ClientGUITopLevelWindowsPanels.DialogEdit( self, title ) as dlg:
-            
-            domain_manager = self._controller.network_engine.domain_manager
-            
-            ( file_post_default_tag_import_options, watchable_default_tag_import_options, url_class_keys_to_tag_import_options ) = domain_manager.GetDefaultTagImportOptions()
-            
-            ( file_post_default_note_import_options, watchable_default_note_import_options, url_class_keys_to_note_import_options ) = domain_manager.GetDefaultNoteImportOptions()
-            
-            url_classes = domain_manager.GetURLClasses()
-            parsers = domain_manager.GetParsers()
-            
-            url_class_keys_to_parser_keys = domain_manager.GetURLClassKeysToParserKeys()
-            
-            panel = ClientGUIScrolledPanelsEdit.EditDefaultImportOptionsPanel(
-                dlg,
-                url_classes,
-                parsers,
-                url_class_keys_to_parser_keys,
-                file_post_default_tag_import_options,
-                watchable_default_tag_import_options,
-                url_class_keys_to_tag_import_options,
-                file_post_default_note_import_options,
-                watchable_default_note_import_options,
-                url_class_keys_to_note_import_options
-            )
-            
-            dlg.SetPanel( panel )
-            
-            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
-                
-                (
-                    file_post_default_tag_import_options,
-                    watchable_default_tag_import_options,
-                    url_class_keys_to_tag_import_options,
-                    file_post_default_note_import_options,
-                    watchable_default_note_import_options,
-                    url_class_keys_to_note_import_options
-                ) = panel.GetValue()
-                
-                domain_manager.SetDefaultTagImportOptions( file_post_default_tag_import_options, watchable_default_tag_import_options, url_class_keys_to_tag_import_options )
-                domain_manager.SetDefaultNoteImportOptions( file_post_default_note_import_options, watchable_default_note_import_options, url_class_keys_to_note_import_options )
                 
             
         
@@ -5015,7 +4969,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 text += '\n' * 2
                 text += 'If you continue, the client will now create and save empty file/search logs for those queries, essentially resetting them, but if you know you need to exit and fix your database in a different way, cancel out now.'
                 text += '\n' * 2
-                text += 'If you do not know why this happened, you may have had a hard drive fault. Please consult "install_dir/db/help my db is broke.txt", and you may want to contact hydrus dev.'
+                text += 'If you do not know why this happened, you may have had a hard drive fault. Please check the \'Recovery->Help my db is broke\' document in the help, and you may want to contact hydrus dev.'
                 
                 result = ClientGUIDialogsQuick.GetYesNo( self, text, title = 'Missing Query Logs!', yes_label = 'continue', no_label = 'back out' )
                 
@@ -7073,6 +7027,10 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
             HG.shortcut_report_mode = not HG.shortcut_report_mode
             
+        elif name == 'shutdown_report_mode':
+            
+            HG.shutdown_report_mode = not HG.shutdown_report_mode
+            
         elif name == 'subprocess_report_mode':
             
             HG.subprocess_report_mode = not HG.subprocess_report_mode
@@ -7495,7 +7453,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
         
     
-    def CreateNewSubscriptionGapDownloader( self, gug_key_and_name, query_text, file_import_options, tag_import_options, note_import_options, file_limit ):
+    def CreateNewSubscriptionGapDownloader( self, gug_key_and_name, query_text, import_options_container, file_limit ):
         
         page = self._notebook.GetOrMakeGalleryDownloaderPage( desired_page_name = 'subscription gap downloaders', select_page = True )
         
@@ -7506,7 +7464,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
         panel = page.GetSidebar()
         
-        panel.PendSubscriptionGapDownloader( gug_key_and_name, query_text, file_import_options, tag_import_options, note_import_options, file_limit )
+        panel.PendSubscriptionGapDownloader( gug_key_and_name, query_text, import_options_container, file_limit )
         
         self._notebook.ShowPage( page )
         
@@ -8029,9 +7987,9 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
         
     
-    def NewPageImportHDD( self, paths, file_import_options, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success ):
+    def NewPageImportHDD( self, paths, import_options_container, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success ):
         
-        page_manager = ClientGUIPageManager.CreatePageManagerImportHDD( paths, file_import_options, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
+        page_manager = ClientGUIPageManager.CreatePageManagerImportHDD( paths, import_options_container, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
         
         self._notebook.NewPage( page_manager, on_deepest_notebook = True )
         
@@ -8329,6 +8287,10 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
                 
                 self._UnclosePage()
                 
+            elif action == CAC.SIMPLE_RENAME_PAGE:
+                
+                self._notebook.RenameCurrentPage()
+                
             elif action == CAC.SIMPLE_RUN_ALL_EXPORT_FOLDERS:
                 
                 self._RunExportFolder()
@@ -8493,14 +8455,22 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
         urls = sorted( urls )
         
-        tag_import_options = CG.client_controller.network_engine.domain_manager.GetDefaultTagImportOptionsForURL( None, urls[0] )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        tag_import_options = tag_import_options.Duplicate()
+        full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
         
-        tag_import_options.SetShouldFetchTagsEvenIfHashKnownAndFileAlreadyInDB( True )
-        tag_import_options.SetShouldFetchTagsEvenIfURLKnownAndFileAlreadyInDB( True )
+        prefetch_import_options = full_import_options_container.GetPrefetchImportOptions()
         
-        page = self._notebook.GetOrMakeURLImportPage( desired_page_name = 'forced urls downloader', destination_tag_import_options = tag_import_options )
+        prefetch_import_options = prefetch_import_options.Duplicate()
+        
+        prefetch_import_options.SetShouldFetchMetadataEvenIfURLKnownAndFileAlreadyInDB( True )
+        prefetch_import_options.SetShouldFetchMetadataEvenIfHashKnownAndFileAlreadyInDB( True )
+        
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+        
+        import_options_container.SetImportOptions( prefetch_import_options )
+        
+        page = self._notebook.GetOrMakeURLImportPage( desired_page_name = 'forced urls downloader', destination_import_options_container = import_options_container )
         
         sidebar = page.GetSidebar()
         

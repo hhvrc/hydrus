@@ -40,7 +40,7 @@ granularity_speed_estimate += 'NAS/SMB: 50-250 files/s'
 granularity_speed_estimate += '\n'
 granularity_speed_estimate += 'Cloud storage: should not be attempted'
 granularity_speed_estimate += '\n'
-granularity_speed_estimate += 'BTRFS filesystems are about 10x as fast.'
+granularity_speed_estimate += 'BTRFS and EXT4 filesystems may be up to 10x this speed.'
 granularity_speed_estimate += '\n\n'
 granularity_speed_estimate += 'If this is going to be too slow for you, it is ok to back out!'
 
@@ -148,7 +148,7 @@ class ReviewGranularityPanel( ClientGUIScrolledPanels.ReviewPanel ):
             
         else:
             
-            ClientGUIDialogsMessage.ShowCritical( 'error!', 'This process was started with a granularity other than 2 or 3! Something went wrong, please tell hydev!' )
+            ClientGUIDialogsMessage.ShowCritical( 'error!', 'Granularity init error!', 'This process was started with a granularity other than 2 or 3! Something went wrong, please tell hydev!' )
             
             return
             

@@ -428,7 +428,8 @@ Also, it is often the case that content that is recorded as deleted is more diff
 
 _Gets the current API version. This increments every time I alter the API._
 
-Restricted access: NO.
+Restricted access:
+:   NO.
     
 Required Headers: n/a
     
@@ -452,7 +453,8 @@ Response:
 
 _Register a new external program with the client. This requires the 'add from api request' mini-dialog under_ services->review services _to be open, otherwise it will 403._
 
-Restricted access: NO.
+Restricted access:
+:   NO.
     
 Required Headers: n/a
     
@@ -502,7 +504,8 @@ The `permits_everything` overrules all the individual permissions and will encom
 
 _Get a new session key._
 
-Restricted access: YES. No permissions required.
+Restricted access:
+:   YES. No permissions required.
     
 Required Headers: n/a
     
@@ -526,7 +529,8 @@ Response:
 
 _Check your access key is valid._
 
-Restricted access: YES. No permissions required.
+Restricted access:
+:   YES. No permissions required.
     
 Required Headers: n/a
     
@@ -543,6 +547,31 @@ Response:
   "human_description" : "API Permissions (autotagger): add tags to files, import files, search for files: Can search: only autotag this"
 }
 ```
+
+### **GET `/client_info`** { id="client_info" }
+
+_Ask the client about its current boot and status._
+
+Restricted access: 
+:   YES. No permissions required.
+
+Required Headers: n/a
+
+Arguments: n/a
+
+Response: 
+:   Some JSON about the current state of the client.
+```json title="Example response"
+{
+    "boot_id": "df59ca0100536e89afbbc8d66ac382464a3119013f0b96c90848a48de545117f",
+    "boot_time": 1779118174.24,
+    "currently_idle": false
+}
+```
+
+The `boot_id` is a random string of hex generated on every program start, and `boot_time` is a timestamp float from when the main program controller started, which is typically a few seconds after the program process starts. Use one or both if you need to track client restarts.
+
+`currently_idle` is a bool for whether the Client API is currently 'idle' as per `options->maintenance and processing`. If you want to add some heavy CPU work and don't want to interrupt the user, check this.
 
 ### **GET `/get_service`** { id="get_service" }
 
@@ -688,7 +717,7 @@ Response:
     *   4 - File failed to import
     *   7 - File vetoed
     
-    A file 'veto' is caused by the file import options (which in this case is the 'quiet' set under the client's _options->importing_) stopping the file due to its resolution or minimum file size rules, etc...
+    A file 'veto' (aka 'ignored') is caused by the file import options (which in this case is the 'client api' set under the client's _options->import options_) stopping the file due to its resolution or minimum file size rules, etc...
     
     'hash' is the file's SHA256 hash in hexadecimal, and 'note' is any additional human-readable text appropriate to the file status that you may recognise from hydrus's normal import workflow. For an outright import error, it will be a summary of the exception that you can present to the user, and a new field `traceback` will have the full trace for debugging purposes.
      
@@ -950,7 +979,7 @@ Response:
 
 The `url_file_statuses` is a list of zero-to-n JSON Objects, each representing a file match the client found in its database for the URL. Typically, it will be of length 0 (for as-yet-unvisited URLs or Gallery/Watchable URLs that are not attached to files) or 1, but sometimes multiple files are given the same URL (sometimes by mistaken misattribution, sometimes by design, such as a mini-manga Post URL that hosts 4 files). Handling n files per URL is a pain but an unavoidable issue you should account for.
 
-`status` mas the same mapping as for `/add_files/add_file`, but the possible results are different:
+`status` has the same mapping as for `/add_files/add_file`, but the possible results are different:
 
   *   0 - File not in database, ready for import (you will only see this very rarely--usually in this case you will just get no matches)
   *   2 - File already in database
@@ -3310,7 +3339,7 @@ Arguments (in JSON):
 
 You can set 'value' to be null, which will clear any existing cookie with the corresponding name, domain, and path (acting essentially as a delete).
 
-Expires can be null, but session cookies will time-out in hydrus after 60 minutes of non-use.
+Expires can be null, to make a session cookie. Hydrus does not purge session cookies very aggressively, so they may hang around for a long time.
 
 ## Managing HTTP Headers
 

@@ -71,7 +71,7 @@ class TestPanel( QW.QWidget ):
         
         self._results = QW.QPlainTextEdit( self )
         
-        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._results, ( 80, 12 ) )
+        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._results, ( 60, 12 ) )
         
         self._results.setMinimumWidth( width )
         self._results.setMinimumHeight( height )

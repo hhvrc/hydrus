@@ -35,6 +35,207 @@
             <h1 id="changelog"><a href="#changelog">changelog</a></h1>
             <ul>
                 <li>
+                    <h2 id="version_674"><a href="#version_674">version 674</a></h2>
+                    <ul>
+                        <li><h3>misc</h3></li>
+                        <li>you can now customise how mouse wheel events propagate out of the hover taglist in the media viewer. this has had a variety of hacky/patchy behaviour before; now you can hit up `options-&gt;media viewer hovers` and tell it to: never propagate; propagate only if no vertical scrollbar; propagate only if vertical scrollbar hasn't been used recently (the new default behaviour); and propagate immediately after scrollbar hits an end (which is what Qt _wants_ to do). this new 'has been used recently' tech locks you in the outer or outer context and uses a little voodoo, but I quite like it (issue #2024)</li>
+                        <li>thanks to a user, the human-readable embedded text section in the media viewer little button up top will now decode and show an embedded `Character Card V2` spec. previously, it would just dump the json string under 'chara', but now it looks a good bit better</li>
+                        <li>the help docs built into the Windows and Linux builds and the one built by the 'build_help.py' script by users running from source are now built in a more strict offline mode that caches the javascript for search tech locally. a user noticed they were previously fetching something from unpkg.com. now they should work properly even on a completely offline machine (iissue #2023)</li>
+                        <li>a variety of file existence checks and merge functions now check for 'hey this seems to be a remote storage that is disconnected/timing out' error states. previously these guys were just doing 'file does not exist' catching. this means booting the client with your NAS defined in some way but not mounted has nicer error handling. you'll get the repair locations dialog with an updated message rather than 'oh god unhandled boot I/O error aieeeee'</li>
+                        <li>added 'shutdown report mode' to the `help-&gt;debug-&gt;report modes` menu. this will report the shutdown calls, shutdown exception catches, and actual mainloop shutdown of all the program's thread workers and other mainloop daemons, with the intention of helping figure out some situations where the client will exit seemingly fine but with a silent low-resource process lingering (we think it is a thread orphaned from the signalling system or otherwise stuck in some deadlock)</li>
+                        <li><h3>cookies.txt and expiration fixes</h3></li>
+                        <li>when importing cookies.txt, 'session' cookies (i.e. those with no expiry) are now imported correctly. previously, they were being parsed as 'discard immediately' and were not being preserved</li>
+                        <li>fixed issues with sessions not saving new cookies after import via cookies.txt or clipboard if the user closed the client before that session was actually used in a request</li>
+                        <li>I hadn't realised, but hydrus was not being very aggressive about clearing 'session' cookies. after thinking about it, this is now intentional policy. I will add some buttons/options around this in future</li>
+                        <li><h3>some repository account refresh cleanup</h3></li>
+                        <li>the way repositories sync their accounts is a little cleaned up. clicking 'refresh account' is nicer and more reliable now</li>
+                        <li>the awkward and confusing 'network'/'hydrus account' panels in 'review services' for a repo are now merged into one expand/collapse box called 'hydrus service'. service status/errors usually appear on the top box while most people need the bottom; now you always see both at once. hope this makes some 'oh, everything is paused' situations a bit clearer</li>
+                        <li>the 'message' status text line in the 'account' panel now hides if there is no server message to show. this guy was just a weird UI gap for pretty much everyone</li>
+                        <li>'refresh account' no longer disables itself when a repo is non-functional. this was another 'technically true, but not helpful' UI thing. if you click it, any blocker now gives a richer reason, with several generic 'account cannot sync right now' reasons replaced with the actual part of bandwidth tracking or whatever that is complaining</li>
+                        <li>if you try to hit 'refresh account', it now recognises if all network traffic is currently paused and breaks out early. previously, it would grey out and wait indefinitely until network traffic was unpaused</li>
+                        <li>a 'refresh account' call no longer sets a temporary 'unknown/unsynced' account to the service. if the fetch job fails, you keep the old account info</li>
+                        <li>errors from 'refresh account' are no longer put into toaster popups</li>
+                        <li>the 'tag filter' button for tag repositories is moved from 'network sync' to the new 'account' panel, beside the permissions button</li>
+                        <li><h3>curl_cffi</h3></li>
+                        <li>the recent test of `curl_cffi`, which adds http 2 and 3 support to hydrus, has proven successful. I am maturing the test and allowing a permanent on setting</li>
+                        <li>you now set the browser name under `options-&gt;connection`. http version selection is removed from the test--it seems it is doable and simpler to just let `curl_cffi` figure that out</li>
+                        <li>the setup_venv.py script now asks if you want `curl_cffi`</li>
+                        <li>`curl_cffi` is disabled for hydrus servers for now; we had some chunking issue when downloading from the PTR</li>
+                        <li><h3>domain manager background work</h3></li>
+                        <li>I moved forward my plans to launch a nicer unified 'here are the current statuses and settings for each network domain' UI and options system. this thing will eventually manage per-domain error timeouts, custom headers, perhaps some proxy settings, curl_cffi, and have some UI for recent errors. we'll migrate the stuff in `options-&gt;connection` to a 'global' entry and then allow more specific network context settings for particular domains; the usual deal</li>
+                        <li>I was thinking I'd launch a stub of this system to allow for a per-domain `curl_cffi` test, but I didn't want to rush it out, so I just kept to prep work and there's nothing launching here yet. I rounded out the objects I already had and verified the direction I'm going; I feel overall good about it</li>
+                        <li><h3>boring stuff</h3></li>
+                        <li>refactored some of the 'render human-readable data' method for KISS</li>
+                        <li>fixed some multi-line indenting in the human-readable rendering routine</li>
+                        <li>KISSed some inelegant 'clear expired cookies' calls and code</li>
+                        <li>added `help-&gt;debug-&gt;scan file storage folders`, which is just a test for a folder precache thing that I removed at the last minute last week when it performed terribly on an IRL spinning HDD. I rewrote it and will do some more testing</li>
+                        <li>cleaned up some error handling in 'server busy, try again later' parsing</li>
+                    </ul>
+                </li>
+                <li>
+                    <h2 id="version_673"><a href="#version_673">version 673</a></h2>
+                    <ul>
+                        <li><h3>misc</h3></li>
+                        <li>the file history chart now has a custom y axis range. also, the chart now remembers if you have set either axis custom and new searches will auto-refit or maintain current dimensions as appropriate. hide/showing the lines will only recalculate the non-user-customised Y axis; let's see how that goes</li>
+                        <li>added a sanity check to the new fast 'give me the average character width' calculation, which is used for some scaling-agnostic UI sizing. one user (on a monospaced font, no less) had extremely wide average character width; I guess the font has funny kerning or extended characters or something. if the average character width is more than twice the reported height (which appears to be more reliable), I now fall back to a slower but more accurate calculation</li>
+                        <li>you can now edit the Access Key of a Client API permissions entry (a user mentioned they were migrating to a new client and updating every existing script to use new random keys was a pain). since you don't want to do this casually, it works through a button that gives a little spiel and tests the new key for validity and such, and the final ok will bail out if you paste something already in the system</li>
+                        <li>updated some system predicate parsing to support `&lt;=` and `&gt;=` operators, along with some variants like 'less than or equal to'. the types now supporting this are: width, height, duration, number of frames, number of words (issue #2019)</li>
+                        <li><h3>new help docs for the recovery.txts</h3></li>
+                        <li>added a 'Recovery' headline section to the help and migrated the .txt recovery docs to basic markdown</li>
+                        <li>the basedir 'help my client will not boot' is migrated to here</li>
+                        <li>all the .txts in the db dir like 'help my db is broke.txt' are migrated to here</li>
+                        <li>as planned, the `static/db_files` dir is removed. you no longer get a bunch of .txts in any new db folder. feel free to delete any old ones you have, but it isn't a big deal</li>
+                        <li><h3>local file parsing optimisation</h3></li>
+                        <li>when you drop a folder on the program, the main scan of that folder is a good bit faster than before and will scale a bit better</li>
+                        <li>when you drop a folder on the program, symlink loops are now recognised and broken out of</li>
+                        <li>when parsing import files from a folder, the main parse object now uses several fewer drive hits</li>
+                        <li>checking for 'file is in use' requires one less drive hit</li>
+                        <li><h3>faster folder checking on startup</h3></li>
+                        <li>when hydrus boots, it checks for the presence of all file storage folders. on a normal client, this is 512 directory presence checks; on an advanced granularity 3 system, this is 8192. this time adds up on boot, particularly on a cold HDD. I have improved the regular test here to do just one hard drive hit per folder instead of two. also, especially for the bootup phase, these locations are now scanned for _en masse_ with a carefully efficient/failsafe top-level scan on the main storage locations, massively reducing the number of hard drive hits required here</li>
+                        <li><h3>optimised caching tech</h3></li>
+                        <li>a user identified that a hacky id-to-value lookup cache used in tag and hash database modules was not working great. under certain types of strain, it would churn, leading to memory bloat and fragmentation</li>
+                        <li>I have tried several solutions and figured out a fairly decent replacement (LRU cache, nothing crazy) that will not churn so much and has less overhead. there's some additional long-term work that needs to be done to solve the bloat problem fully (full weakref tracking of tags/hashes), but I'm overall happy. tag and hash fetching when you load media or do various other heavy database jobs is now a little more optimised in several ways, and in most cases causes less memory duplication and fragmentation</li>
+                        <li>while I was poking around here, I also overhauled the general LRU cache used by a bunch of UI-level guys. thumbnail refetch and image zooming back and forth may be a shave faster</li>
+                        <li><h3>source environment cleanup</h3></li>
+                        <li>as planned a few months ago, v673 cleans up the 'running from source' setup significantly. you shouldn't have to do anything unless you run from source and use a custom script to automatically recreate your venv. I delete some old redundant scripts today, so if you happened to set an executable permission on something a long time ago, git may moan at you about being unable to pull because of your pending changes. deleting the files and then pulling again should work</li>
+                        <li>the pyproject.toml file no longer has any groups. there's one setup, nice and simple. the venue to test alternate library versions is now `setup_venv.py` exclusively</li>
+                        <li>the old basedir requirements.txt is now removed</li>
+                        <li>the manual 'running from source' help is updated. you now do just `pip install .` for a manual, pyproject.toml based pip install, with no groups needed</li>
+                        <li>the .bat/.command/.sh versions of `setup_help` and `setup_venv` and `git_pull` are removed--use the multiplat .py files from now on</li>
+                        <li>the `open_venv.bat/.ps1` scripts and `auto_update_installer.bat`, which were just fun experiments, are deleted. if you need some rinky-dink scripts to pull off a very custom thing like this, I recommend talking to an AI to get exactly what you need for your setup</li>
+                        <li>to improve hydrus package security, all dependency versions in the pyproject.toml and setup_venv.py and the build requirement.txts are now pinned/capped to recent latest versions. anything that was `&gt;=` is now `&lt;=` for the version as of the 672 build. all library version updates will now be considered manually by human eyes in future builds</li>
+                        <li>relatedly, the windows ffmpeg version is no longer latest but pinned at `8.1.1`</li>
+                        <li>deduped the basedir license files and renamed to `LICENSE`</li>
+                        <li>wrote a very basic `CONTRIBUTING.md` to mention that public pulls are closed right now</li>
+                        <li>for KISS, I'll switch the builds from their requirements.txts over to the pyproject.toml in the next future build test</li>
+                        <li><h3>boring cleanup</h3></li>
+                        <li>moved some file parsing code out of `ClientGUILocalFileimports` to `ClientImportFileParse`</li>
+                        <li>jiggled some 'make this panel x characters wide' numbers after last week's character-width update. this generally meant clearing out old +2 padding hacks and shaving some 64 to 60, that sort of thing, and I fixed a couple of things that were a little out of whack or sizing the wrong widget</li>
+                    </ul>
+                </li>
+                <li>
+                    <h2 id="version_672"><a href="#version_672">version 672</a></h2>
+                    <ul>
+                        <li><h3>misc</h3></li>
+                        <li>fixed a stupid error where the new-ish `media playback-&gt;ffmpeg call timeout` setting was not hooked up correctly on options dialog ok and was not saving! sorry for the trouble, I don't know how this slipped through testing</li>
+                        <li>fixed an issue where edit-pasting a prefixed 'sha256:abcd...'-style hash into an existing 'system:hashes' would wipe out the existing hashes (issue #2015)</li>
+                        <li>fixed the 'is this video rotated 90 degrees?' test in my ffmpeg output parsing for ffmpeg 8.1.x (which the windows builds moved to recently) (issue #1377)</li>
+                        <li>improved the speed and precision of the core call in the 'hey roughly how wide is 16 characters for this widget?' size calculations used by stuff across the program. system:hash panel should fit better in different fonts and sizes now. this may make some tight multi-column lists (like the one in duplicate page, auto-resolution tab) go a bit wide, requiring you to shrink them a little manually to hide new horizontal scrollbars--forgive me</li>
+                        <li>if a PNG file has chromaticity data but not gamma data, I now sub in a gamma of 0.45455 (which works well as a best-case fallback), and continue with the new ICC Profile-based chromaticity correction. thanks to the user who noticed this in the duplicate filter and had example files to test that rendered with a slightly different glow but were inexplicably marked, in an older version of the client, as pixel dupes</li>
+                        <li><h3>duplicates auto-resolution</h3></li>
+                        <li>the cog icon of the potential duplicate par search panel (which you see on dupe pages and a couple other places in auto-resolution UI) has a new 'start new potential duplicate pair search panels paused' entry. if you use a bunch of these and wrestling with the pause status is annoying, try it out</li>
+                        <li>you can now use 'system:number of pixels' in the single-file 'test A or B using search terms' comparator</li>
+                        <li>you can now use 'system:ratio' in the single-file 'test A or B using search terms' comparator</li>
+                        <li>you can now use 'system:ratio' in the 'test A against B using file info' comparator, but the UI for it shows some default operator labels; `&lt;` instead of `taller than`. the comparator summary label should work though</li>
+                        <li>the system pred dropdown in that edit panel (this is the Metadata Conditional edit panel) collapses system:width, height, num_pixels, and ratio down to 'system:dimensions', like in a normal search page</li>
+                        <li>added unit tests for the new comparators</li>
+                        <li><h3>some import options follow-up</h3></li>
+                        <li>added three simple examples to the top of the new import options help for 'setting up import previously deleted'; 'sending some tags elsewhere'; and 'forcing a tag redownload' as a stepping stone between 'ignore this whole system m8' and 'how to harmonically conjunct the polyhierarchic metalateral defaults'</li>
+                        <li>also added an example of how to customise and clone URL Class defaults</li>
+                        <li>added a 'help for this panel' button that links to the html help to the regular edit import options panel</li>
+                        <li>the regular edit import options panel's favourite button has a new 'save current value as new favourite' entry in its menu, under edit/add</li>
+                        <li>in the new import options system, the 'locations' import options now shows for post urls, watcher urls, and the subs defaults in simple mode</li>
+                        <li><h3>client api</h3></li>
+                        <li>added `/client_info`, accessible to all valid access keys, which provides a random hex `boot_id`, a float `boot_time`, and `currently_idle` bool, for tracking client restarts and throttling decisions</li>
+                        <li>Client API version is now 92</li>
+                        <li><h3>boring cleanup</h3></li>
+                        <li>the 'fetch service id' button in review services has nicer error handling and now disables the button while it works</li>
+                        <li>cleaned up how the 'set forced mimetype to these files' operation works behind the scenes</li>
+                        <li>reworked how the sidebar taglist broadcasts tag changes to the current search; moving from an old pubsub to a newer Qt signal</li>
+                        <li>fixed an issue with dissolving an OR predicate from the active predicates menu where the signal was being double-sent</li>
+                        <li>reworked the `NumberTest` rendering tech to better handle custom number and operator rendering</li>
+                        <li>the Number Tests across the program, which power a bunch of the newer system predicates where you can say 'width is approx 400 +/- 15%' are no longer coerced to integers behind the scenes. this doesn't affect much, but in the duplicates auto-resolution system, where you can do `A has height &gt; 1.8x B`, that multiplier can now result in a float. in the trivial case of B height `1`, `1 * 1.8` is now less than `2`, rather than being rounded up</li>
+                    </ul>
+                </li>
+                <li>
+                    <h2 id="version_671"><a href="#version_671">version 671</a></h2>
+                    <ul>
+                        <li><h3>import options overhaul</h3></li>
+                        <li>the frontend and object storage is moved to the new import options system! there's a bunch going on here, but in brief--</li>
+                        <li>the old file/tag/note import options are split into seven smaller types: prefetch, file filtering, tag filtering, locations, tags, notes, presentation</li>
+                        <li>your old options have been converted to the new system and it should all work as before, with only minor logical changes. you do not have to do anything</li>
+                        <li>all the defaults are now edited in `file-&gt;options-&gt;import options`. the system is richer and supports favourites/templates for quick-load</li>
+                        <li>all the 'import options' buttons across the program use some slightly newer UI and offer quick 'load from favourites'</li>
+                        <li>the 'edit subscriptions' dialog now has a column to show a summary for any custom import options you have set</li>
+                        <li>the 'edit subscription' dialog now has a column to show a summary for any queries that have 'additional tags' set up</li>
+                        <li>full help, now with screenshots, is here: https://hydrusnetwork.github.io/hydrus/getting_started_import_options.html</li>
+                        <li><h3>misc</h3></li>
+                        <li>the pretty media info lines that appear on a single media right-click flyout menu and some other places now includes a `approx bitrate: 1.4MB/s` line. it is pretty similar to the 'sort by approx bitrate' sort but only appears for stuff with an actual duration (the sort also puts big static images before small ones). it is just a naive `size / duration` and it'll do `1.4MB/s` with existing display tech rather than `7,200KBps` as you otherwise usually see, so I may revisit when I eventually get around to 1000/1024 byte-count presentation options and such</li>
+                        <li>renamed the shortcut labels 'close page' and 'restore the most recently closed page', to 'pages: close current' and 'pages: unclose the most recently closed'</li>
+                        <li>added a 'pages: rename current' shortcut to 'the main window' set</li>
+                        <li>fixed the setting of referral urls to child import objects in two cases: A) when a file import produced multiple child urls with the note `Found x new URLs in one post` and B) when a gallery url in the search phase produced an unexpected non-gallery url because of 3XX or api url class redirection with note `was redirected to a non-gallery url, which has been queued as a file import`.. the referral url was not being set correctly because of a regression in v664. thank you to the enterprising user who ran this through Codex to find the solution</li>
+                        <li>fixed a foolish typo that broke importing a cookies.txt (issue #2011)</li>
+                        <li>when loading a cookies.txt, if the file includes some complicated utf-8 encoding that the current default locale cannot decode, I now catch the decoding failure and try to recover with a newly encoded temp file (also issue #2011)</li>
+                        <li>fixed a bit of page counting logic that would turn up in some 'hey do you want to close the x pages?' labels and some 'do to current page' logic, where a page of pages was not counting child page of pages</li>
+                        <li>updated the base `requirements.txt` to match the future build stuff we folded in recently. missed this guy by accident; he'll be deleted in v673 in lieu of the cleaner `pyproject.toml` that's coming up</li>
+                        <li>did a quick hotfix patch to master for the curl_cffi test, which was frozen by accident at chrome/http2</li>
+                        <li>added a note to the installation help, Linux specifically: if you get a crash on any keypress after booting the client, you probably need to run from source (issue #2010)</li>
+                        <li>added some careful typedefs and imports to fix a deferred import that was causing certain recent database updates to fail out when trying to load the core options object</li>
+                        <li><b>normal users do not pass this line</b></li>
+                        <li><h3>import options detailed changes</h3></li>
+                        <li>an import options manager with default settings is now created with a new db</li>
+                        <li>on update from v671, your existing quiet/loud file import options, post/watcher tag/note import options, and all the url class tag/note import options are converted into a new import options manager. the old settings are deleted from your options and domain manager objects once it is all done and clear</li>
+                        <li>a new button-with-a-dropdown-menu-arrow to handles the import options container of a specific import context. its arrow menu offers a detailed review of what it currently holds and supports quick 'favourites/template' loading</li>
+                        <li>the 'fetch page metadata even if hash/url recognised and file appears "already in db" stuff is moved from tag import options to the new 'prefetch import options'. this is the only movement of options; everything else has been separated into the sub-panels you've seen in recent weeks</li>
+                        <li>updated the new system's freeze routine to consult both the given url of the import object _and_ any referral url, _and_ if either is an API redirect, to look up every url class in the api redirect chain and select the first for which there is a custom import options entry. previously, referral url lookup was spotty, and it would only ever look at the final place in the api redirect chain. very sophisticated setups can now have separate per-url-class import options that nonetheless connect to the same final api url class</li>
+                        <li>import folders and subscription queries now add 'additional tags' even if the file ends up 'previously deleted' (all imports generally apply new content updates to a 'previously deleted' result, so this brings these supplementary tags into normal behaviour.) I may add an option around which import statuses quality for a post-import content update commit, now everything is on the same page</li>
+                        <li>if you hop skip and jump, you can now set 'additional tags' to a local file import that is entirely adjunct to the normal filename tagging system. there's probably some weird edge undesired behaviour now, because of odd new capabilities like this, so I'm interested in error reports or 'hey you should probably hide this by default here' reports</li>
+                        <li>made some svgs and screenshots for the new import options help, removed the old help, integrated it all into the 'gettting started - downloading' help, and added it to the main index</li>
+                        <li><h3>import options detailed fixes</h3></li>
+                        <li>fixed some import situations (usually when the import object had no other tags to add) where 'additional tags' in a tag import options might not be added</li>
+                        <li>if a file import results in 'ignored' but somehow gets an sha256 hash (local imports hit by file filtering rules would get this), no post-job content updates like urls or tags will be added to the file</li>
+                        <li>in edit subscriptions, the 'set file/tag/note import options' stuff is merged into one and there are copy/paste/favourite buttons like in `options-&gt;import options` with the same clever paste-merge tech. there is also a new column to see which subs have custom import options set. just a bit easier to mass-manage custom options here now</li>
+                        <li>fixed a bug with adding a _watchable_ URL with a custom import destination (via Client API); previously, it would just to the first watchable page. now it checks and creates a new one with the desired custom location import options as needed</li>
+                        <li>tag import options now present a single-line summary (they'd spill over to multiple lines when things got complicated), with some tighter syntax</li>
+                        <li><h3>client api</h3></li>
+                        <li>the `get_client_options` call no longer presents a `default_file_import_options` summary row</li>
+                        <li>Client API version is now 91</li>
+                        <li><b>non-hydev do not pass this line</b></li>
+                        <li><h3>some last-minute fixes and tweaks</h3></li>
+                        <li>added some repair code for if your 'global' options container set is missing or missing a sub-option type. the holes are filled in and the fixed structure is saved back</li>
+                        <li>wrote some more safety code to ensure a non-full global options container cannot be set to the core options structure with the issue reported nicely to the user</li>
+                        <li>I didn't like how the favourite buttons were still loading up the complicated custom-merge dialog on 'load', so I made a quick-multi-load 'load' and slow-single-load 'custom load' menus. if you just want to set x to a big selection somewhere, no problem</li>
+                        <li>same deal with the new general 'import options button'--I added a submenu to pull from the favourites, and you can 'load' in one click or 'custom load' if you need something like 'hey I just need the prefetch options from this template'</li>
+                        <li>in the main edit panel, updated the options summary strings, which were in the form `file filtering: default/stuff` to `default file filtering` and `&gt; file filtering: stuff`. this makes the non-default stuff stand out better, but maybe we can do more here. maybe this guy could evolve into a checklist or a multi-column list</li>
+                        <li>the new vertically stacked listbook now disables horizontal scrollbar too (the scrollbar was drawing over the bottom item, let's go)</li>
+                        <li>fixed an issue with my migration routine where a new container would not contain prefetch import options with the 'force refetch' stuff from tag import options when the original file import options was missing/default</li>
+                        <li>updated the migration routine to abstain from adding prefetch stuff if it was uninteresting</li>
+                        <li>updated all my importer migration code to safely attempt to determine the already-migrated defaults for this importer before migration so the 'if we don't disagree with our parent's defaults, we can set that sub-options to default' logic can kick in. this eases the transition and ensures we don't end up with a bunch of importers with default 'tag filter: allows everything' stubs because the user only changed the parsing rules</li>
+                        <li>fixed a little thing in the import options manager initialisation where the defaults set the 'quiet' presentation rules to the Client API setting--the Client API import does not publish files anywhere, so no need for that</li>
+                        <li>fixed an issue where the 'panel types to load for this import caller type' CONST reference was being unintentionally updated and thus poisoning later dialog opens</li>
+                        <li>ditched the 'set and check full' system as too brittle with bad error handling</li>
+                        <li><h3>boring import options data migration log</h3></li>
+                        <li>all importers' storage and final pipeline: hdd imports, import folders, simple downloaders, url downloader pages; a couple of misc 'download these urls' routines used by stuff like IPFS, hydrus file repository download, gallery imports, the multiple gallery import container, watcher imports, the multiple watcher import container, client api imports, and subscriptions</li>
+                        <li>subscription query 'additional tags'</li>
+                        <li>migrated some network report mode stuff over to the new system as a frozen import options container is assembled with potential URL data</li>
+                        <li>ancient legacy subscription update routine</li>
+                        <li>subscription serialisation unit test</li>
+                        <li><h3>boring cleanup and refactoring</h3></li>
+                        <li>the import options manager now tracks if it is dirty and needs saving, and the main client controller consults that in the normal maintenance and shutdown cycle</li>
+                        <li>removed the default file import options from `options-&gt;importing` and tag/note stuff from `network-&gt;downloaders-&gt;default import options`</li>
+                        <li>deleted the old system's legacy edit panels and widgets</li>
+                        <li>removed some hackery that made gallery/watcher list selection-inspection a little faster but was too beardy</li>
+                        <li>the old `show_downloader_options` display option is replaced by direct `import_options_caller_type` inspection in all situations</li>
+                        <li>wrote an `ImportOptionsMetatype` for our seven new sub-options to help some typing inference. all these guys now know their own `import_options_type` too, and some `Set` stuff is a bit simpler</li>
+                        <li>moved the subscription query 'additional tags' button to a simpler single-panel-dialog solution</li>
+                        <li>updated the UI for all importers to use the new import options container button</li>
+                        <li>figured out some default/display fixes for the newer container edit UI panels to show the correct 'this defers to default type x' whether editing a default, global, favourite, or a specific importer</li>
+                        <li>cleaned up some prefetch options juggling</li>
+                        <li>improved some edge cases in the process by which paged importers figure out their best-guess current location context</li>
+                        <li>moved some legacy presentation import options consultation in the gallery/watcher sidebar list menu is over to the new system</li>
+                        <li>when a new url import page call wants to queue up urls with a custom import destination or, now, prefetch import options, this is merged into an import options container. as an edge-case logical change here, such jobs will no longer be added to pre-existing pages that have the same import destination and prefetch settings but other options differences. this is really in the weeds, but I may change this behaviour and just merge them into existing pages but with different import options; we'll see</li>
+                        <li>a check that regularly goes 'hey are we still good to import stuff?' in all importers that reviews the validity of the destination import location (generally checking if we want to import to a local file domain that has since been deleted) has been cleaned up, refactored into one central location, and now consults the next-pending object for specific options. if someone sets all x url classes to import to 'cool places' and then deletes that, the queue now pauses ahead of time rather than spitting out a hundred errors. the actual exception raised here has an improved typedef, too, that the veto system catches easier</li>
+                        <li>moved the new system's constants to their own `ImportOptionsConstants.py`, `as IOC`, so stuff can see them better</li>
+                        <li>moved the new system's manager to its own `ImportOptionsManager.py`</li>
+                        <li>moved some 'filter these pending tags this way' from the now-defunct `ClientImportOptions` to `TagImportOptions`</li>
+                        <li>the various edit/custom-paste UI now obeys the 'simple mode :^)' set in `options-&gt;import options`</li>
+                        <li>renamed the old `ClientImportOptions` to `CheckerImportOptions`, since that is all it does now</li>
+                        <li>cleaned up some old rubbish `subscription.ToTuple` mess</li>
+                        <li>cleaned up some misc bad code in hdd importers</li>
+                        <li>deleted all the legacy UI code for the old system</li>
+                    </ul>
+                </li>
+                <li>
                     <h2 id="version_670"><a href="#version_670">version 670</a></h2>
                     <ul>
                         <li><h3>misc</h3></li>

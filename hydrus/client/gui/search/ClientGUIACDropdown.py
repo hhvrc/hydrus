@@ -2171,6 +2171,23 @@ class AutoCompleteDropdownTagsFileSearchContext( AutoCompleteDropdownTags ):
         
     
 
+class PredicatesBroadcast( object ):
+    
+    def __init__(
+        self,
+        predicates: list[ ClientSearchPredicate.Predicate ],
+        permit_add: bool = True,
+        permit_remove: bool = True,
+        start_or_predicate = False
+    ):
+        
+        self.predicates = predicates
+        self.permit_add = permit_add
+        self.permit_remove = permit_remove
+        self.start_or_predicate = start_or_predicate
+        
+    
+
 class AutocompleteDropdownTagsFileSearchContextORCapable( AutoCompleteDropdownTagsFileSearchContext ):
     
     def __init__(
@@ -2255,7 +2272,7 @@ class AutocompleteDropdownTagsFileSearchContextORCapable( AutoCompleteDropdownTa
             
             self._under_construction_or_predicate = None
             
-            self._predicates_listbox.EnterPredicates( self._page_key, predicates )
+            self._predicates_listbox.EnterPredicates( predicates )
             
         
         self._UpdateORButtons()
@@ -2400,6 +2417,11 @@ class AutocompleteDropdownTagsFileSearchContextORCapable( AutoCompleteDropdownTa
                 
                 self._or_cancel.show()
             
+        
+    
+    def EnterPredicatesFromSignal( self, predicates_broadcast: PredicatesBroadcast ):
+        
+        self._predicates_listbox.EnterPredicatesFromSignal( predicates_broadcast )
         
     
 
@@ -2978,15 +3000,12 @@ class AutoCompleteDropdownTagsRead( AutocompleteDropdownTagsFileSearchContextORC
         self._LoadFavouriteSearch( folder_name, name )
         
     
-    def EnterPredicates( self, page_key, predicates: set[ ClientSearchPredicate.Predicate ] ):
+    def EnterPredicates( self, predicates: set[ ClientSearchPredicate.Predicate ] ):
         
-        if page_key == self._page_key:
-            
-            self._predicates_listbox.EnterPredicates( page_key, predicates )
-            
+        self._predicates_listbox.EnterPredicates( predicates )
         
     
-    def GetPredicates( self ) -> set[ ClientSearchPredicate.Predicate ]:
+    def GetPredicates( self ) -> list[ ClientSearchPredicate.Predicate ]:
         
         return self._file_search_context.GetPredicates()
         
@@ -3101,7 +3120,7 @@ class ListBoxTagsActiveSearchPredicates( ClientGUIListBoxes.ListBoxTagsPredicate
             self._DataHasChanged()
             
         
-        CG.client_controller.sub( self, 'EnterPredicates', 'enter_predicates' )
+        #CG.client_controller.sub( self, 'EnterPredicates', 'enter_predicates' )
         
     
     def _Activate( self, ctrl_down, shift_down ) -> bool:
@@ -3367,12 +3386,19 @@ class ListBoxTagsActiveSearchPredicates( ClientGUIListBoxes.ListBoxTagsPredicate
             
         
     
-    def EnterPredicates( self, page_key, predicates, permit_add = True, permit_remove = True, start_or_predicate = False ):
+    def EnterPredicatesFromSignal( self, predicates_broadcast: PredicatesBroadcast ):
         
-        if page_key == self._page_key:
-            
-            self._EnterPredicates( predicates, permit_add = permit_add, permit_remove = permit_remove, start_or_predicate = start_or_predicate )
-            
+        self._EnterPredicates(
+            predicates_broadcast.predicates,
+            permit_add = predicates_broadcast.permit_add,
+            permit_remove = predicates_broadcast.permit_remove,
+            start_or_predicate = predicates_broadcast.start_or_predicate
+        )
+        
+    
+    def EnterPredicates( self, predicates, permit_add = True, permit_remove = True, start_or_predicate = False ):
+        
+        self._EnterPredicates( predicates, permit_add = permit_add, permit_remove = permit_remove, start_or_predicate = start_or_predicate )
         
     
     def SetFileSearchContext( self, file_search_context: ClientSearchFileSearchContext.FileSearchContext ):
@@ -3681,7 +3707,7 @@ class EditAdvancedORPredicates( ClientGUIScrolledPanels.EditPanel ):
         self._result_preview = QW.QPlainTextEdit()
         self._result_preview.setReadOnly( True )
         
-        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._result_preview, ( 64, 6 ) )
+        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._result_preview, ( 60, 6 ) )
         
         self._result_preview.setMinimumWidth( width )
         self._result_preview.setMinimumHeight( height )

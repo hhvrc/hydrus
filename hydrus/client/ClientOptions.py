@@ -15,8 +15,10 @@ from hydrus.client import ClientGlobals as CG
 from hydrus.client.duplicates import ClientDuplicates
 from hydrus.client.importing.options import FileFilteringImportOptions
 from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import LocationImportOptions
 from hydrus.client.importing.options import PrefetchImportOptions
+from hydrus.client.metadata import ClientMetadataMigration
 
 class ClientOptions( HydrusSerialisable.SerialisableBase ):
     
@@ -340,6 +342,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'use_legacy_mpv_mediator' : False,
             'potential_duplicate_pairs_search_context_panel_stops_to_estimate' : True,
             'potential_duplicate_pairs_search_can_do_file_search_based_optimisation' : True,
+            'potential_duplicate_pairs_search_starts_paused' : False,
             'manage_tags_show_deleted_mappings' : False,
             'mpv_destruction_test' : False,
             'hover_window_duplicates_always_on_top' : True,
@@ -454,7 +457,6 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
         from hydrus.core.files.images import HydrusImageHandling
         from hydrus.core.files.images import HydrusImageColours
         from hydrus.client.metadata import ClientTags
-        from hydrus.client.importing.options import ImportOptionsContainer
         
         self._dictionary[ 'integers' ] = {
             'notebook_tab_alignment' : CC.DIRECTION_UP,
@@ -576,13 +578,14 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'tag_list_tag_display_type_sidebar' : ClientTags.TAG_DISPLAY_SELECTION_LIST,
             'tag_list_tag_display_type_media_viewer_hover' : ClientTags.TAG_DISPLAY_SINGLE_MEDIA,
             'command_palette_num_chars_for_results_threshold' : 1,
-            'last_selected_import_options_container_panel_options_type' : ImportOptionsContainer.IMPORT_OPTIONS_TYPE_TAGS,
+            'last_selected_import_options_container_panel_options_type' : IOC.IMPORT_OPTIONS_TYPE_TAGS,
             'thread_slots_misc' : 10,
             'thread_slots_gallery_files' : 15,
             'thread_slots_gallery_search' : 5,
             'thread_slots_watcher_files' : 15,
             'thread_slots_watcher_check' : 5,
             'ffmpeg_subprocess_timeout' : 15,
+            'media_viewer_tags_scrolling_behaviour' : CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_ONLY_PROPAGATE_AFTER_DELAY,
         }
         
         self._dictionary[ 'floats' ] = {
@@ -668,6 +671,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'qt_media_player_preferred_audio_device_name' : None,
             'qt_media_player_preferred_audio_device_id_hex' : None,
             'mpv_preferred_audio_device' : None,
+            'curl_cffi_definition' : None, # this guy is going to end up in the new network context settings for 'global' 
         }
         
         self._dictionary[ 'strings' ] = {
@@ -1125,7 +1129,6 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
                 
                 default_neighbouring_txt_tag_service_keys = [ bytes.fromhex( hex_key ) for hex_key in encoded_default_neighbouring_txt_tag_service_keys ]
                 
-                from hydrus.client.metadata import ClientMetadataMigration
                 from hydrus.client.metadata import ClientMetadataMigrationExporters
                 from hydrus.client.metadata import ClientMetadataMigrationImporters
                 
@@ -1225,6 +1228,14 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def DeleteDefaultFileImportOptions( self ):
+        
+        with self._lock:
+            
+            del self._dictionary[ 'default_file_import_options' ]
+            
+        
+    
     def DeleteFrameLocation( self, frame_key ):
         
         with self._lock:
@@ -1315,7 +1326,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetDefaultExportFilesMetadataRouters( self ):
+    def GetDefaultExportFilesMetadataRouters( self ) -> list[ ClientMetadataMigration.SingleFileMetadataRouter ]:
         
         with self._lock:
             
@@ -1623,7 +1634,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetNoneableString( self, name ):
+    def GetNoneableString( self, name ) -> str | None:
         
         with self._lock:
             

@@ -30,7 +30,7 @@ jobs:
         run: python3 -m pip install -r hydrus/static/build_files/windows/requirements.txt
       - 
         name: Build docs to /help
-        run: mkdocs build -d help
+        run: mkdocs build -d help -f mkdocs-offline.yml
         working-directory: hydrus
       -
         name: Download and Extract mpv-dev
@@ -40,7 +40,7 @@ jobs:
       -
         name: Download and Extract FFmpeg
         run: |
-          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z" -OutFile "ffmpeg-release-full.7z"
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-8.1.1-full_build.7z" -OutFile "ffmpeg-release-full.7z"
           7z e ffmpeg-release-full.7z -ohydrus/bin "**/bin/ffmpeg.exe"
       -
         name: Build Hydrus

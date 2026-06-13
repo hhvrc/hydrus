@@ -14,7 +14,7 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
 from hydrus.client import ClientThreading
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import TagImportOptions
 from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.metadata import ClientTags
 from hydrus.client.networking.api import ClientLocalServerCore
@@ -210,12 +210,12 @@ class HydrusResourceClientAPIRestrictedAddTagsAddTags( HydrusResourceClientAPIRe
                     
                     if content_action in ( HC.CONTENT_UPDATE_ADD, HC.CONTENT_UPDATE_PEND ) and not override_previously_deleted_mappings:
                         
-                        hashes_for_this_package = ClientImportOptions.FilterNotPreviouslyDeletedTagHashes( service_key, media_results, tag )
+                        hashes_for_this_package = TagImportOptions.FilterNotPreviouslyDeletedTagHashes( service_key, media_results, tag )
                         
                     
                     if content_action in ( HC.CONTENT_UPDATE_DELETE, HC.CONTENT_UPDATE_PETITION ) and not create_new_deleted_mappings:
                         
-                        hashes_for_this_package = ClientImportOptions.FilterCurrentTagHashes( service_key, media_results, tag )
+                        hashes_for_this_package = TagImportOptions.FilterCurrentTagHashes( service_key, media_results, tag )
                         
                     
                     if content_action == HC.CONTENT_UPDATE_PETITION:

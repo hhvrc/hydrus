@@ -46,8 +46,7 @@ def ResultsFetch(
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DURATION,
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_FILE_PROPERTIES,
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_MIME,
-                ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_WIDTH, # TODO: add ratio and num pixels and collapse and reorder this to 'system:dimensions'
-                ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_HEIGHT,
+                ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DIMENSIONS,
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_NUM_TAGS,
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_TAG_ADVANCED,
                 ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_TIME,

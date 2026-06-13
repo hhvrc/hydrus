@@ -1004,11 +1004,9 @@ class LoginScriptHydrus( object ):
         
         session = engine.session_manager.GetSession( network_context )
         
-        ClientNetworkingSessions.ClearExpiredCookies( session )
-        
         cookies = ClientNetworkingSessions.GetRequestsSessionCookieJar( session )
         
-        return 'session_key' in session.cookies
+        return 'session_key' in cookies
         
     
     def IsLoggedIn( self, engine, network_context ):
@@ -1307,8 +1305,6 @@ class LoginScriptDomain( HydrusSerialisable.SerialisableBaseNamed ):
         
         session = engine.session_manager.GetSession( network_context )
         
-        ClientNetworkingSessions.ClearExpiredCookies( session )
-        
         cookies = ClientNetworkingSessions.GetRequestsSessionCookieJar( session )
         
         search_domain = network_context.context_data
@@ -1316,7 +1312,7 @@ class LoginScriptDomain( HydrusSerialisable.SerialisableBaseNamed ):
         session_cookies = False
         expiry_timestamps = []
         
-        for cookie_name_string_match in list(self._required_cookies_info.keys()):
+        for cookie_name_string_match in self._required_cookies_info.keys():
             
             try:
                 

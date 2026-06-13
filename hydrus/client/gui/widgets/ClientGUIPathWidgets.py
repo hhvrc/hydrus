@@ -144,31 +144,31 @@ class FilePickerCtrl( QW.QWidget ):
             
             if self._wildcard:
                 
-                path = QW.QFileDialog.getSaveFileName( self, '', existing_path, filter = self._wildcard, selectedFilter = self._wildcard, options = options )[0]
+                qt_response_path = QW.QFileDialog.getSaveFileName( self, '', existing_path, filter = self._wildcard, selectedFilter = self._wildcard, options = options )[0]
                 
             else:
                 
-                path = QW.QFileDialog.getSaveFileName( self, '', existing_path, options = options )[0]
+                qt_response_path = QW.QFileDialog.getSaveFileName( self, '', existing_path, options = options )[0]
                 
             
         else:
             
             if self._wildcard:
                 
-                path = QW.QFileDialog.getOpenFileName( self, '', existing_path, filter = self._wildcard, selectedFilter = self._wildcard, options = options )[0]
+                qt_response_path = QW.QFileDialog.getOpenFileName( self, '', existing_path, filter = self._wildcard, selectedFilter = self._wildcard, options = options )[0]
                 
             else:
                 
-                path = QW.QFileDialog.getOpenFileName( self, '', existing_path, options = options )[0]
+                qt_response_path = QW.QFileDialog.getOpenFileName( self, '', existing_path, options = options )[0]
                 
             
         
-        if path == '':
+        if qt_response_path == '':
             
             return
             
         
-        path = os.path.normpath( path )
+        path = os.path.normpath( qt_response_path )
         
         self._path_edit.setText( path )
         

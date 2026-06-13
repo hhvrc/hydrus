@@ -20,11 +20,11 @@ from hydrus.client import ClientThreading
 from hydrus.client.importing import ClientImporting
 from hydrus.client.importing import ClientImportGallerySeeds
 from hydrus.client.importing import ClientImportSubscriptionQuery
-from hydrus.client.importing.options import ClientImportOptions
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import CheckerImportOptions
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import ImportOptionsContainerMigration
 from hydrus.client.importing.options import NoteImportOptionsLegacy
-from hydrus.client.importing.options import TagImportOptionsLegacy
 from hydrus.client.networking import ClientNetworkingBandwidth
 from hydrus.client.networking import ClientNetworkingGUG
 
@@ -32,7 +32,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_SUBSCRIPTION
     SERIALISABLE_NAME = 'Subscription'
-    SERIALISABLE_VERSION = 3
+    SERIALISABLE_VERSION = 4
     
     def __init__( self, name, gug_key_and_name = None ):
         
@@ -66,13 +66,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         
         self._paused = False
         
-        self._file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        self._file_import_options.SetIsDefault( True )
-        
-        self._tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        
-        self._note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        self._note_import_options.SetIsDefault( True )
+        self._import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
         self._no_work_until = 0
         self._no_work_until_reason = ''
@@ -175,9 +169,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         serialisable_gug_key_and_name = ( gug_key.hex(), gug_name )
         serialisable_query_headers = [ query_header.GetSerialisableTuple() for query_header in self._query_headers ]
         serialisable_checker_options = self._checker_options.GetSerialisableTuple()
-        serialisable_file_import_options = self._file_import_options.GetSerialisableTuple()
-        serialisable_tag_import_options = self._tag_import_options.GetSerialisableTuple()
-        serialisable_note_import_options = self._note_import_options.GetSerialisableTuple()
+        serialisable_import_options_container = self._import_options_container.GetSerialisableTuple()
         
         return (
             serialisable_gug_key_and_name,
@@ -187,9 +179,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
             self._periodic_file_limit,
             self._this_is_a_random_sample_sub,
             self._paused,
-            serialisable_file_import_options,
-            serialisable_tag_import_options,
-            serialisable_note_import_options,
+            serialisable_import_options_container,
             self._no_work_until,
             self._no_work_until_reason,
             self._show_a_popup_while_working,
@@ -210,9 +200,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
             self._periodic_file_limit,
             self._this_is_a_random_sample_sub,
             self._paused,
-            serialisable_file_import_options,
-            serialisable_tag_import_options,
-            serialisable_note_import_options,
+            serialisable_import_options_container,
             self._no_work_until,
             self._no_work_until_reason,
             self._show_a_popup_while_working,
@@ -227,9 +215,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         self._gug_key_and_name = ( bytes.fromhex( serialisable_gug_key ), gug_name )
         self._query_headers = [ HydrusSerialisable.CreateFromSerialisableTuple( serialisable_query ) for serialisable_query in serialisable_query_headers ]
         self._checker_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_checker_options )
-        self._file_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
-        self._tag_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_import_options )
-        self._note_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_note_import_options )
+        self._import_options_container = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_import_options_container )
         
     
     def _NoDelays( self ):
@@ -245,7 +231,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         message += '\n\n'
         message += 'If you get many of these messages, one for every subscription query for the site, and the gap downloaders find no new files, then the site has changed URL format in a subtle way and the subscription checker was unable to recognise it (in which case, if the subscription appears to be working, you can ignore any more of these messages).'
         
-        call = HydrusData.Call( CG.client_controller.pub, 'make_new_subscription_gap_downloader', self._gug_key_and_name, query_text, self._file_import_options.Duplicate(), self._tag_import_options.Duplicate(), self._note_import_options, file_limit * 5 )
+        call = HydrusData.Call( CG.client_controller.pub, 'make_new_subscription_gap_downloader', self._gug_key_and_name, query_text, self._import_options_container.Duplicate(), file_limit * 5 )
         
         call.SetLabel( 'start a new downloader for this to fill in the gap!' )
         
@@ -936,6 +922,72 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
             return ( 3, new_serialisable_info )
             
         
+        if version == 3:
+            
+            (
+                serialisable_gug_key_and_name,
+                serialisable_query_headers,
+                serialisable_checker_options,
+                initial_file_limit,
+                periodic_file_limit,
+                this_is_a_random_sample_sub,
+                paused,
+                serialisable_file_import_options,
+                serialisable_tag_import_options,
+                serialisable_note_import_options,
+                no_work_until,
+                no_work_until_reason,
+                show_a_popup_while_working,
+                publish_files_to_popup_button,
+                publish_files_to_page,
+                publish_label_override,
+                merge_query_publish_events
+            ) = old_serialisable_info
+            
+            file_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
+            tag_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_import_options )
+            note_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_note_import_options )
+            
+            if CG.client_controller.IsBooted():
+                
+                optional_parent_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION )
+                
+            else:
+                
+                optional_parent_container = None
+                
+            
+            import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainer(
+                file_import_options_legacy = file_import_options_legacy,
+                tag_import_options_legacy = tag_import_options_legacy,
+                note_import_options_legacy = note_import_options_legacy,
+                optional_parent_container = optional_parent_container
+            )
+            
+            serialisable_import_options_container = import_options_container.GetSerialisableTuple()
+            
+            
+            new_serialisable_info = (
+                serialisable_gug_key_and_name,
+                serialisable_query_headers,
+                serialisable_checker_options,
+                initial_file_limit,
+                periodic_file_limit,
+                this_is_a_random_sample_sub,
+                paused,
+                serialisable_import_options_container,
+                no_work_until,
+                no_work_until_reason,
+                show_a_popup_while_working,
+                publish_files_to_popup_button,
+                publish_files_to_page,
+                publish_label_override,
+                merge_query_publish_events
+            )
+            
+            return ( 4, new_serialisable_info )
+            
+        
     
     def _WorkOnQueriesFiles( self, job_status: ClientThreading.JobStatus ):
         
@@ -1152,22 +1204,13 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
                         job_status.SetStatusText( x_out_of_y + HydrusText.GetFirstLine( text ), 2 )
                         
                     
-                    import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-                        self._file_import_options,
-                        FileImportOptionsLegacy.IMPORT_TYPE_QUIET,
-                        self._tag_import_options,
-                        self._note_import_options,
-                        file_seed.GetReferralURL(),
-                        file_seed.file_seed_data
-                    )
+                    full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION, urls = file_seed.GetURLsForOptionsLookup() )
                     
-                    file_seed.WorkOnURL( file_seed_cache, status_hook, query_header.GenerateNetworkJobFactory( self._name ), ClientImporting.GenerateMultiplePopupNetworkJobPresentationContextFactory( job_status ), import_options_container )
+                    file_seed.WorkOnURL( file_seed_cache, status_hook, query_header.GenerateNetworkJobFactory( self._name ), ClientImporting.GenerateMultiplePopupNetworkJobPresentationContextFactory( job_status ), full_import_options_container )
                     
-                    query_tag_import_options_legacy = query_header.GetTagImportOptions()
+                    query_tag_import_options = query_header.GetTagImportOptions()
                     
-                    query_tag_import_options = query_tag_import_options_legacy.GetTagImportOptions()
-                    
-                    if query_tag_import_options.HasAdditionalTags() and file_seed.status in CC.SUCCESSFUL_IMPORT_STATES:
+                    if query_tag_import_options.HasAdditionalTags() and ImportOptionsContainer.WeShouldWriteContentUpdatesToThisImport( file_seed.status ):
                         
                         if file_seed.HasHash():
                             
@@ -1186,9 +1229,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
                             
                         
                     
-                    real_presentation_import_options = FileImportOptionsLegacy.GetRealPresentationImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
-                    
-                    if file_seed.ShouldPresent( real_presentation_import_options ):
+                    if file_seed.ShouldPresent( full_import_options_container.GetPresentationImportOptions() ):
                         
                         hash = file_seed.GetHash()
                         
@@ -1435,9 +1476,9 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         return self._checker_options
         
     
-    def GetFileImportOptions( self ):
+    def GetImportOptionsContainer( self ) -> ImportOptionsContainer.ImportOptionsContainer:
         
-        return self._file_import_options
+        return self._import_options_container
         
     
     def GetGUGKeyAndName( self ):
@@ -1470,19 +1511,9 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         return ( mergeable, unmergeable )
         
     
-    def GetNoteImportOptions( self ):
-        
-        return self._note_import_options
-        
-    
     def GetPresentationOptions( self ):
         
         return ( self._show_a_popup_while_working, self._publish_files_to_popup_button, self._publish_files_to_page, self._publish_label_override, self._merge_query_publish_events )
-        
-    
-    def GetTagImportOptions( self ):
-        
-        return self._tag_import_options
         
     
     def HasQuerySearchTextFragment( self, search_text_fragment ):
@@ -1617,7 +1648,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
         return subscriptions
         
     
-    def SetCheckerOptions( self, checker_options: ClientImportOptions.CheckerOptions, names_to_query_log_containers = None ):
+    def SetCheckerOptions( self, checker_options: CheckerImportOptions.CheckerOptions, names_to_query_log_containers = None ):
         
         changes_made = self._checker_options.GetSerialisableTuple() != checker_options.GetSerialisableTuple()
         
@@ -1646,9 +1677,9 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
             
         
     
-    def SetFileImportOptions( self, file_import_options ):
+    def SetImportOptionsContainer( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
-        self._file_import_options = file_import_options.Duplicate()
+        self._import_options_container = import_options_container.Duplicate()
         
     
     def SetFileLimits( self, initial_file_limit, periodic_file_limit ):
@@ -1689,16 +1720,6 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
     def SetNoWorkUntil( self, no_work_until ):
         
         self._no_work_until = no_work_until
-        
-    
-    def SetNoteImportOptions( self, note_import_options ):
-        
-        self._note_import_options = note_import_options.Duplicate()
-        
-    
-    def SetTagImportOptions( self, tag_import_options ):
-        
-        self._tag_import_options = tag_import_options.Duplicate()
         
     
     def SetThisIsARandomSampleSubscription( self, value: bool ):
@@ -1768,9 +1789,9 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
                     self._SyncQueries( job_status )
                     
                 
-                real_file_import_options = FileImportOptionsLegacy.GetRealFileImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_QUIET )
+                full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION )
                 
-                real_file_import_options.GetLocationImportOptions().CheckReadyToImport()
+                full_import_options_container.GetLocationImportOptions().CheckReadyToImport()
                 
                 self._WorkOnQueriesFiles( job_status )
                 
@@ -1824,7 +1845,7 @@ class Subscription( HydrusSerialisable.SerialisableBaseNamed ):
     
     def ToTuple( self ):
         
-        return ( self._name, self._gug_key_and_name, self._query_headers, self._checker_options, self._initial_file_limit, self._periodic_file_limit, self._paused, self._file_import_options, self._tag_import_options, self._no_work_until, self._no_work_until_reason )
+        return ( self._initial_file_limit, self._periodic_file_limit, self._no_work_until, self._no_work_until_reason )
         
     
 

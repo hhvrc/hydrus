@@ -905,6 +905,32 @@ class TestClientAPI( unittest.TestCase ):
         
         #
         
+        api_permissions = set_up_permissions[ 'everything' ]
+        
+        access_key_hex = api_permissions.GetAccessKey().hex()
+        
+        headers = { 'Hydrus-Client-API-Access-Key' : access_key_hex }
+        
+        connection.request( 'GET', '/client_info', headers = headers )
+        
+        response = connection.getresponse()
+        
+        data = response.read()
+        
+        text = str( data, 'utf-8' )
+        
+        body_dict = json.loads( text )
+        
+        self.assertTrue( isinstance( body_dict[ 'boot_id' ], str ) )
+        self.assertTrue( isinstance( body_dict[ 'boot_time' ], float ) )
+        self.assertTrue( isinstance( body_dict[ 'currently_idle' ], bool ) )
+        
+        boot_id_hex = body_dict[ 'boot_id' ]
+        
+        self.assertEqual( len( bytes.fromhex( boot_id_hex ) ), 32 )
+        
+        #
+        
         return set_up_permissions
         
     

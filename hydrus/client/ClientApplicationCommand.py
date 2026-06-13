@@ -208,6 +208,7 @@ SIMPLE_WINDOW_ALWAYS_ON_TOP_FLIP = 195
 SIMPLE_WINDOW_ALWAYS_ON_TOP_ON = 196
 SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF = 197
 SIMPLE_WINDOW_FRAMELESS_FLIP = 198
+SIMPLE_RENAME_PAGE = 199
 
 REARRANGE_THUMBNAILS_TYPE_FIXED = 0
 REARRANGE_THUMBNAILS_TYPE_COMMAND = 1
@@ -273,7 +274,8 @@ simple_enum_to_str_lookup = {
     SIMPLE_CLOSE_MEDIA_VIEWER_AND_FOCUS_TAB : 'close media viewer and focus the tab the media came from, if possible',
     SIMPLE_CLOSE_MEDIA_VIEWER_AND_FOCUS_TAB_AND_FOCUS_MEDIA : 'close media viewer and focus the tab the media came from, if possible, and focus the media',
     SIMPLE_FOCUS_TAB_AND_MEDIA : 'focus the tab the media came from, if possible, and focus the media',
-    SIMPLE_CLOSE_PAGE : 'close page',
+    SIMPLE_CLOSE_PAGE : 'pages: close current',
+    SIMPLE_RENAME_PAGE : 'pages: rename current',
     LEGACY_SIMPLE_COPY_BMP : 'copy bmp of image',
     LEGACY_SIMPLE_COPY_LITTLE_BMP : 'copy small bmp of image for quick source lookups',
     LEGACY_SIMPLE_COPY_BMP_OR_FILE_IF_NOT_BMPABLE : 'copy bmp of image; otherwise copy file',
@@ -391,7 +393,7 @@ simple_enum_to_str_lookup = {
     SIMPLE_ZOOM_MAX : 'zoom: max',
     SIMPLE_SWITCH_BETWEEN_FULLSCREEN_BORDERLESS_AND_REGULAR_FRAMED_WINDOW : 'switch between fullscreen borderless and regular framed window',
     SIMPLE_SYNCHRONISED_WAIT_SWITCH : 'switch between searching a page immediately on new tags and waiting',
-    SIMPLE_UNCLOSE_PAGE : 'restore the most recently closed page',
+    SIMPLE_UNCLOSE_PAGE : 'pages: unclose the most recently closed',
     SIMPLE_UNDELETE_FILE : 'undelete file',
     SIMPLE_UNDO : 'undo (limited support)',
     SIMPLE_VIEW_FIRST : 'media navigation: first',

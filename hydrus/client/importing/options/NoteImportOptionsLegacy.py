@@ -63,14 +63,14 @@ class NoteImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
         return self._note_import_options
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         if self._is_default:
             
             return 'Using whatever the default note import options is at at time of import.'
             
         
-        return self._note_import_options.GetSummary( show_downloader_options = show_downloader_options )
+        return self._note_import_options.GetSummary( import_options_caller_type )
         
     
     def IsDefault( self ):

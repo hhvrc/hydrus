@@ -78,7 +78,7 @@ class AboutPanel( ClientGUIScrolledPanels.ReviewPanel ):
         license_textedit.setPlainText( license_text )
         license_textedit.setReadOnly( True )
         
-        text_width = ClientGUIFunctions.ConvertTextToPixelWidth( license_textedit, 80 )
+        text_width = ClientGUIFunctions.ConvertTextToPixelWidth( license_textedit, 70 )
         
         license_textedit.setMinimumWidth( text_width )
         
@@ -320,7 +320,9 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         
         #
         
-        self._have_initialised_x_axis = False
+        self._have_initialised_axes = False
+        self._user_set_custom_x = False
+        self._user_set_custom_y = False
         
         self._search_panel = QW.QWidget( self )
         
@@ -384,6 +386,11 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         
         self._file_history_chart.setMinimumSize( 720, 480 )
         
+        self._min_y = ClientGUICommon.BetterSpinBox( self, 0, 0, max = 1000000000 )
+        self._max_y = ClientGUICommon.BetterSpinBox( self, 0, 0, max = 1000000000 )
+        self._auto_y_range = ClientGUICommon.BetterButton( self, 'refit y axis', self._AutoYRange )
+        self._auto_y_range.setToolTip( ClientGUIFunctions.WrapToolTip( 'Recalculate a y axis range based on the current data that is in view.' ) )
+        
         self._start_date = QW.QDateEdit( self )
         self._end_date = QW.QDateEdit( self )
         self._auto_x_range = ClientGUICommon.BetterButton( self, 'refit x axis', self._AutoXRange )
@@ -401,6 +408,12 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         QP.AddToLayout( button_hbox, self._show_archive, CC.FLAGS_CENTER_PERPENDICULAR )
         QP.AddToLayout( button_hbox, self._show_deleted, CC.FLAGS_CENTER_PERPENDICULAR )
         
+        y_axis_hbox = QP.HBoxLayout()
+        
+        QP.AddToLayout( y_axis_hbox, self._min_y, CC.FLAGS_EXPAND_BOTH_WAYS )
+        QP.AddToLayout( y_axis_hbox, self._max_y, CC.FLAGS_EXPAND_BOTH_WAYS )
+        QP.AddToLayout( y_axis_hbox, self._auto_y_range, CC.FLAGS_CENTER )
+        
         start_end_hbox = QP.HBoxLayout()
         
         QP.AddToLayout( start_end_hbox, self._start_date, CC.FLAGS_EXPAND_BOTH_WAYS )
@@ -411,6 +424,7 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         
         QP.AddToLayout( file_history_vbox, button_hbox, CC.FLAGS_CENTER )
         QP.AddToLayout( file_history_vbox, self._file_history_chart, CC.FLAGS_EXPAND_BOTH_WAYS )
+        QP.AddToLayout( file_history_vbox, y_axis_hbox, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( file_history_vbox, start_end_hbox, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         self._file_history_chart_panel.setLayout( file_history_vbox )
@@ -437,16 +451,21 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         
         self._RefreshSearch()
         
-        self._show_current.clicked.connect( self._file_history_chart.FlipAllVisible )
-        self._show_inbox.clicked.connect( self._file_history_chart.FlipInboxVisible )
-        self._show_archive.clicked.connect( self._file_history_chart.FlipArchiveVisible )
-        self._show_deleted.clicked.connect( self._file_history_chart.FlipDeletedVisible )
+        self._show_current.clicked.connect( self._FlipAllVisible )
+        self._show_inbox.clicked.connect( self._FlipInboxVisible )
+        self._show_archive.clicked.connect( self._FlipArchiveVisible )
+        self._show_deleted.clicked.connect( self._FlipDeletedVisible )
         
         self._start_date.dateChanged.connect( self._UpdateXRange )
         self._end_date.dateChanged.connect( self._UpdateXRange )
         
+        self._min_y.valueChanged.connect( self._UpdateYRange )
+        self._max_y.valueChanged.connect( self._UpdateYRange )
+        
     
     def _AutoXRange( self ):
+        
+        self._user_set_custom_x = False
         
         self._file_history_chart.AutoSetXRange()
         
@@ -460,12 +479,69 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
         self._end_date.blockSignals( False )
         
     
+    def _AutoYRange( self ):
+        
+        self._user_set_custom_y = False
+        
+        self._file_history_chart.AutoSetYRange()
+        
+        self._min_y.blockSignals( True )
+        self._max_y.blockSignals( True )
+        
+        self._min_y.setValue( self._file_history_chart.GetMinY() )
+        self._max_y.setValue( self._file_history_chart.GetMaxY() )
+        
+        self._min_y.blockSignals( False )
+        self._max_y.blockSignals( False )
+        
+    
     def _CancelCurrentSearch( self ):
         
         self._job_status.Cancel()
         
         self._cancel_button.setEnabled( False )
         
+    
+    def _FlipAllVisible( self ):
+        
+        self._file_history_chart.FlipAllVisible()
+        
+        if not self._user_set_custom_y:
+            
+            self._AutoYRange()
+            
+        
+    
+    def _FlipInboxVisible( self ):
+        
+        self._file_history_chart.FlipInboxVisible()
+        
+        if not self._user_set_custom_y:
+            
+            self._AutoYRange()
+            
+        
+    
+    def _FlipArchiveVisible( self ):
+        
+        self._file_history_chart.FlipArchiveVisible()
+        
+        if not self._user_set_custom_y:
+            
+            self._AutoYRange()
+            
+        
+    
+    def _FlipDeletedVisible( self ):
+        
+        self._file_history_chart.FlipDeletedVisible()
+        
+        if not self._user_set_custom_y:
+            
+            self._AutoYRange()
+            
+        
+    
     
     def _RefreshSearch( self ):
         
@@ -507,15 +583,32 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
                 
                 self._file_history_chart.SetFileHistory( file_history )
                 
-                if not self._have_initialised_x_axis:
+                if not self._have_initialised_axes:
                     
-                    self._have_initialised_x_axis = True
+                    self._have_initialised_axes = True
                     
                     self._AutoXRange()
+                    self._AutoYRange()
                     
                 else:
                     
-                    self._UpdateXRange()
+                    if self._user_set_custom_x:
+                        
+                        self._UpdateXRange()
+                        
+                    else:
+                        
+                        self._AutoXRange()
+                        
+                    
+                    if self._user_set_custom_y:
+                        
+                        self._UpdateYRange()
+                        
+                    else:
+                        
+                        self._AutoYRange()
+                        
                     
                 
                 self._status_st.setVisible( False )
@@ -561,7 +654,16 @@ class ReviewFileHistory( ClientGUIScrolledPanels.ReviewPanel ):
     
     def _UpdateXRange( self ):
         
+        self._user_set_custom_x = True
+        
         self._file_history_chart.SetXRange( self._start_date.dateTime(), self._end_date.dateTime() )
+        
+    
+    def _UpdateYRange( self ):
+        
+        self._user_set_custom_y = True
+        
+        self._file_history_chart.SetYRange( self._min_y.value(), self._max_y.value() )
         
     
 

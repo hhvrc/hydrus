@@ -2,7 +2,6 @@ from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusSerialisable
 
 from hydrus.client import ClientConstants as CC
-from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
 from hydrus.client.importing.options import FileFilteringImportOptions
 from hydrus.client.importing.options import LocationImportOptions
@@ -12,23 +11,6 @@ from hydrus.client.search import ClientSearchPredicate
 
 IMPORT_TYPE_QUIET = 0
 IMPORT_TYPE_LOUD = 1
-
-def GetRealFileImportOptions( file_import_options: "FileImportOptionsLegacy", loud_or_quiet: int ) -> "FileImportOptionsLegacy":
-    
-    if file_import_options.IsDefault():
-        
-        file_import_options = CG.client_controller.new_options.GetDefaultFileImportOptions( loud_or_quiet )
-        
-    
-    return file_import_options
-    
-
-def GetRealPresentationImportOptions( file_import_options: "FileImportOptionsLegacy", loud_or_quiet: int ) -> PresentationImportOptions.PresentationImportOptions:
-    
-    real_file_import_options = GetRealFileImportOptions( file_import_options, loud_or_quiet )
-    
-    return real_file_import_options.GetPresentationImportOptions()
-    
 
 # don't delete this guy; generally leave him functional as-is. some ye olde importers might still want him for an old _UpdateSerialisable
 class FileImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
@@ -394,7 +376,7 @@ class FileImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
         return self._presentation_import_options
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         if self._is_default:
             
@@ -405,15 +387,15 @@ class FileImportOptionsLegacy( HydrusSerialisable.SerialisableBase ):
         
         #
         
-        statements.append( self._file_filtering_import_options.GetSummary( show_downloader_options ) )
+        statements.append( self._file_filtering_import_options.GetSummary( import_options_caller_type ) )
         
         #
         
-        statements.append( self._location_import_options.GetSummary( show_downloader_options ) )
+        statements.append( self._location_import_options.GetSummary( import_options_caller_type ) )
         
         #
         
-        statements.append( self._presentation_import_options.GetSummary( show_downloader_options ) )
+        statements.append( self._presentation_import_options.GetSummary( import_options_caller_type ) )
         
         #
         

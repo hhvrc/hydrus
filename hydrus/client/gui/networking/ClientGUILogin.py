@@ -1236,6 +1236,7 @@ def GenerateTestNetworkJobPresentationContextFactory( window: QW.QWidget, networ
     
     return network_job_presentation_context_factory
     
+
 class ReviewTestResultPanel( ClientGUIScrolledPanels.ReviewPanel ):
     
     def __init__( self, parent, test_result ):
@@ -1252,14 +1253,14 @@ class ReviewTestResultPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._body = QW.QPlainTextEdit( self )
         self._body.setReadOnly( True )
         
-        min_size = ClientGUIFunctions.ConvertTextToPixels( self._body, ( 64, 3 ) )
+        min_size = ClientGUIFunctions.ConvertTextToPixels( self._body, ( 60, 3 ) )
         
         QP.SetMinClientSize( self._body, min_size )
         
         self._data_preview = QW.QPlainTextEdit( self )
         self._data_preview.setReadOnly( True )
         
-        min_size = ClientGUIFunctions.ConvertTextToPixels( self._data_preview, ( 64, 8 ) )
+        min_size = ClientGUIFunctions.ConvertTextToPixels( self._data_preview, ( 60, 8 ) )
         
         QP.SetMinClientSize( self._data_preview, min_size )
         
@@ -1269,14 +1270,14 @@ class ReviewTestResultPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._temp_variables = QW.QPlainTextEdit( self )
         self._temp_variables.setReadOnly( True )
         
-        min_size = ClientGUIFunctions.ConvertTextToPixels( self._temp_variables, ( 64, 6 ) )
+        min_size = ClientGUIFunctions.ConvertTextToPixels( self._temp_variables, ( 60, 6 ) )
         
         QP.SetMinClientSize( self._temp_variables, min_size )
         
         self._cookies = QW.QPlainTextEdit( self )
         self._cookies.setReadOnly( True )
         
-        min_size = ClientGUIFunctions.ConvertTextToPixels( self._cookies, ( 64, 6 ) )
+        min_size = ClientGUIFunctions.ConvertTextToPixels( self._cookies, ( 60, 6 ) )
         
         QP.SetMinClientSize( self._cookies, min_size )
         

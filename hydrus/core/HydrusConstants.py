@@ -53,7 +53,7 @@ if BASE_DIR == '':
 BIN_DIR = os.path.join( CONTENT_BASE_DIR, 'bin' )
 HELP_DIR = os.path.join( CONTENT_BASE_DIR, 'help' )
 
-LICENSE_PATH = os.path.join( CONTENT_BASE_DIR, 'license.txt' )
+LICENSE_PATH = os.path.join( CONTENT_BASE_DIR, 'LICENSE' )
 
 DEFAULT_DB_DIR = os.path.join( BASE_DIR, 'db' )
 
@@ -127,8 +127,8 @@ options = {}
 # Misc
 
 NETWORK_VERSION = 20
-SOFTWARE_VERSION = 670
-CLIENT_API_VERSION = 90
+SOFTWARE_VERSION = 674
+CLIENT_API_VERSION = 92
 
 SERVER_THUMBNAIL_DIMENSIONS = ( 200, 200 )
 
@@ -1569,6 +1569,7 @@ DOCUMENTATION_DOWNLOADER_PARSERS_FORMULAE_STATIC = 'downloader_parsers_formulae.
 DOCUMENTATION_RATINGS = 'getting_started_ratings.html'
 DOCUMENTATION_SIDECARS = 'advanced_sidecars.html'
 DOCUMENTATION_ABOUT_DOCS = "about_docs.html"
+DOCUMENTATION_IMPORT_OPTIONS = 'getting_started_import_options.html'
 
 # default options
 

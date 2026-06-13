@@ -10,7 +10,7 @@ The client can download files and parse tags and other metadata from simple webs
 
 The program's emphasis is on your freedom. You control everything, and the program never phones home. In the same way, it is quite an advanced program, and not a beautiful one, so it isn't for everyone. Try it out, see if you like it!
 
-This github repository is currently a weekly sync with my home dev environment, where I work on hydrus by myself. **Feel free to fork and do whatever you like with my code, but please do not make pull requests.** The [issue tracker here on Github](https://github.com/hydrusnetwork/hydrus/issues) is active and run by volunteer users.
+Hydrus is mostly a solo project. **Feel free to fork and do whatever you like with my code, but public pull requests are currently closed.** The [issue tracker here on Github](https://github.com/hydrusnetwork/hydrus/issues) is active and run by volunteer users.
 
 ## Start Here!
 

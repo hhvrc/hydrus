@@ -28,7 +28,6 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientDaemons
 from hydrus.client import ClientDefaults
 from hydrus.client import ClientGlobals as CG
-from hydrus.client import ClientOptions
 from hydrus.client import ClientServices
 from hydrus.client import ClientThreading
 from hydrus.client.gui import ClientGUICallAfter
@@ -187,6 +186,9 @@ class Controller( HydrusController.HydrusController ):
         
         # just to set up some defaults, in case some db update expects something for an odd yaml-loading reason
         self.options = ClientDefaults.GetClientDefaultOptions()
+        
+        from hydrus.client import ClientOptions
+        
         self.new_options = ClientOptions.ClientOptions()
         
         HC.options = self.options
@@ -1420,6 +1422,23 @@ class Controller( HydrusController.HydrusController ):
         
         #
         
+        import_options_manager = self.Read( 'serialisable', HydrusSerialisable.SERIALISABLE_TYPE_IMPORT_OPTIONS_MANAGER )
+        
+        if import_options_manager is None:
+            
+            from hydrus.client.importing.options import ImportOptionsManager
+            
+            import_options_manager = ImportOptionsManager.ImportOptionsManager.STATICGetDefaultInitialisedManager()
+            
+            import_options_manager._dirty = True
+            
+            self.BlockingSafeShowCriticalMessage( 'Problem loading object', 'Your import options manager was missing on boot! I have recreated a new one with default settings. Please check that your hard drive and client are ok and let the hydrus dev know the details if there is a mystery.' )
+            
+        
+        self.import_options_manager = import_options_manager
+        
+        #
+        
         from hydrus.client import ClientDownloading
         
         self.quick_download_manager = ClientDownloading.QuickDownloadManager( self )
@@ -2036,6 +2055,15 @@ class Controller( HydrusController.HydrusController ):
                 self.tag_display_manager.SetClean()
                 
             
+            if self.import_options_manager.IsDirty():
+                
+                self.frame_splash_status.SetSubtext( 'import options manager' )
+                
+                self.WriteSynchronous( 'serialisable', self.import_options_manager )
+                
+                self.import_options_manager.SetClean()
+                
+            
         
     
     def SaveDirtyObjectsInfrequent( self ):
@@ -2381,7 +2409,14 @@ class Controller( HydrusController.HydrusController ):
             
             service = typing.cast( ClientServices.ServiceRestricted, service )
             
-            service.SyncAccount()
+            try:
+                
+                service.SyncAccount()
+                
+            except HydrusExceptions.CancelledException:
+                
+                continue
+                
             
         
     
@@ -2526,7 +2561,7 @@ class Controller( HydrusController.HydrusController ):
             
             if 'malformed' in trace:
                 
-                hell_message = 'Looking at it, it looks like your database may be malformed! This is a serious error. Please check "/install_dir/db/help my db is broke.txt" as soon as you can for the next steps. The specific error will now follow.'
+                hell_message = 'Looking at it, it looks like your database may be malformed! This is a serious error. Please check the \'Recovery->Help my db is broke\' document in the help as soon as you can for the next steps. The specific error will now follow.'
                 
                 HydrusData.DebugPrint( hell_message )
                 

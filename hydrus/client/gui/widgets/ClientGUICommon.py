@@ -392,7 +392,7 @@ class ExpandCollapseArrowButton( BetterButton ):
         
         super().__init__( parent, label = self.UP_ARROW, func = self.ExpandCollapseFlip )
         
-        self.setFixedWidth( ClientGUIFunctions.ConvertTextToPixelWidth( self, 4 ) )
+        self.setFixedWidth( ClientGUIFunctions.ConvertTextToPixelWidth( self, 4.5 ) )
         
         self._is_collapsed = True
         self._expands_downward = expands_downward
@@ -590,10 +590,8 @@ class BetterCheckBoxList( QW.QListWidget ):
         
         if row_height == -1:
             
-            ( width_gumpf, row_height ) = ClientGUIFunctions.ConvertTextToPixels( self, ( 20, 1 ) )
+            row_height = ClientGUIFunctions.ConvertTextToPixelHeight( self, 1 )
             
-        
-        # ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self, ( 10, num_chars ) )
         
         height = ( row_height * num_chars ) + ( self.frameWidth() * 2 )
         

@@ -27,8 +27,8 @@ from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.importing import ClientGUIFileSeedCache
 from hydrus.client.gui.importing import ClientGUIGallerySeedLog
 from hydrus.client.gui.importing import ClientGUIImport
-from hydrus.client.gui.importing import ClientGUIImportOptionsLegacy
-from hydrus.client.gui.importing import ClientGUIImportOptionsPanels
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainerButton
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainer
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
 from hydrus.client.gui.metadata import ClientGUITime
@@ -39,6 +39,8 @@ from hydrus.client.importing import ClientImporting
 from hydrus.client.importing import ClientImportSubscriptions
 from hydrus.client.importing import ClientImportSubscriptionQuery
 from hydrus.client.importing import ClientImportSubscriptionLegacy # keep this here so the serialisable stuff is registered, it has to be imported somewhere
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 
 def DoAliveOrDeadCheck( win: QW.QWidget, subscriptions: collections.abc.Collection[ ClientImportSubscriptions.Subscription ], query_headers: collections.abc.Collection[ ClientImportSubscriptionQuery.SubscriptionQueryHeader ] ):
     
@@ -282,7 +284,16 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         #
         
-        ( name, gug_key_and_name, query_headers, checker_options, initial_file_limit, periodic_file_limit, paused, file_import_options, tag_import_options, self._no_work_until, self._no_work_until_reason ) = subscription.ToTuple()
+        name = subscription.GetName()
+        gug_key_and_name = subscription.GetGUGKeyAndName()
+        query_headers = subscription.GetQueryHeaders()
+        checker_options = subscription.GetCheckerOptions()
+        paused = subscription.IsPaused()
+        
+        ( initial_file_limit, periodic_file_limit, self._no_work_until, self._no_work_until_reason ) = subscription.ToTuple()
+        
+        import_options_container = subscription.GetImportOptionsContainer()
+        
         this_is_a_random_sample_sub = subscription.ThisIsARandomSampleSubscription()
         
         self._query_panel = ClientGUICommon.StaticBox( self, 'site and queries' )
@@ -391,17 +402,7 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         #
         
-        note_import_options = subscription.GetNoteImportOptions()
-        
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
-        
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION, import_options_container )
         
         #
         
@@ -495,7 +496,7 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         QP.AddToLayout( vbox, self._control_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._file_limits_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._file_presentation_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         self.widget().setLayout( vbox )
         
@@ -709,7 +710,18 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         pretty_items = file_seed_cache_status.GetStatusText( simple = True )
         
-        return ( pretty_name, pretty_paused, pretty_status, pretty_latest_new_file_time, pretty_last_check_time, pretty_next_check_time, pretty_file_velocity, pretty_delay, pretty_items )
+        tag_import_options = query_header.GetTagImportOptions()
+        
+        if tag_import_options.HasAdditionalTags():
+            
+            pretty_additional_tags = tag_import_options.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT )
+            
+        else:
+            
+            pretty_additional_tags = ''
+            
+        
+        return ( pretty_name, pretty_paused, pretty_status, pretty_latest_new_file_time, pretty_last_check_time, pretty_next_check_time, pretty_file_velocity, pretty_delay, pretty_items, pretty_additional_tags )
         
     
     def _ConvertQueryHeaderToSortTuple( self, query_header: ClientImportSubscriptionQuery.SubscriptionQueryHeader ):
@@ -772,7 +784,18 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         sort_last_check_time = ClientGUIListCtrl.SafeNoneInt( last_check_time )
         sort_next_check_time = ClientGUIListCtrl.SafeNoneInt( next_check_time )
         
-        return ( name, paused, checker_status, sort_latest_new_file_time, sort_last_check_time, sort_next_check_time, file_velocity, delay, items )
+        tag_import_options = query_header.GetTagImportOptions()
+        
+        if tag_import_options.HasAdditionalTags():
+            
+            pretty_additional_tags = tag_import_options.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT )
+            
+        else:
+            
+            pretty_additional_tags = ''
+            
+        
+        return ( name, paused, checker_status, sort_latest_new_file_time, sort_last_check_time, sort_next_check_time, file_velocity, delay, items, pretty_additional_tags )
         
     
     def _CopyQueries( self ):
@@ -1523,19 +1546,15 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         checker_options = self._checker_options.GetValue()
         
-        file_import_options = self._import_options_button.GetFileImportOptions()
-        tag_import_options = self._import_options_button.GetTagImportOptions()
-        note_import_options = self._import_options_button.GetNoteImportOptions()
+        import_options_container = self._import_options_container_button.GetValue()
+        
+        subscription.SetImportOptionsContainer( import_options_container )
         
         subscription.SetGUGKeyAndName( gug_key_and_name )
         subscription.SetCheckerOptions( checker_options )
         subscription.SetFileLimits( initial_file_limit, periodic_file_limit )
         
         subscription.SetPaused( paused )
-        
-        subscription.SetFileImportOptions( file_import_options )
-        subscription.SetTagImportOptions( tag_import_options )
-        subscription.SetNoteImportOptions( note_import_options )
         
         subscription.SetNoWorkUntil( self._no_work_until )
         
@@ -1578,7 +1597,7 @@ class EditSubscriptionQueryPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._status_st = ClientGUICommon.BetterStaticText( status_panel )
         
-        st_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._status_st, 50 )
+        st_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._status_st, 60 )
         
         self._status_st.setMinimumWidth( st_width )
         
@@ -1597,13 +1616,9 @@ class EditSubscriptionQueryPanel( ClientGUIScrolledPanels.EditPanel ):
         
         tags_panel = ClientGUICommon.StaticBox( self, 'tags' )
         
-        tag_import_options = query_header.GetTagImportOptions()
-        show_downloader_options = False # just for additional tags, no parsing gubbins needed
-        allow_default_selection = False
+        self._tag_import_options = query_header.GetTagImportOptions()
         
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetTagImportOptions( tag_import_options )
+        self._edit_tag_import_options_button = ClientGUICommon.BetterButton( tags_panel, self._tag_import_options.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION ), self._EditTagImportOptions )
         
         #
         
@@ -1675,7 +1690,7 @@ class EditSubscriptionQueryPanel( ClientGUIScrolledPanels.EditPanel ):
         st.setWordWrap( True )
         
         tags_panel.Add( st, CC.FLAGS_EXPAND_PERPENDICULAR )
-        tags_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        tags_panel.Add( self._edit_tag_import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
         
@@ -1720,6 +1735,30 @@ class EditSubscriptionQueryPanel( ClientGUIScrolledPanels.EditPanel ):
         ClientGUIFunctions.SetFocusLater( self._query_text )
         
     
+    def _EditTagImportOptions( self ):
+        
+        from hydrus.client.gui.importing import ClientGUIImportOptionsPanels
+        
+        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit additional tags' ) as dlg:
+            
+            panel = ClientGUIScrolledPanels.EditSingleCtrlPanel( dlg )
+            
+            # this is beardy but we force local import here to hide the tag parsing options. this guy is only for 'additional tags'
+            control = ClientGUIImportOptionsPanels.EditTagImportOptionsPanel( panel, self._tag_import_options, IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT )
+            
+            panel.SetControl( control )
+            
+            dlg.SetPanel( panel )
+            
+            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
+                
+                self._tag_import_options = control.GetValue()
+                
+                self._edit_tag_import_options_button.setText( self._tag_import_options.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION ) )
+                
+            
+        
+    
     def _GetValue( self ) -> tuple[ ClientImportSubscriptionQuery.SubscriptionQueryHeader, ClientImportSubscriptionQuery.SubscriptionQueryLogContainer ]:
         
         query_header = self._original_query_header.Duplicate()
@@ -1732,7 +1771,7 @@ class EditSubscriptionQueryPanel( ClientGUIScrolledPanels.EditPanel ):
         
         query_header.SetDisplayName( self._display_name.GetValue() )
         
-        query_header.SetTagImportOptions( self._import_options_button.GetTagImportOptions() )
+        query_header.SetTagImportOptions( self._tag_import_options )
         
         query_header.SetFileSeedCacheCompactionNumber( self._file_seed_cache_compaction_number.value() )
         
@@ -1842,9 +1881,26 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         self._subscriptions_panel.AddButton( 'select subscriptions', self.SelectSubscriptions )
         self._subscriptions_panel.AddButton( 'overwrite downloader', self.SetDownloader, enabled_only_on_selection = True )
         self._subscriptions_panel.AddButton( 'overwrite checker options', self.SetCheckerOptions, enabled_only_on_selection = True )
-        self._subscriptions_panel.AddButton( 'overwrite file import options', self.SetFileImportOptions, enabled_only_on_selection = True )
-        self._subscriptions_panel.AddButton( 'overwrite tag import options', self.SetTagImportOptions, enabled_only_on_selection = True )
-        self._subscriptions_panel.AddButton( 'overwrite note import options', self.SetNoteImportOptions, enabled_only_on_selection = True )
+        
+        self._subscriptions_panel.NewButtonRow()
+        
+        self._subscriptions_panel.AddWindow( ClientGUICommon.BetterStaticText( self._subscriptions_panel, label = 'import options:' ) )
+        self._subscriptions_panel.AddIconButton( CC.global_icons().copy, self._CopyImportOptionsContainer, enabled_only_on_single_selection = True )
+        
+        menu_template_items = []
+        
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'custom paste: choose what you want', 'Open a dialog with the current options and what is in your clipboard and choose what to keep and overwrite.', self._PasteImportOptionsContainerCustom ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemSeparator() )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'merge-paste', 'Replace what is selected with what you have in the clipboard that is non-default.', self._PasteImportOptionsContainers ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'fill-in-gaps-paste', 'Fill in what is currently default in the selected with what you have in the clipboard that is non-default.', self._PasteImportOptionsContainersMerge ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'replace-paste', 'Replace what is selected with what you have in the clipboard.', self._PasteImportOptionsContainersFillIn ) )
+        
+        self._subscriptions_panel.AddMenuIconButton( CC.global_icons().paste, 'paste a new set of options from the clipboard', menu_template_items, enabled_only_on_selection = True )
+        
+        self._import_options_containers_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, CG.client_controller.import_options_manager, edit_allowed = True )
+        self._subscriptions_panel.AddWindow( self._import_options_containers_favourites_button )
+        
+        self._subscriptions_panel.AddButton( 'clear', self._ClearImportOptionsContainers, enabled_only_on_selection = True )
         
         #
         
@@ -1873,6 +1929,9 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         QP.AddToLayout( vbox, self._subscriptions_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
         
         self.widget().setLayout( vbox )
+        
+        self._import_options_containers_favourites_button.loadFavourite.connect( self._LoadFavouriteImportOptionsContainer )
+        self._import_options_containers_favourites_button.loadFavouriteCustom.connect( self._LoadFavouriteImportOptionsContainerCustom )
         
     
     def _AddSubscription( self, unknown_subscription ):
@@ -2025,9 +2084,37 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         return False
         
     
-    def _ConvertSubscriptionToDisplayTuple( self, subscription ):
+    def _ClearImportOptionsContainers( self ):
         
-        ( name, gug_key_and_name, query_headers, checker_options, initial_file_limit, periodic_file_limit, paused, file_import_options, tag_import_options, no_work_until, no_work_until_reason ) = subscription.ToTuple()
+        selected = self._subscriptions.GetData( only_selected = True )
+        
+        summary = ', '.join( [ subscription.GetName() for subscription in selected ] )
+        
+        message = f'Clear all custom import options from {summary}?'
+        
+        result = ClientGUIDialogsQuick.GetYesNo( self, message )
+        
+        if result != QW.QDialog.DialogCode.Accepted:
+            
+            return
+            
+        
+        for subscription in selected:
+            
+            subscription.SetImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer() )
+            
+        
+        self._subscriptions.UpdateDatas( selected )
+        
+    
+    def _ConvertSubscriptionToDisplayTuple( self, subscription: ClientImportSubscriptions.Subscription ):
+        
+        name = subscription.GetName()
+        gug_key_and_name = subscription.GetGUGKeyAndName()
+        query_headers = subscription.GetQueryHeaders()
+        paused = subscription.IsPaused()
+        
+        ( initial_file_limit, periodic_file_limit, no_work_until, no_work_until_reason ) = subscription.ToTuple()
         
         try:
             
@@ -2036,7 +2123,7 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         except:
             
             pretty_site = 'unknown downloader'
-                
+            
         
         if pretty_site == '':
             
@@ -2166,12 +2253,28 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
             pretty_paused = ''
             
         
-        return ( name, pretty_site, pretty_status, pretty_latest_new_file_time, pretty_last_checked, pretty_delay, pretty_items, pretty_paused )
+        import_options_container = subscription.GetImportOptionsContainer()
+        
+        if import_options_container.IsEmpty():
+            
+            pretty_import_options_container = ''
+            
+        else:
+            
+            pretty_import_options_container = import_options_container.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION )
+            
+        
+        return ( name, pretty_site, pretty_status, pretty_latest_new_file_time, pretty_last_checked, pretty_delay, pretty_items, pretty_paused, pretty_import_options_container )
         
     
-    def _ConvertSubscriptionToSortTuple( self, subscription ):
+    def _ConvertSubscriptionToSortTuple( self, subscription: ClientImportSubscriptions.Subscription ):
         
-        ( name, gug_key_and_name, query_headers, checker_options, initial_file_limit, periodic_file_limit, paused, file_import_options, tag_import_options, no_work_until, no_work_until_reason ) = subscription.ToTuple()
+        name = subscription.GetName()
+        gug_key_and_name = subscription.GetGUGKeyAndName()
+        query_headers = subscription.GetQueryHeaders()
+        paused = subscription.IsPaused()
+        
+        ( initial_file_limit, periodic_file_limit, no_work_until, no_work_until_reason ) = subscription.ToTuple()
         
         pretty_site = gug_key_and_name[1]
         
@@ -2265,7 +2368,36 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         sort_latest_new_file_time = ClientGUIListCtrl.SafeNoneInt( latest_new_file_time )
         sort_last_checked = ClientGUIListCtrl.SafeNoneInt( last_checked )
         
-        return ( name, pretty_site, status, sort_latest_new_file_time, sort_last_checked, delay, items, paused )
+        import_options_container = subscription.GetImportOptionsContainer()
+        
+        if import_options_container.IsEmpty():
+            
+            pretty_import_options_container = ''
+            
+        else:
+            
+            pretty_import_options_container = import_options_container.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_SUBSCRIPTION )
+            
+        
+        return ( name, pretty_site, status, sort_latest_new_file_time, sort_last_checked, delay, items, paused, pretty_import_options_container )
+        
+    
+    def _CopyImportOptionsContainer( self ):
+        
+        selected = self._subscriptions.GetTopSelectedData()
+        
+        if selected is None:
+            
+            return
+            
+        
+        subscription = selected
+        
+        import_options_container = subscription.GetImportOptionsContainer()
+        
+        payload = import_options_container.DumpToString()
+        
+        CG.client_controller.pub( 'clipboard', 'text', payload )
         
     
     def _DoAsyncGetQueryLogContainers( self, query_headers: collections.abc.Collection[ ClientImportSubscriptionQuery.SubscriptionQueryHeader ], call: HydrusData.Call ):
@@ -2402,6 +2534,133 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
             return to_export
             
+        
+    
+    def _LoadFavouriteImportOptionsContainer( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        self._LoadFavouriteImportOptionsContainerDoIt( incoming_import_options_container, False )
+        
+    
+    def _LoadFavouriteImportOptionsContainerCustom( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        self._LoadFavouriteImportOptionsContainerDoIt( incoming_import_options_container, True )
+        
+    
+    def _LoadFavouriteImportOptionsContainerDoIt( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer, do_custom_merge: bool ):
+        
+        selected_subscriptions = self._subscriptions.GetData( only_selected = True )
+        
+        if len( selected_subscriptions ) == 0:
+            
+            ClientGUIDialogsMessage.ShowInformation( self, 'Hey, nothing is selected in the subscriptions list--select something and try loading again.' )
+            
+            return
+            
+        
+        if do_custom_merge:
+            
+            try:
+                
+                if not self._subscriptions.HasOneSelected():
+                    
+                    ClientGUIDialogsMessage.ShowInformation( self, 'Hey, multiple items in the subscriptions list are selected. I am only going to do this on the topmost selected.  If you need to do this to multiple entries, set up one exactly how you want and then copy/replace-paste to the rest.' )
+                    
+                
+                simple_mode = CG.client_controller.new_options.GetBoolean( 'import_options_simple_mode' )
+                
+                subscription = self._subscriptions.GetTopSelectedData()
+                
+                current_import_options_container = subscription.GetImportOptionsContainer()
+                
+                final_import_options_container = ClientGUIImportOptionsContainer.DoCustomOverwrite(
+                    self,
+                    simple_mode,
+                    IOC.IMPORT_OPTIONS_CALLER_TYPE_SPECIFIC_IMPORTER,
+                    current_import_options_container,
+                    incoming_import_options_container
+                )
+                
+            except HydrusExceptions.CancelledException:
+                
+                return
+                
+            
+        else:
+            
+            final_import_options_container = incoming_import_options_container
+            
+        
+        for subscription in selected_subscriptions:
+            
+            subscription.SetImportOptionsContainer( final_import_options_container )
+            
+        
+        self._subscriptions.UpdateDatas( selected_subscriptions )
+        
+    
+    def _PasteImportOptionsContainers( self, paste_type = ClientGUIImportOptionsContainer.PASTE_REPLACE ):
+        
+        try:
+            
+            pasted_import_options_container = ClientGUIImportOptionsContainer.GetPasteObject( self )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        subscriptions = self._subscriptions.GetData( only_selected = True )
+        
+        for subscription in subscriptions:
+            
+            if paste_type in ( ClientGUIImportOptionsContainer.PASTE_MERGE, ClientGUIImportOptionsContainer.PASTE_FILL_IN ):
+                
+                existing_import_options_container = subscription.GetImportOptionsContainer()
+                
+                edited_import_options_container = existing_import_options_container.Duplicate()
+                
+                if paste_type == ClientGUIImportOptionsContainer.PASTE_MERGE:
+                    
+                    edited_import_options_container.OverwriteWithThisSlice( pasted_import_options_container )
+                    
+                else:
+                    
+                    edited_import_options_container.FillInWithThisSlice( pasted_import_options_container )
+                    
+                
+            else:
+                
+                edited_import_options_container = pasted_import_options_container.Duplicate()
+                
+            
+            subscription.SetImportOptionsContainer( edited_import_options_container )
+            
+        
+        self._subscriptions.UpdateDatas( subscriptions )
+        
+    
+    def _PasteImportOptionsContainerCustom( self ):
+        
+        try:
+            
+            pasted_import_options_container = ClientGUIImportOptionsContainer.GetPasteObject( self )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        self._LoadFavouriteImportOptionsContainer( pasted_import_options_container )
+        
+    
+    def _PasteImportOptionsContainersFillIn( self ):
+        
+        self._PasteImportOptionsContainers( paste_type = ClientGUIImportOptionsContainer.PASTE_FILL_IN )
+        
+    
+    def _PasteImportOptionsContainersMerge( self ):
+        
+        self._PasteImportOptionsContainers( paste_type = ClientGUIImportOptionsContainer.PASTE_MERGE )
         
     
     def _RegenDupeData( self ):
@@ -3487,107 +3746,5 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
         
         self._subscriptions.UpdateDatas( subscriptions )
-        
-    
-    def SetFileImportOptions( self ):
-        
-        subscriptions = self._subscriptions.GetData( only_selected = True )
-        
-        if len( subscriptions ) == 0:
-            
-            return
-            
-        
-        file_import_options = subscriptions[0].GetFileImportOptions()
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit file import options' ) as dlg:
-            
-            panel = ClientGUIImportOptionsPanels.EditFileImportOptionsLegacyPanel( dlg, file_import_options, show_downloader_options, allow_default_selection )
-            
-            dlg.SetPanel( panel )
-            
-            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
-                
-                file_import_options = panel.GetValue()
-                
-                for subscription in subscriptions:
-                    
-                    subscription.SetFileImportOptions( file_import_options )
-                    
-                
-                self._subscriptions.UpdateDatas( subscriptions )
-                
-            
-        
-    
-    def SetNoteImportOptions( self ):
-        
-        subscriptions = self._subscriptions.GetData( only_selected = True )
-        
-        if len( subscriptions ) == 0:
-            
-            return
-            
-        
-        note_import_options = subscriptions[0].GetNoteImportOptions()
-        allow_default_selection = True
-        
-        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit note import options' ) as dlg:
-            
-            panel = ClientGUIScrolledPanels.EditSingleCtrlPanel( dlg )
-            
-            edit_notes_widget = ClientGUIImportOptionsPanels.EditNoteImportOptionsLegacyPanel( panel, note_import_options, allow_default_selection )
-            
-            panel.SetControl( edit_notes_widget )
-            
-            dlg.SetPanel( panel )
-            
-            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
-                
-                note_import_options = edit_notes_widget.GetValue()
-                
-                for subscription in subscriptions:
-                    
-                    subscription.SetNoteImportOptions( note_import_options )
-                    
-                
-                self._subscriptions.UpdateDatas( subscriptions )
-                
-            
-        
-    
-    def SetTagImportOptions( self ):
-        
-        subscriptions = self._subscriptions.GetData( only_selected = True )
-        
-        if len( subscriptions ) == 0:
-            
-            return
-            
-        
-        tag_import_options = subscriptions[0].GetTagImportOptions()
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit tag import options' ) as dlg:
-            
-            panel = ClientGUIImportOptionsPanels.EditTagImportOptionsLegacyPanel( dlg, tag_import_options, show_downloader_options, allow_default_selection )
-            
-            dlg.SetPanel( panel )
-            
-            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
-                
-                tag_import_options = panel.GetValue()
-                
-                for subscription in subscriptions:
-                    
-                    subscription.SetTagImportOptions( tag_import_options )
-                    
-                
-                self._subscriptions.UpdateDatas( subscriptions )
-                
-            
         
     

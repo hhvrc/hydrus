@@ -76,6 +76,20 @@ daemon_report_mode = False
 mpv_report_mode = False
 potential_duplicates_report_mode = False
 
+# just to note for this guy, we are looking at:
+    # MainLoop: quick downloader
+    # MainLoop: duplicates auto-resolution
+    # MainLoop: import folders
+    # MainLoop: potential duplicates search
+    # MainLoop: file maintenance
+    # MainLoop: db maintenance
+    # MainLoop: tag display sync
+    # MainLoop: subscriptions
+    # 10+ CallToThread
+    # 2 Job Scheduler
+    # ~10 CallToThreadLongRunning
+shutdown_report_mode = False
+
 mpv_allow_crashy_files = False
 mpv_allow_crashy_files_silently = False
 

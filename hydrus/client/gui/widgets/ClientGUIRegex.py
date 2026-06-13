@@ -24,7 +24,7 @@ class RegexButton( ClientGUICommon.BetterButton ):
         self._show_group_menu = show_group_menu
         self._show_manage_favourites_menu = show_manage_favourites_menu
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 4 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 4.5 )
         
         self.setFixedWidth( width )
         

@@ -34,8 +34,8 @@ I have many ideas on how to improve the software in future. If, after a few mont
 
 This is free software. Everything I, hydrus dev, have made is under the very permissive Do What The Fuck You Want To Public License, Version 3:
 
-``` title="license.txt"
---8<-- "license.txt"
+``` title="License"
+--8<-- "LICENSE"
 ```
 
 This is a joke, but it also isn't. If you want to fork my code and change it to do something else, go ahead. In the same way, looking after your client and making backups in case something goes wrong is your responsibility.

@@ -130,15 +130,15 @@ def PickDirectory( parent: QW.QWidget, message: str, starting_dir_path: str | No
         options |= QW.QFileDialog.Option.DontUseNativeDialog
         
     
-    path = QW.QFileDialog.getExistingDirectory( parent, caption = message, dir = starting_dir_path, options = options )
+    qt_response_path = QW.QFileDialog.getExistingDirectory( parent, caption = message, dir = starting_dir_path, options = options )
     
-    if path == '':
+    if qt_response_path == '':
         
         raise HydrusExceptions.CancelledException()
         
     
     # as well as A/foo/../B collapse stuff, this wangles forward slashes on windows to backslashes (this dialog returns slashes, hooray)
-    path = os.path.normpath( path )
+    path = os.path.normpath( qt_response_path )
     
     LAST_FOLDER_SELECTED = path
     

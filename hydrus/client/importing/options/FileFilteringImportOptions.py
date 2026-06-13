@@ -7,9 +7,12 @@ from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusSerialisable
 
 from hydrus.client import ClientData
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.search import ClientSearchPredicate
 
-class FileFilteringImportOptions( HydrusSerialisable.SerialisableBase ):
+class FileFilteringImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_FILE_FILTERING
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_FILE_FILTERING_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'File Filtering Import Options'
@@ -186,7 +189,7 @@ class FileFilteringImportOptions( HydrusSerialisable.SerialisableBase ):
         return self._min_size
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ) -> str:
         
         statements = []
         

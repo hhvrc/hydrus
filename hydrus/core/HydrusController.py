@@ -28,6 +28,8 @@ class HydrusController( object ):
         
         self._name = 'hydrus'
         
+        self._boot_id = HydrusData.GenerateKey()
+        
         self._last_shutdown_was_bad = False
         self._i_own_running_file = False
         
@@ -463,6 +465,11 @@ class HydrusController( object ):
             
         
         self.db.ForceACommit()
+        
+    
+    def GetBootId( self ):
+        
+        return self._boot_id
         
     
     def GetBootTimestampMS( self ):

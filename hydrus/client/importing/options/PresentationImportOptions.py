@@ -3,6 +3,7 @@ from hydrus.core import HydrusSerialisable
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 
 PRESENTATION_STATUS_ANY_GOOD = 0
 PRESENTATION_STATUS_NEW_ONLY = 1
@@ -24,7 +25,9 @@ presentation_inbox_enum_str_lookup = {
     PRESENTATION_INBOX_AND_INCLUDE_ALL_INBOX : 'or in inbox'
 }
 
-class PresentationImportOptions( HydrusSerialisable.SerialisableBase ):
+class PresentationImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_PRESENTATION
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_PRESENTATION_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Presentation Import Options'
@@ -199,7 +202,7 @@ class PresentationImportOptions( HydrusSerialisable.SerialisableBase ):
         return self._presentation_status
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         if self._presentation_status == PRESENTATION_STATUS_NONE:
             

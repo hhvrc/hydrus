@@ -161,7 +161,7 @@ class EditFormulaPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._formula_description = QW.QPlainTextEdit( my_panel )
         
-        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._formula_description, ( 90, 8 ) )
+        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self._formula_description, ( 60, 8 ) )
         
         self._formula_description.setMinimumWidth( width )
         self._formula_description.setMinimumHeight( height )

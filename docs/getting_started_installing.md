@@ -76,6 +76,8 @@ I try to release a new version every Wednesday by 8pm EST and write an accompany
         
         One user reports that Fedora might need `libxkbcommon` too.
         
+        **One user had a related error that caused a program crash any time he pressed any key. This was an _incompatibility_ with the `libxkbcommon` bundled with the built release. The solution here--and with any other severe crashes than can be traced to a specific bundled .so file--is to run from source.**
+        
     
     *   Get the .tag.gz. Extract it somewhere useful and create shortcuts to 'hydrus_client' and 'hydrus_server' as you like. The build is made on Ubuntu, so if you run something else, compatibility is hit and miss.
     *   If you have problems running the Ubuntu build, [running from source](running_from_source.md) is usually an improvement, and it is easy to set up these days.

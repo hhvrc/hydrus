@@ -6,10 +6,13 @@ from hydrus.core import HydrusTime
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.media import ClientMediaResult
 from hydrus.client.metadata import ClientContentUpdates
 
-class LocationImportOptions( HydrusSerialisable.SerialisableBase ):
+class LocationImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_LOCATIONS
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_LOCATION_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Location Import Options'
@@ -135,7 +138,7 @@ class LocationImportOptions( HydrusSerialisable.SerialisableBase ):
         return self._import_destination_location_context
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         statements = []
         

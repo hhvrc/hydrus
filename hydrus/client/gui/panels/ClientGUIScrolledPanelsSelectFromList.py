@@ -56,7 +56,7 @@ class EditSelectFromListPanel( ClientGUIScrolledPanels.EditPanel ):
         
         max_label_width_chars = max( ( len( label ) for ( label, value ) in choice_tuples ) )
         
-        width_chars = min( 64, max_label_width_chars + 2 )
+        width_chars = min( 60, max_label_width_chars )
         height_chars = min( len( choice_tuples ), 36 )
         
         ( width_px, height_px ) = ClientGUIFunctions.ConvertTextToPixels( self._list, ( width_chars, height_chars ) )

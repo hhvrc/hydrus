@@ -18,19 +18,23 @@ try:
             
             divisor = 1.0
             unit = 'B'
+            highest_usage = 1
             
-            highest_usage = max( ( m[1] for m in monthly_usage ) )
-            
-            lines = [ ( 1073741824.0, 'GB' ), ( 1048576.0, 'MB' ), ( 1024.0, 'KB' ) ]
-            
-            for ( line_divisor, line_unit ) in lines:
+            if len( monthly_usage ) > 0:
                 
-                if highest_usage > line_divisor:
+                highest_usage = max( ( m[1] for m in monthly_usage ) )
+                
+                lines = [ ( 1073741824.0, 'GB' ), ( 1048576.0, 'MB' ), ( 1024.0, 'KB' ) ]
+                
+                for ( line_divisor, line_unit ) in lines:
                     
-                    divisor = line_divisor
-                    unit = line_unit
-                    
-                    break
+                    if highest_usage > line_divisor:
+                        
+                        divisor = line_divisor
+                        unit = line_unit
+                        
+                        break
+                        
                     
                 
             
@@ -47,7 +51,7 @@ try:
             
             y_value_axis = QCh.QtCharts.QValueAxis()
             
-            y_value_axis.setRange( 0.0, ( highest_usage * 1.2 ) / line_divisor )
+            y_value_axis.setRange( 0.0, ( highest_usage * 1.2 ) / divisor )
             
             y_value_axis.setLabelFormat( '%i{}'.format( unit ) )
             
@@ -259,6 +263,8 @@ try:
             
             self._RedrawLines()
             
+            self._CalculateYRange()
+            
         
         def _RedrawLines( self ):
             
@@ -266,8 +272,6 @@ try:
             self._inbox_files_series.setVisible( self._show_inbox )
             self._archive_files_series.setVisible( self._show_archive )
             self._deleted_files_series.setVisible( self._show_deleted )
-            
-            self._CalculateYRange()
             
         
         def FlipAllVisible( self ):
@@ -301,6 +305,16 @@ try:
         def GetEndDate( self ) -> QC.QDate:
             
             return self._x_datetime_axis.max().date()
+            
+        
+        def GetMaxY( self ) -> int:
+            
+            return int( self._y_value_axis.max() )
+            
+        
+        def GetMinY( self ) -> int:
+            
+            return int( self._y_value_axis.min() )
             
         
         def GetStartDate( self ) -> QC.QDate:
@@ -378,9 +392,60 @@ try:
                 
             
         
+        def AutoSetYRange( self ):
+            
+            # apparently you can go like self._current_files_series.boundingRect, but it isn't surfaced in qtpy and it is generally whack
+            # let's just do it manually
+            
+            min_y = 0
+            
+            max_y = 1
+            
+            lists = []
+            
+            if self._show_current:
+                
+                lists.append( self._file_history[ 'current' ] )
+                
+            
+            if self._show_deleted:
+                
+                lists.append( self._file_history[ 'deleted' ] )
+                
+            
+            if self._show_inbox:
+                
+                lists.append( self._file_history[ 'inbox' ] )
+                
+            
+            if self._show_archive:
+                
+                lists.append( self._file_history[ 'archive' ] )
+                
+            
+            for l in lists:
+                
+                if len( l ) == 0:
+                    
+                    continue
+                    
+                
+                largest_y_here = max( ( row[1] for row in l ) )
+                
+                max_y = max( max_y, largest_y_here )
+                
+            
+            self.SetYRange( min_y, max_y )
+            
+        
         def SetXRange( self, start_datetime: QC.QDateTime, end_datetime: QC.QDateTime ):
             
             self._x_datetime_axis.setRange( start_datetime, end_datetime )
+            
+        
+        def SetYRange( self, min_y: int, max_y: int ):
+            
+            self._y_value_axis.setRange( min_y, max_y )
             
         
     

@@ -53,6 +53,8 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
         self._gugs = HydrusSerialisable.SerialisableList()
         self._url_classes = HydrusSerialisable.SerialisableList()
         self._parsers = HydrusSerialisable.SerialisableList()
+        
+        # TODO: Move this guy to DomainSettings
         self._network_contexts_to_custom_header_dicts = collections.defaultdict( dict )
         
         self._parser_namespaces = []
@@ -65,7 +67,7 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
         self._url_domain_masks_to_url_classes = collections.defaultdict( list )
         
         # TODO: Replace this with DomainStatus and do Cleanse/IsStub clearing on load
-        # one question is whether to store by domains or networkcontexts. consider this, but perhaps not a big deal for now
+        # We will be converting to Network Context as we do!
         self._domains_to_network_infrastructure_errors = collections.defaultdict( list )
         
         from hydrus.client.importing.options import TagImportOptionsLegacy
@@ -110,130 +112,6 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def _GetDefaultNoteImportOptionsForURL( self, referral_url: str | None, file_or_post_url: str ):
-        
-        urls_to_examine_in_order = [ file_or_post_url ]
-        
-        if referral_url is not None:
-            
-            urls_to_examine_in_order.append( referral_url )
-            
-        
-        ClientNetworkingFunctions.NetworkReportMode( f'Doing default tag import options lookup for {urls_to_examine_in_order}.' )
-        
-        for url in urls_to_examine_in_order:
-            
-            url_class = self._GetURLClass( url )
-            
-            if url_class is not None:
-                
-                try:
-                    
-                    # we store options for the final link in the api redirect chain
-                    ( url_class, api_url ) = self._GetNormalisedAPIURLClassAndURL( url )
-                    
-                except HydrusExceptions.URLClassException as e:
-                    
-                    ClientNetworkingFunctions.NetworkReportMode( f'Failed to API-redirect-resolve on {url}: {e}.' )
-                    
-                    continue
-                    
-                
-                url_class_key = url_class.GetClassKey()
-                
-                if url_class_key in self._url_class_keys_to_default_note_import_options:
-                    
-                    ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to specific note import options.' )
-                    
-                    return self._url_class_keys_to_default_note_import_options[ url_class_key ]
-                    
-                else:
-                    
-                    url_type = url_class.GetURLType()
-                    
-                    if url_type == HC.URL_TYPE_POST:
-                        
-                        ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to default post note import options.' )
-                        
-                        return self._file_post_default_note_import_options
-                        
-                    elif url_type == HC.URL_TYPE_WATCHABLE:
-                        
-                        ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to default watcher note import options.' )
-                        
-                        return self._watchable_default_note_import_options
-                        
-                    
-                
-            
-        
-        ClientNetworkingFunctions.NetworkReportMode( f'No matches; resolving to default post note import options.' )
-        
-        return self._file_post_default_note_import_options
-        
-    
-    def _GetDefaultTagImportOptionsForURL( self, referral_url: str | None, file_or_post_url: str ):
-        
-        urls_to_examine_in_order = [ file_or_post_url ]
-        
-        if referral_url is not None:
-            
-            urls_to_examine_in_order.append( referral_url )
-            
-        
-        ClientNetworkingFunctions.NetworkReportMode( f'Doing default tag import options lookup for {urls_to_examine_in_order}.' )
-        
-        for url in urls_to_examine_in_order:
-            
-            url_class = self._GetURLClass( url )
-            
-            if url_class is not None:
-                
-                try:
-                    
-                    # we store options for the final link in the api redirect chain
-                    ( url_class, api_url ) = self._GetNormalisedAPIURLClassAndURL( url )
-                    
-                except HydrusExceptions.URLClassException as e:
-                    
-                    ClientNetworkingFunctions.NetworkReportMode( f'Failed to API-redirect-resolve on {url}: {e}.' )
-                    
-                    continue
-                    
-                
-                url_class_key = url_class.GetClassKey()
-                
-                if url_class_key in self._url_class_keys_to_default_tag_import_options:
-                    
-                    ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to specific tag import options.' )
-                    
-                    return self._url_class_keys_to_default_tag_import_options[ url_class_key ]
-                    
-                else:
-                    
-                    url_type = url_class.GetURLType()
-                    
-                    if url_type == HC.URL_TYPE_POST:
-                        
-                        ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to default post tag import options.' )
-                        
-                        return self._file_post_default_tag_import_options
-                        
-                    elif url_type == HC.URL_TYPE_WATCHABLE:
-                        
-                        ClientNetworkingFunctions.NetworkReportMode( f'{url} resolved to default watcher tag import options.' )
-                        
-                        return self._watchable_default_tag_import_options
-                        
-                    
-                
-            
-        
-        ClientNetworkingFunctions.NetworkReportMode( f'No matches; resolving to default post tag import options.' )
-        
-        return self._file_post_default_tag_import_options
-        
-    
     def _GetGUG( self, gug_key_and_name: tuple[ bytes, str ] | None ):
         
         if gug_key_and_name is None:
@@ -262,7 +140,7 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def _GetNormalisedAPIURLClassAndURL( self, url ) -> tuple[ ClientNetworkingURLClass.URLClass, str ]:
+    def _GetNormalisedAPIURLClassAndURL( self, url ) -> tuple[ ClientNetworkingURLClass.URLClass, str, list[ ClientNetworkingURLClass.URLClass] ]:
         
         url_class = self._GetURLClass( url )
         
@@ -272,6 +150,7 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
         seen_url_classes = set()
+        url_class_chain = [ url_class ]
         
         seen_url_classes.add( url_class )
         
@@ -309,12 +188,13 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
                 raise HydrusExceptions.URLClassException( message )
                 
             
+            url_class_chain.append( api_url_class )
             seen_url_classes.add( api_url_class )
             
         
         api_url = api_url_class.Normalise( api_url, for_server = True )
         
-        return ( api_url_class, api_url )
+        return ( api_url_class, api_url, url_class_chain )
         
     
     def _GetSerialisableInfo( self ):
@@ -408,7 +288,7 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
         
         try:
             
-            ( url_class, url_to_fetch ) = self._GetNormalisedAPIURLClassAndURL( url )
+            ( url_class, url_to_fetch, url_class_chain ) = self._GetNormalisedAPIURLClassAndURL( url )
             
         except HydrusExceptions.URLClassException as e:
             
@@ -422,7 +302,7 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
         
         try:
             
-            ( parser_url_class, parser_url ) = self._GetNormalisedAPIURLClassAndURL( url )
+            ( parser_url_class, parser_url, url_class_chain ) = self._GetNormalisedAPIURLClassAndURL( url )
             
         except HydrusExceptions.URLClassException as e:
             
@@ -1066,6 +946,28 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def DeleteDefaultImportOptions( self ):
+        
+        with self._lock:
+            
+            # you can wipe these guys out completely in a serialised object update around v730, when the v671 db code rolls out
+            
+            from hydrus.client.importing.options import TagImportOptionsLegacy
+            
+            self._file_post_default_tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy()
+            self._watchable_default_tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy()
+            
+            self._url_class_keys_to_default_tag_import_options = {}
+            
+            from hydrus.client.importing.options import NoteImportOptionsLegacy
+            
+            self._file_post_default_note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
+            self._watchable_default_note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
+            
+            self._url_class_keys_to_default_note_import_options = {}
+            
+        
+    
     def DeleteGUGs( self, deletee_names ):
         
         with self._lock:
@@ -1217,6 +1119,23 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def GetAPIPertinentURLClassKeysInPreferenceOrder( self, url: str ):
+        
+        with self._lock:
+            
+            try:
+                
+                ( url_class, api_url, url_class_chain ) = self._GetNormalisedAPIURLClassAndURL( url )
+                
+            except HydrusExceptions.URLClassException as e:
+                
+                url_class_chain = []
+                
+            
+        
+        return [ url_class.GetClassKey() for url_class in url_class_chain ]
+        
+    
     def GetDefaultGUGKeyAndName( self ) -> tuple[ bytes, str ] | None:
         
         with self._lock:
@@ -1243,27 +1162,11 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetDefaultNoteImportOptionsForURL( self, referral_url, url ):
-        
-        with self._lock:
-            
-            return self._GetDefaultNoteImportOptionsForURL( referral_url, url )
-            
-        
-    
     def GetDefaultTagImportOptions( self ):
         
         with self._lock:
             
             return ( self._file_post_default_tag_import_options, self._watchable_default_tag_import_options, self._url_class_keys_to_default_tag_import_options )
-            
-        
-    
-    def GetDefaultTagImportOptionsForURL( self, referral_url, url ):
-        
-        with self._lock:
-            
-            return self._GetDefaultTagImportOptionsForURL( referral_url, url )
             
         
     
@@ -1484,6 +1387,32 @@ class NetworkDomainManager( HydrusSerialisable.SerialisableBase ):
                 return {}
                 
             
+        
+    
+    def GetURLClassKey( self, url: str, pursue_to_api = False ) -> bytes | None:
+        
+        if pursue_to_api:
+            
+            try:
+                
+                ( url_class, api_url, url_class_chain ) = self._GetNormalisedAPIURLClassAndURL( url )
+                
+            except HydrusExceptions.URLClassException as e:
+                
+                url_class = None
+                
+            
+        else:
+            
+            url_class = self.GetURLClass( url )
+            
+        
+        if url_class is not None:
+            
+            return url_class.GetClassKey()
+            
+        
+        return None
         
     
     def GetURLClasses( self ):

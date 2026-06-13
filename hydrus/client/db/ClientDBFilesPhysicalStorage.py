@@ -12,6 +12,90 @@ from hydrus.client import ClientThreading
 from hydrus.client.db import ClientDBModule
 from hydrus.client.files import ClientFilesPhysical
 
+# TODO: In an IRL situation, this guy took ages, far longer than just hitting up every dir with os.isdir and such. Why would that be?
+def TryToGetPresumptiveSubfolderPathsBeneathLocation( location: ClientFilesPhysical.FilesStorageBaseLocation, granularity: int ) -> set[ str ]:
+    """
+    Given a Location, what subfolder paths does it seem to have?
+    We want a quick result in all cases, no matter the actual shape of the storage, so if it look like 400,000 files in a dir, let's dump out early.
+    """
+    
+    subfolder_paths = set()
+    subdirs_to_scan = []
+    
+    with os.scandir( location.path ) as scan:
+        
+        num_top_level_files = 0
+        num_top_level_dirs = 0
+        
+        for entry in scan:
+            
+            if entry.is_dir():
+                
+                num_top_level_dirs += 1
+                
+                if num_top_level_dirs > 600: # 512 is strict max
+                    
+                    raise HydrusExceptions.CancelledException( 'Too many subdirs!' )
+                    
+                
+                if granularity == 2:
+                    
+                    subfolder_paths.add( entry.path )
+                    
+                elif granularity == 3:
+                    
+                    subdirs_to_scan.append( entry.path )
+                    
+                
+            else:
+                
+                num_top_level_files += 1
+                
+                if num_top_level_files > 16:
+                    
+                    raise HydrusExceptions.CancelledException( 'Too many files!' )
+                    
+                
+            
+        
+    
+    for subdir_path in subdirs_to_scan:
+        # we must be granularity 3
+        
+        with os.scandir( subdir_path ) as scan:
+            
+            num_second_level_files = 0
+            num_second_level_dirs = 0
+            
+            for entry in scan:
+                
+                if entry.is_dir():
+                    
+                    num_second_level_dirs += 1
+                    
+                    if num_second_level_dirs > 20: # 16 is strict max
+                        
+                        raise HydrusExceptions.CancelledException( 'Too many subdirs!' )
+                        
+                    
+                    subfolder_paths.add( entry.path )
+                    
+                else:
+                    
+                    num_second_level_files += 1
+                    
+                    if num_second_level_files > 16:
+                        
+                        raise HydrusExceptions.CancelledException( 'Too many files!' )
+                        
+                    
+                
+            
+        
+    
+    return subfolder_paths
+    
+
 class ClientDBFilesPhysicalStorage( ClientDBModule.ClientDBModule ):
     
     def __init__(
@@ -59,6 +143,7 @@ class ClientDBFilesPhysicalStorage( ClientDBModule.ClientDBModule ):
         subfolders = set()
         
         location_ids_to_locations = {}
+        #base_locations_to_presumptive_subfolder_paths = collections.defaultdict( set )
         
         current_granularity = self._GetCurrentGranularity()
         
@@ -91,8 +176,29 @@ class ClientDBFilesPhysicalStorage( ClientDBModule.ClientDBModule ):
                 
                 base_location = paths_to_base_locations[ location ]
                 
-            
-            subfolders.add( ClientFilesPhysical.FilesStorageSubfolder( prefix, base_location ) )
+            '''
+            if base_location not in base_locations_to_presumptive_subfolder_paths:
+                
+                try:
+                    
+                    presumptive_subfolder_paths = TryToGetPresumptiveSubfolderPathsBeneathLocation( base_location, current_granularity )
+                    
+                    base_locations_to_presumptive_subfolder_paths[ base_location ] = presumptive_subfolder_paths
+                    
+                except HydrusExceptions.CancelledException:
+                    
+                    pass # welp
+                    
+                
+            '''
+            subfolder = ClientFilesPhysical.FilesStorageSubfolder( prefix, base_location )
+            '''
+            if subfolder.path in base_locations_to_presumptive_subfolder_paths[ base_location ]:
+                
+                subfolder.SetWeKnowItExistedAsOfNow( True )
+                
+            '''
+            subfolders.add( subfolder )
             
         
         all_prefixes = { subfolder.prefix for subfolder in subfolders }

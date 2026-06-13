@@ -15,8 +15,9 @@ from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing import ClientImportGallerySeeds
 from hydrus.client.importing import ClientImportSubscriptions
 from hydrus.client.importing import ClientImportSubscriptionQuery
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import CheckerImportOptions
 from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsContainerMigration
 from hydrus.client.importing.options import TagImportOptionsLegacy
 from hydrus.client.networking import ClientNetworkingContexts
 from hydrus.client.networking import ClientNetworkingJobs
@@ -364,7 +365,7 @@ class SubscriptionQueryLegacy( HydrusSerialisable.SerialisableBase ):
         self._paused = not self._paused
         
     
-    def RegisterSyncComplete( self, checker_options: ClientImportOptions.CheckerOptions ):
+    def RegisterSyncComplete( self, checker_options: CheckerImportOptions.CheckerOptions ):
         
         self._last_check_time = HydrusTime.GetNow()
         
@@ -432,7 +433,7 @@ class SubscriptionQueryLegacy( HydrusSerialisable.SerialisableBase ):
         self._tag_import_options = tag_import_options
         
     
-    def UpdateNextCheckTime( self, checker_options: ClientImportOptions.CheckerOptions ):
+    def UpdateNextCheckTime( self, checker_options: CheckerImportOptions.CheckerOptions ):
         
         if self._check_now:
             
@@ -782,7 +783,7 @@ class SubscriptionLegacy( HydrusSerialisable.SerialisableBaseNamed ):
             
             ( serialisable_gallery_identifier, serialisable_gallery_stream_identifiers, query, period, get_tags_if_url_recognised_and_file_redundant, initial_file_limit, periodic_file_limit, paused, serialisable_file_import_options, serialisable_tag_import_options, last_checked, check_now, last_error, no_work_until, no_work_until_reason, serialisable_file_seed_cache ) = old_serialisable_info
             
-            checker_options = ClientImportOptions.CheckerOptions( 5, period // 5, period * 10, ( 1, period * 10 ) )
+            checker_options = CheckerImportOptions.CheckerOptions( 5, period // 5, period * 10, (1, period * 10) )
             
             file_seed_cache = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_seed_cache )
             
@@ -1178,7 +1179,7 @@ class SubscriptionLegacy( HydrusSerialisable.SerialisableBaseNamed ):
         self._tag_import_options = tag_import_options.Duplicate()
         
     
-    def SetTuple( self, gug_key_and_name, checker_options: ClientImportOptions.CheckerOptions, initial_file_limit, periodic_file_limit, paused, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy, tag_import_options: TagImportOptionsLegacy.TagImportOptionsLegacy, no_work_until ):
+    def SetTuple( self, gug_key_and_name, checker_options: CheckerImportOptions.CheckerOptions, initial_file_limit, periodic_file_limit, paused, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy, tag_import_options: TagImportOptionsLegacy.TagImportOptionsLegacy, no_work_until ):
         
         self._gug_key_and_name = gug_key_and_name
         self._checker_options = checker_options
@@ -1203,6 +1204,7 @@ class SubscriptionLegacy( HydrusSerialisable.SerialisableBaseNamed ):
         return ( self._name, self._gug_key_and_name, self._queries, self._checker_options, self._initial_file_limit, self._periodic_file_limit, self._paused, self._file_import_options, self._tag_import_options, self._no_work_until, self._no_work_until_reason )
         
     
+
 HydrusSerialisable.SERIALISABLE_TYPES_TO_OBJECT_TYPES[ HydrusSerialisable.SERIALISABLE_TYPE_SUBSCRIPTION_LEGACY ] = SubscriptionLegacy
 
 def ConvertLegacySubscriptionToNew( legacy_subscription: SubscriptionLegacy ):
@@ -1215,8 +1217,8 @@ def ConvertLegacySubscriptionToNew( legacy_subscription: SubscriptionLegacy ):
         initial_file_limit,
         periodic_file_limit,
         paused,
-        file_import_options,
-        tag_import_options,
+        file_import_options_legacy,
+        tag_import_options_legacy,
         no_work_until,
         no_work_until_reason
         ) = legacy_subscription.ToTuple()
@@ -1230,8 +1232,12 @@ def ConvertLegacySubscriptionToNew( legacy_subscription: SubscriptionLegacy ):
     
     subscription.SetPaused( paused )
     
-    subscription.SetFileImportOptions( file_import_options )
-    subscription.SetTagImportOptions( tag_import_options )
+    import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainer(
+        file_import_options_legacy,
+        tag_import_options_legacy
+    )
+    
+    subscription.SetImportOptionsContainer( import_options_container )
     
     subscription.SetNoWorkUntil( no_work_until )
     

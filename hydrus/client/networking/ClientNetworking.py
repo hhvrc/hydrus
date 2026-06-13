@@ -491,6 +491,15 @@ class NetworkEngine( object ):
         self._is_shutdown = True
         
     
+    def PauseNewJobs( self ):
+        
+        self._pause_all_new_network_traffic = True
+        
+        self.controller.new_options.SetBoolean( 'pause_all_new_network_traffic', self._pause_all_new_network_traffic )
+        
+        self.controller.pub( 'notify_refresh_network_menu' )
+        
+    
     def PausePlayNewJobs( self ):
         
         self._pause_all_new_network_traffic = not self._pause_all_new_network_traffic
@@ -501,6 +510,8 @@ class NetworkEngine( object ):
             
             self.controller.pub( 'notify_network_traffic_unpaused' )
             
+        
+        self.controller.pub( 'notify_refresh_network_menu' )
         
     
     def RefreshOptions( self ):

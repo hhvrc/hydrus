@@ -40,6 +40,7 @@ from hydrus.client.gui import ClientGUISplash
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.lists import ClientGUIListManager
 from hydrus.client.importing import ClientImportFiles
+from hydrus.client.importing.options import ImportOptionsManager
 from hydrus.client.media import ClientMediaResultCache
 from hydrus.client.metadata import ClientTagsHandling
 from hydrus.client.networking import ClientNetworking
@@ -191,6 +192,12 @@ class Controller( object ):
         self.only_run = only_run
         self.run_finished = False
         self.was_successful = False
+        
+        self._timestamps_lock = threading.Lock()
+        
+        self._timestamps_ms = collections.defaultdict( lambda: 0 )
+        
+        self._boot_id = HydrusData.GenerateKey()
         
         self.main_qt_thread = self.app.thread()
         
@@ -395,6 +402,8 @@ class Controller( object ):
         self.CallToThreadLongRunning( self.network_engine.MainLoop )
         
         self.tag_display_manager = ClientTagsHandling.TagDisplayManager()
+        
+        self.import_options_manager = ImportOptionsManager.ImportOptionsManager.STATICGetDefaultInitialisedManager()
         
         self.duplicates_auto_resolution_manager = ClientDuplicatesAutoResolution.DuplicatesAutoResolutionManager( self )
         
@@ -668,6 +677,11 @@ class Controller( object ):
         return False
         
     
+    def GetBootId( self ):
+        
+        return self._boot_id
+        
+    
     def GetCurrentSessionPageAPIInfoDict( self ):
         
         return {
@@ -717,6 +731,11 @@ class Controller( object ):
         return self._server_files_dir
         
     
+    def GetHydrusTempDir( self ):
+        
+        return self._hydrus_temp_dir
+        
+    
     def GetMainGUI( self ):
         
         return self.win
@@ -756,9 +775,12 @@ class Controller( object ):
         return read
         
     
-    def GetHydrusTempDir( self ):
+    def GetTimestampMS( self, name: str ) -> int:
         
-        return self._hydrus_temp_dir
+        with self._timestamps_lock:
+            
+            return self._timestamps_ms[ name ]
+            
         
     
     def GetWrite( self, name ):

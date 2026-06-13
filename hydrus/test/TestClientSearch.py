@@ -1745,6 +1745,7 @@ class TestAutocompletePredGubbins( unittest.TestCase ):
             ( 'system:duration > 5 minutes 30 seconds', "system:duration > 5m30s" ),
             ( 'system:duration > 5 minutes 0 seconds', "system:duration > 300 seconds" ),
             ( 'system:duration > 5 minutes 0 seconds', "system:duration > 5 minutes" ),
+            ( f"system:duration {HC.UNICODE_GREATER_THAN_OR_EQUAL_TO} 5 minutes 0 seconds", 'system:duration greater than or equal to 5 minutes' ),
             ( 'system:framerate < 60fps', "system:framerate < 60fps" ),
             ( f'system:framerate {HC.UNICODE_APPROX_EQUAL} 12fps {HC.UNICODE_PLUS_OR_MINUS}15%', "system:framerate ~= 12fps" ),
             ( 'system:number of frames < 600', "system:number of frames < 600" ),

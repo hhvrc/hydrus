@@ -32,6 +32,8 @@ FLESH_OUT_SYSTEM_PRED_TYPES = {
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DIMENSIONS,
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_WIDTH,
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_HEIGHT,
+    ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_NUM_PIXELS,
+    ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO,
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_IMPORT_TIME,
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_ARCHIVED_TIME,
     ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_MODIFIED_TIME,
@@ -632,6 +634,25 @@ class FleshOutPredicatePanel( ClientGUIScrolledPanels.EditPanel ):
             static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_WIDTH, ClientNumberTest.NumberTest.STATICCreateFromCharacters( '=', 3840 ) ), ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_HEIGHT, ClientNumberTest.NumberTest.STATICCreateFromCharacters( '=', 2160 ) ) ), forced_label = '4k', show_remove_button = False ) )
             
             editable_pred_panels.append( self._PredOKPanel( self, ClientGUIPredicatesSingle.PanelPredicateSystemHeight, predicate ) )
+            
+        elif predicate_type == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_NUM_PIXELS:
+            
+            recent_predicate_types = [ ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_NUM_PIXELS ]
+            
+            editable_pred_panels.append( self._PredOKPanel( self, ClientGUIPredicatesSingle.PanelPredicateSystemNumPixels, predicate ) )
+            
+        elif predicate_type == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO:
+            
+            recent_predicate_types = [ ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO ]
+            
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( '=', 16, 9 ) ), ), show_remove_button = False ) )
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( '=', 9, 16 ) ), ), show_remove_button = False ) )
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( '=', 4, 3 ) ), ), show_remove_button = False ) )
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( '=', 1, 1 ) ), ), show_remove_button = False ) )
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( 'taller than', 1, 1 ) ), ), show_remove_button = False ) )
+            static_pred_buttons.append( ClientGUIPredicatesSingle.StaticSystemPredicateButton( self, ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( 'wider than', 1, 1 ) ), ), show_remove_button = False ) )
+            
+            editable_pred_panels.append( self._PredOKPanel( self, ClientGUIPredicatesSingle.PanelPredicateSystemRatio, predicate ) )
             
         elif predicate_type == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DURATION:
             

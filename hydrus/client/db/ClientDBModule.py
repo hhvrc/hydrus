@@ -52,7 +52,7 @@ class ClientDBModule( HydrusDBModule.HydrusDBModule ):
         message += '\n' * 2
         message += 'If this is happening on the first boot after an update, it is likely a fault in the update code. If you updated many versions in one go, kill the hydrus process now and update in a smaller version increment.'
         message += '\n' * 2
-        message += 'If this is just a normal boot, you most likely encountered hard drive damage. You should check "install_dir/db/help my db is broke.txt" for background reading. Whatever happens next, you need to check that your hard drive is healthy.'
+        message += 'If this is just a normal boot, you most likely encountered hard drive damage. You should check the \'Recovery->Help my db is broke\' document in the help for background reading. Whatever happens next, you need to check that your hard drive is healthy.'
         message += '\n' * 2
         
         if self.CAN_REPOPULATE_ALL_MISSING_DATA:

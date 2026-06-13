@@ -30,6 +30,19 @@ class MediaViewerHoversPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._hover_window_duplicates_always_on_top = QW.QCheckBox( hover_windows_panel )
         self._hover_window_duplicates_always_on_top.setToolTip( ClientGUIFunctions.WrapToolTip( 'Should the special duplicates hover window, which appears in the duplicate filter, always be viewable?' ) )
         
+        self._media_viewer_tags_scrolling_behaviour = ClientGUICommon.BetterChoice( hover_windows_panel )
+        
+        for ( value, s ) in CC.media_viewer_tags_scrolling_behaviour_str_lookup.items():
+            
+            self._media_viewer_tags_scrolling_behaviour.addItem( s, value )
+            
+        
+        tt = 'In Qt, if you scroll to the end of a scrollbar-having list, mouse wheel events will propagate up to the parent. For the media viewer this can be annoying since you would scroll down to the bottom of a taglist and then immediately switch to the next media.'
+        tt += '\n\n'
+        tt += 'Set a different behaviour depending on your preferences. The "if vertical scrollbar has not been used recently" option will lock you into a scroll inside the list until there is a delay between wheels, at which point an outer navigation is allowed to propagate. It involves a little voodoo, so if you do not like how it feels, try something else!'
+        
+        self._media_viewer_tags_scrolling_behaviour.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
+        
         background_panel = ClientGUICommon.StaticBox( self, 'background' )
         
         self._draw_tags_hover_in_media_viewer_background = QW.QCheckBox( background_panel )
@@ -94,6 +107,7 @@ class MediaViewerHoversPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._enable_top_right_hover_in_media_viewer.setChecked( not self._new_options.GetBoolean( 'disable_top_right_hover_in_media_viewer' ) )
         self._enable_notes_hover_in_media_viewer.setChecked( not self._new_options.GetBoolean( 'disable_notes_hover_in_media_viewer' ) )
         self._hover_window_duplicates_always_on_top.setChecked( self._new_options.GetBoolean( 'hover_window_duplicates_always_on_top' ) )
+        self._media_viewer_tags_scrolling_behaviour.SetValue( self._new_options.GetInteger( 'media_viewer_tags_scrolling_behaviour' ) )
         
         self._file_info_line_consider_archived_interesting.setChecked( self._new_options.GetBoolean( 'file_info_line_consider_archived_interesting' ) )
         self._file_info_line_consider_archived_time_interesting.setChecked( self._new_options.GetBoolean( 'file_info_line_consider_archived_time_interesting' ) )
@@ -116,6 +130,7 @@ class MediaViewerHoversPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         rows.append( ( 'Pop-in ratings and locations (top-right) hover window on mouseover:', self._enable_top_right_hover_in_media_viewer ) )
         rows.append( ( 'Pop-in notes (right) hover window on mouseover:', self._enable_notes_hover_in_media_viewer ) )
         rows.append( ( 'Pin the duplicates (right, duplicates filter) hover window so it is always visible:', self._hover_window_duplicates_always_on_top ) )
+        rows.append( ( 'Allow a mouse wheel scroll over the taglist to propagate to the main canvas:', self._media_viewer_tags_scrolling_behaviour ) )
         
         hover_windows_gridbox = ClientGUICommon.WrapInGrid( hover_windows_panel, rows )
         
@@ -207,6 +222,7 @@ class MediaViewerHoversPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._new_options.SetBoolean( 'disable_top_right_hover_in_media_viewer', not self._enable_top_right_hover_in_media_viewer.isChecked() )
         self._new_options.SetBoolean( 'disable_notes_hover_in_media_viewer', not self._enable_notes_hover_in_media_viewer.isChecked() )
         self._new_options.SetBoolean( 'hover_window_duplicates_always_on_top', self._hover_window_duplicates_always_on_top.isChecked() )
+        self._new_options.SetInteger( 'media_viewer_tags_scrolling_behaviour', self._media_viewer_tags_scrolling_behaviour.GetValue() )
         
         self._new_options.SetBoolean( 'preview_window_hover_top_right_shows_popup', self._preview_window_hover_top_right_shows_popup.isChecked() )
         self._new_options.SetBoolean( 'draw_top_right_hover_in_preview_window_background', self._draw_top_right_hover_in_preview_window_background.isChecked() )

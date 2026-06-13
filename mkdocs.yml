@@ -17,6 +17,7 @@ nav:
     - getting_started_searching.md
     - getting_started_more_tags.md
     - getting_started_downloading.md
+    - getting_started_import_options.md
     - getting_started_ratings.md
     - PTR: 
       - access_keys.md
@@ -64,6 +65,16 @@ nav:
   - API: 
     - client_api.md
     - developer_api.md
+  - Recovery:
+    - help_my_client_will_not_boot.md
+    - help_my_db_is_broke.md
+    - help_my_db_disappeared.md
+    - help_my_db_is_the_wrong_granularity.md
+    - help_my_media_files_are_broke.md
+    - help_my_media_folders_are_broke.md
+    - help_I_had_a_file_identifier_missing_error.md
+    - help_my_mpv_crashes_with_unusual_audio.md
+    - how_to_see_inside_the_db.md
   - Misc:
     - faq.md
     - privacy.md
@@ -172,4 +183,3 @@ markdown_extensions:
 
 plugins:
   - search
-  - offline

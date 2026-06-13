@@ -17,6 +17,8 @@ from hydrus.client.importing import ClientImporting
 from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing import ClientImportGallerySeeds
 from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import ImportOptionsContainerMigration
 from hydrus.client.importing.options import NoteImportOptionsLegacy
 from hydrus.client.importing.options import TagImportOptionsLegacy
@@ -27,7 +29,7 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_SIMPLE_DOWNLOADER_IMPORT
     SERIALISABLE_NAME = 'Simple Downloader Import'
-    SERIALISABLE_VERSION = 5
+    SERIALISABLE_VERSION = 6
     
     def __init__( self ):
         
@@ -37,8 +39,7 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
         self._gallery_seed_log = ClientImportGallerySeeds.GallerySeedLog()
         self._file_seed_cache = ClientImportFileSeeds.FileSeedCache()
         
-        self._file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        self._file_import_options.SetIsDefault( True )
+        self._import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
         self._formula_name = 'all files linked by images in page'
         self._gallery_paused = False
@@ -104,20 +105,20 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
         
         serialisable_gallery_seed_log = self._gallery_seed_log.GetSerialisableTuple()
         serialisable_file_seed_cache = self._file_seed_cache.GetSerialisableTuple()
-        serialisable_file_import_options = self._file_import_options.GetSerialisableTuple()
+        serialisable_import_options_container = self._import_options_container.GetSerialisableTuple()
         
-        return ( serialisable_pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, self._formula_name, self._gallery_paused, self._files_paused )
+        return ( serialisable_pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, self._formula_name, self._gallery_paused, self._files_paused )
         
     
     def _InitialiseFromSerialisableInfo( self, serialisable_info ):
         
-        ( serialisable_pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, self._formula_name, self._gallery_paused, self._files_paused ) = serialisable_info
+        ( serialisable_pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, self._formula_name, self._gallery_paused, self._files_paused ) = serialisable_info
         
         self._pending_jobs = [ ( url, HydrusSerialisable.CreateFromSerialisableTuple( serialisable_simple_downloader_formula ) ) for ( url, serialisable_simple_downloader_formula ) in serialisable_pending_jobs ]
         
         self._gallery_seed_log = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_gallery_seed_log )
         self._file_seed_cache = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_seed_cache )
-        self._file_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
+        self._import_options_container = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_import_options_container )
         
     
     def _NetworkJobFactory( self, *args, **kwargs ):
@@ -204,6 +205,33 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             return ( 5, new_serialisable_info )
             
         
+        if version == 5:
+            
+            ( pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, formula_name, queue_paused, files_paused ) = old_serialisable_info
+            
+            file_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
+            
+            if CG.client_controller.IsBooted():
+                
+                optional_parent_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
+                
+            else:
+                
+                optional_parent_container = None
+                
+            
+            import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainer(
+                file_import_options_legacy = file_import_options_legacy,
+                optional_parent_container = optional_parent_container
+            )
+            
+            serialisable_import_options_container = import_options_container.GetSerialisableTuple()
+            
+            new_serialisable_info = ( pending_jobs, serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, formula_name, queue_paused, files_paused )
+            
+            return ( 6, new_serialisable_info )
+            
+        
     
     def _WorkOnFiles( self ):
         
@@ -224,23 +252,11 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
                 
             
         
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
-        
-        import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-            self._file_import_options,
-            FileImportOptionsLegacy.IMPORT_TYPE_LOUD,
-            tag_import_options,
-            note_import_options,
-            file_seed.GetReferralURL(),
-            file_seed.file_seed_data
-        )
+        full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, urls = file_seed.GetURLsForOptionsLookup() )
         
         try:
             
-            did_substantial_work = file_seed.WorkOnURL( self._file_seed_cache, status_hook, self._NetworkJobFactory, self._FileNetworkJobPresentationContextFactory, import_options_container )
+            did_substantial_work = file_seed.WorkOnURL( self._file_seed_cache, status_hook, self._NetworkJobFactory, self._FileNetworkJobPresentationContextFactory, full_import_options_container )
             
         except HydrusExceptions.NetworkException as e:
             
@@ -261,9 +277,7 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             time.sleep( 3 )
             
         
-        real_presentation_import_options = FileImportOptionsLegacy.GetRealPresentationImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
-        
-        if file_seed.ShouldPresent( real_presentation_import_options ):
+        if file_seed.ShouldPresent( full_import_options_container.GetPresentationImportOptions() ):
             
             file_seed.PresentToPage( self._page_key )
             
@@ -532,14 +546,6 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetFileImportOptions( self ):
-        
-        with self._lock:
-            
-            return self._file_import_options
-            
-        
-    
     def GetFormulaName( self ):
         
         with self._lock:
@@ -548,11 +554,29 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def GetImportOptionsContainer( self ):
+        
+        with self._lock:
+            
+            return self._import_options_container
+            
+        
+    
     def GetGallerySeedLog( self ):
         
         with self._lock:
             
             return self._gallery_seed_log
+            
+        
+    
+    def GetLocationContext( self ):
+        
+        with self._lock:
+            
+            full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
+            
+            return full_import_options_container.GetLocationImportOptions().GetDestinationLocationContext()
             
         
     
@@ -653,13 +677,15 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def SetFileImportOptions( self, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy ):
+    def SetImportOptionsContainer( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
         with self._lock:
             
-            if file_import_options.DumpToString() != self._file_import_options.DumpToString():
-                
-                self._file_import_options = file_import_options
+            change_made = import_options_container.DumpToString() != self._import_options_container.DumpToString()
+            
+            self._import_options_container = import_options_container
+            
+            if change_made:
                 
                 self._SerialisableChangeMade()
                 
@@ -743,11 +769,9 @@ class SimpleDownloaderImport( HydrusSerialisable.SerialisableBase ):
             
             try:
                 
-                real_file_import_options = FileImportOptionsLegacy.GetRealFileImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
+                ClientImportControl.CheckImporterCanDoFileWorkBecauseLocationsProblem( self._file_seed_cache, self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
                 
-                ClientImportControl.CheckImporterCanDoFileWorkBecausePausifyingProblem( real_file_import_options.GetLocationImportOptions() )
-                
-            except HydrusExceptions.VetoException:
+            except HydrusExceptions.VetoException as e:
                 
                 self._files_paused = True
                 
@@ -889,9 +913,9 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_URLS_IMPORT
     SERIALISABLE_NAME = 'URL Import'
-    SERIALISABLE_VERSION = 4
+    SERIALISABLE_VERSION = 5
     
-    def __init__( self, destination_location_context = None, destination_tag_import_options = None ):
+    def __init__( self, import_options_container = None ):
         
         super().__init__()
         
@@ -901,24 +925,12 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
         self._file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
         self._file_import_options.SetIsDefault( True )
         
-        if destination_location_context is not None:
+        if import_options_container is None:
             
-            self._file_import_options = FileImportOptionsLegacy.GetRealFileImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD ).Duplicate()
-            
-            self._file_import_options.GetLocationImportOptions().SetDestinationLocationContext( destination_location_context )
+            import_options_container = ImportOptionsContainer.ImportOptionsContainer()
             
         
-        if destination_tag_import_options is not None:
-            
-            self._tag_import_options = destination_tag_import_options
-            
-        else:
-            
-            self._tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-            
-        
-        self._note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        self._note_import_options.SetIsDefault( True )
+        self._import_options_container = import_options_container
         
         self._paused = False
         
@@ -1002,22 +1014,18 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
         
         serialisable_gallery_seed_log = self._gallery_seed_log.GetSerialisableTuple()
         serialisable_file_seed_cache = self._file_seed_cache.GetSerialisableTuple()
-        serialisable_file_import_options = self._file_import_options.GetSerialisableTuple()
-        serialisable_tag_import_options = self._tag_import_options.GetSerialisableTuple()
-        serialisable_note_import_options = self._note_import_options.GetSerialisableTuple()
+        serialisable_import_options_container = self._import_options_container.GetSerialisableTuple()
         
-        return ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, serialisable_tag_import_options, serialisable_note_import_options, self._paused )
+        return ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, self._paused )
         
     
     def _InitialiseFromSerialisableInfo( self, serialisable_info ):
         
-        ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, serialisable_tag_import_options, serialisable_note_import_options, self._paused ) = serialisable_info
+        ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, self._paused ) = serialisable_info
         
         self._gallery_seed_log = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_gallery_seed_log )
         self._file_seed_cache = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_seed_cache )
-        self._file_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
-        self._tag_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_import_options )
-        self._note_import_options = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_note_import_options )
+        self._import_options_container = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_import_options_container )
         
     
     def _NetworkJobFactory( self, *args, **kwargs ):
@@ -1074,6 +1082,37 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             return ( 4, new_serialisable_info )
             
         
+        if version == 4:
+            
+            ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_file_import_options, serialisable_tag_import_options, serialisable_note_import_options, paused ) = old_serialisable_info
+            
+            file_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_file_import_options )
+            tag_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_import_options )
+            note_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_note_import_options )
+            
+            if CG.client_controller.IsBooted():
+                
+                optional_parent_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
+                
+            else:
+                
+                optional_parent_container = None
+                
+            
+            import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainer(
+                file_import_options_legacy = file_import_options_legacy,
+                tag_import_options_legacy = tag_import_options_legacy,
+                note_import_options_legacy = note_import_options_legacy,
+                optional_parent_container = optional_parent_container
+            )
+            
+            serialisable_import_options_container = import_options_container.GetSerialisableTuple()
+            
+            new_serialisable_info = ( serialisable_gallery_seed_log, serialisable_file_seed_cache, serialisable_import_options_container, paused )
+            
+            return ( 5, new_serialisable_info )
+            
+        
     
     def _WorkOnFiles( self ):
         
@@ -1086,26 +1125,15 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
         
         did_substantial_work = False
         
-        url = file_seed.file_seed_data
-        
-        import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-            self._file_import_options,
-            FileImportOptionsLegacy.IMPORT_TYPE_LOUD,
-            self._tag_import_options,
-            self._note_import_options,
-            file_seed.GetReferralURL(),
-            file_seed.file_seed_data
-        )
+        full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, urls = file_seed.GetURLsForOptionsLookup() )
         
         try:
             
             status_hook = lambda s: s # do nothing for now
             
-            did_substantial_work = file_seed.WorkOnURL( self._file_seed_cache, status_hook, self._NetworkJobFactory, self._FileNetworkJobPresentationContextFactory, import_options_container )
+            did_substantial_work = file_seed.WorkOnURL( self._file_seed_cache, status_hook, self._NetworkJobFactory, self._FileNetworkJobPresentationContextFactory, full_import_options_container )
             
-            real_presentation_import_options = FileImportOptionsLegacy.GetRealPresentationImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
-            
-            if file_seed.ShouldPresent( real_presentation_import_options ):
+            if file_seed.ShouldPresent( full_import_options_container.GetPresentationImportOptions() ):
                 
                 file_seed.PresentToPage( self._page_key )
                 
@@ -1206,14 +1234,6 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetFileImportOptions( self ) -> FileImportOptionsLegacy.FileImportOptionsLegacy:
-        
-        with self._lock:
-            
-            return self._file_import_options
-            
-        
-    
     def GetFileSeedCache( self ):
         
         with self._lock:
@@ -1230,6 +1250,24 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def GetImportOptionsContainer( self ) -> ImportOptionsContainer.ImportOptionsContainer:
+        
+        with self._lock:
+            
+            return self._import_options_container
+            
+        
+    
+    def GetLocationContext( self ):
+        
+        with self._lock:
+            
+            full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
+            
+            return full_import_options_container.GetLocationImportOptions().GetDestinationLocationContext()
+            
+        
+    
     def GetNetworkJobs( self ):
         
         with self._lock:
@@ -1238,27 +1276,11 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetNoteImportOptions( self ) -> NoteImportOptionsLegacy.NoteImportOptionsLegacy:
-        
-        with self._lock:
-            
-            return self._note_import_options
-            
-        
-    
     def GetNumSeeds( self ):
         
         with self._lock:
             
             return len( self._file_seed_cache ) + len( self._gallery_seed_log )
-            
-        
-    
-    def GetTagImportOptions( self ) -> TagImportOptionsLegacy.TagImportOptionsLegacy:
-        
-        with self._lock:
-            
-            return self._tag_import_options
             
         
     
@@ -1391,39 +1413,15 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def SetFileImportOptions( self, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy ):
+    def SetImportOptionsContainer( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
         with self._lock:
             
-            if file_import_options.DumpToString() != self._file_import_options.DumpToString():
-                
-                self._file_import_options = file_import_options
-                
-                self._SerialisableChangeMade()
-                
+            changes_made = import_options_container.DumpToString() != self._import_options_container.DumpToString()
             
-        
-    
-    def SetNoteImportOptions( self, note_import_options: NoteImportOptionsLegacy.NoteImportOptionsLegacy ):
-        
-        with self._lock:
+            self._import_options_container = import_options_container
             
-            if note_import_options.DumpToString() != self._note_import_options.DumpToString():
-                
-                self._note_import_options = note_import_options
-                
-                self._SerialisableChangeMade()
-                
-            
-        
-    
-    def SetTagImportOptions( self, tag_import_options: TagImportOptionsLegacy.TagImportOptionsLegacy ):
-        
-        with self._lock:
-            
-            if tag_import_options.DumpToString() != self._tag_import_options.DumpToString():
-                
-                self._tag_import_options = tag_import_options
+            if changes_made:
                 
                 self._SerialisableChangeMade()
                 
@@ -1470,11 +1468,9 @@ class URLsImport( HydrusSerialisable.SerialisableBase ):
             
             try:
                 
-                real_file_import_options = FileImportOptionsLegacy.GetRealFileImportOptions( self._file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
+                ClientImportControl.CheckImporterCanDoFileWorkBecauseLocationsProblem( self._file_seed_cache, self._import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS )
                 
-                ClientImportControl.CheckImporterCanDoFileWorkBecausePausifyingProblem( real_file_import_options.GetLocationImportOptions() )
-                
-            except HydrusExceptions.VetoException:
+            except HydrusExceptions.VetoException as e:
                 
                 self._paused = True
                 

@@ -668,6 +668,7 @@ class MediaPlaybackPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._new_options.SetBoolean( 'enable_truncated_images_pil', self._enable_truncated_images_pil.isChecked() )
         self._new_options.SetBoolean( 'do_icc_profile_normalisation', self._do_icc_profile_normalisation.isChecked() )
         self._new_options.SetBoolean( 'use_system_ffmpeg', self._use_system_ffmpeg.isChecked() )
+        self._new_options.SetInteger( 'ffmpeg_subprocess_timeout', self._ffmpeg_subprocess_timeout.value() )
         
         mpv_conf_path = self._mpv_conf_path.GetPath()
         

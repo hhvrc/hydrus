@@ -2,6 +2,7 @@ import threading
 import time
 
 from hydrus.core import HydrusConstants as HC
+from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusLists
@@ -227,9 +228,19 @@ class ManagerWithMainLoop( object ):
             
         except HydrusExceptions.ShutdownException:
             
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'MainLoop Manager "{self}" caught a Shutdown exception in its mainloop.' )
+                
+            
             pass
             
         finally:
+            
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'MainLoop Manager "{self}" is shut down!' )
+                
             
             self._mainloop_is_finished = True
             

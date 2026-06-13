@@ -20,7 +20,6 @@ from hydrus.client import ClientPaths
 from hydrus.client import ClientPDFHandling
 from hydrus.client import ClientThreading
 from hydrus.client.files import ClientFilesMaintenance
-from hydrus.client.gui import ClientGUIAsync
 from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUIDialogsQuick
 from hydrus.client.gui import ClientGUITopLevelWindowsPanels
@@ -1106,6 +1105,68 @@ def RedownloadURLClassURLsForceRefetch( win: QW.QWidget, medias, url_class ):
     CG.client_controller.gui.RedownloadURLsForceFetch( urls )
     
 
+def set_files_forced_filetypes( single_medias: list[ ClientMediaSingle.MediaSingle ], forced_mime: int ):
+    
+    job_status = ClientThreading.JobStatus( cancellable = True )
+    
+    job_status.SetStatusTitle( 'forcing filetypes' )
+    
+    BLOCK_SIZE = 64
+    
+    pauser = HydrusThreading.BigJobPauser()
+    
+    if len( single_medias ) > BLOCK_SIZE:
+        
+        CG.client_controller.pub( 'message', job_status )
+        
+    
+    for ( num_done, num_to_do, block_of_media ) in HydrusLists.SplitListIntoChunksRich( single_medias, BLOCK_SIZE ):
+        
+        if job_status.IsCancelled():
+            
+            break
+            
+        
+        job_status.SetStatusText( HydrusNumbers.ValueRangeToPrettyString( num_done, num_to_do ) )
+        job_status.SetGauge( num_done, num_to_do )
+        
+        hashes = { media.GetHash() for media in block_of_media }
+        
+        CG.client_controller.WriteSynchronous( 'force_filetype', hashes, forced_mime )
+        
+        hashes_we_needed_to_dupe = set()
+        
+        for media in block_of_media:
+            
+            hash = media.GetHash()
+            
+            current_mime = media.GetMime()
+            mime_to_move_to = forced_mime
+            
+            if mime_to_move_to is None:
+                
+                mime_to_move_to = media.GetFileInfoManager().GetOriginalMime()
+                
+            
+            needed_to_dupe_the_file = CG.client_controller.client_files_manager.ChangeFileExt( hash, current_mime, mime_to_move_to )
+            
+            if needed_to_dupe_the_file:
+                
+                hashes_we_needed_to_dupe.add( hash )
+                
+            
+        
+        if len( hashes_we_needed_to_dupe ) > 0:
+            
+            CG.client_controller.WriteSynchronous( 'file_maintenance_add_jobs_hashes', hashes_we_needed_to_dupe, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_DELETE_NEIGHBOUR_DUPES, HydrusTime.GetNow() + 3600 )
+            
+        
+        pauser.Pause()
+        
+    
+    job_status.FinishAndDismiss()
+    
+
 def SetFilesForcedFiletypes( win: QW.QWidget, medias: collections.abc.Collection[ ClientMedia.Media ] ):
     
     # boot a panel, it shows the user what current mimes are, what forced mimes are, and they have the choice to set all to x
@@ -1128,76 +1189,7 @@ def SetFilesForcedFiletypes( win: QW.QWidget, medias: collections.abc.Collection
             
             forced_mime = panel.GetValue()
             
-            def work_callable():
-                
-                job_status = ClientThreading.JobStatus( cancellable = True )
-                
-                job_status.SetStatusTitle( 'forcing filetypes' )
-                
-                BLOCK_SIZE = 64
-                
-                pauser = HydrusThreading.BigJobPauser()
-                
-                if len( single_medias ) > BLOCK_SIZE:
-                    
-                    CG.client_controller.pub( 'message', job_status )
-                    
-                
-                for ( num_done, num_to_do, block_of_media ) in HydrusLists.SplitListIntoChunksRich( single_medias, BLOCK_SIZE ):
-                    
-                    if job_status.IsCancelled():
-                        
-                        break
-                        
-                    
-                    job_status.SetStatusText( HydrusNumbers.ValueRangeToPrettyString( num_done, num_to_do ) )
-                    job_status.SetGauge( num_done, num_to_do )
-                    
-                    hashes = { media.GetHash() for media in block_of_media }
-                    
-                    CG.client_controller.WriteSynchronous( 'force_filetype', hashes, forced_mime )
-                    
-                    hashes_we_needed_to_dupe = set()
-                    
-                    for media in block_of_media:
-                        
-                        hash = media.GetHash()
-                        
-                        current_mime = media.GetMime()
-                        mime_to_move_to = forced_mime
-                        
-                        if mime_to_move_to is None:
-                            
-                            mime_to_move_to = media.GetFileInfoManager().GetOriginalMime()
-                            
-                        
-                        needed_to_dupe_the_file = CG.client_controller.client_files_manager.ChangeFileExt( hash, current_mime, mime_to_move_to )
-                        
-                        if needed_to_dupe_the_file:
-                            
-                            hashes_we_needed_to_dupe.add( hash )
-                            
-                        
-                    
-                    if len( hashes_we_needed_to_dupe ) > 0:
-                        
-                        CG.client_controller.WriteSynchronous( 'file_maintenance_add_jobs_hashes', hashes_we_needed_to_dupe, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_DELETE_NEIGHBOUR_DUPES, HydrusTime.GetNow() + 3600 )
-                        
-                    
-                    pauser.Pause()
-                    
-                
-                job_status.FinishAndDismiss()
-                
-            
-            def publish_callable( result ):
-                
-                pass
-                
-            
-            job = ClientGUIAsync.AsyncQtJob( win, work_callable, publish_callable )
-            
-            job.start()
+            CG.client_controller.CallToThread( set_files_forced_filetypes, single_medias, forced_mime )
             
         
     

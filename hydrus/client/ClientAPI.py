@@ -189,6 +189,14 @@ class APIManager( HydrusSerialisable.SerialisableBase ):
             
         
     
+    def HasAccessKey( self, access_key: bytes ) -> bool:
+        
+        with self._lock:
+            
+            return access_key in self._access_keys_to_permissions
+            
+        
+    
     def IsDirty( self ):
         
         with self._lock:
@@ -208,9 +216,19 @@ class APIManager( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def OverwriteAccess( self, api_permissions ):
+    def OverwriteAccess( self, original_api_permissions: "APIPermissions", edited_api_permissions: "APIPermissions" ):
         
-        self.AddAccess( api_permissions )
+        with self._lock:
+            
+            if original_api_permissions.GetAccessKey() != edited_api_permissions.GetAccessKey():
+                
+                del self._access_keys_to_permissions[ original_api_permissions.GetAccessKey() ]
+                
+            
+            self._access_keys_to_permissions[ edited_api_permissions.GetAccessKey() ] = edited_api_permissions
+            
+            self._SetDirty()
+            
         
     
     def SetClean( self ):

@@ -8,6 +8,7 @@ from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusLists
 from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusPaths
+from hydrus.core import HydrusTime
 from hydrus.core.files import HydrusFilesPhysicalStorage
 
 from hydrus.client import ClientThreading
@@ -340,6 +341,8 @@ class FilesStorageBaseLocation( object ):
         self.ideal_weight = ideal_weight
         self.max_num_bytes = max_num_bytes
         
+        self._last_successful_exists_time = 0
+        
     
     def __eq__( self, other ):
         
@@ -443,9 +446,21 @@ class FilesStorageBaseLocation( object ):
         return False
         
     
-    def PathExists( self ):
+    def PathExists( self, lazy_check_ok = False ):
         
-        return os.path.exists( self.path ) and os.path.isdir( self.path )
+        if lazy_check_ok and not HydrusTime.TimeHasPassedFloat( self._last_successful_exists_time + 300 ):
+            
+            return True
+            
+        
+        result = HydrusPaths.PathExistsAndIsDir( self.path )
+        
+        if result:
+            
+            self._last_successful_exists_time = HydrusTime.GetNowFloat()
+            
+        
+        return result
         
     
     def WouldLikeToRemoveSubfolders( self, current_normalised_weight: float, total_ideal_weight: int, weight_of_subfolder: float ):
@@ -556,6 +571,8 @@ class FilesStorageSubfolder( object ):
         
         #
         
+        self._last_successful_exists_time = 0
+        
         self.hex_prefix = self.prefix[1:]
         
         our_subfolders = self._GetOurSubfolders()
@@ -647,8 +664,25 @@ class FilesStorageSubfolder( object ):
         HydrusPaths.MakeSureDirectoryExists( self.path )
         
     
-    def PathExists( self ):
+    def PathExists( self, lazy_check_ok = False ):
         
-        return os.path.exists( self.path ) and os.path.isdir( self.path )
+        if lazy_check_ok and not HydrusTime.TimeHasPassedFloat( self._last_successful_exists_time + 300 ):
+            
+            return True
+            
+        
+        result = HydrusPaths.PathExistsAndIsDir( self.path )
+        
+        if result:
+            
+            self._last_successful_exists_time = HydrusTime.GetNowFloat()
+            
+        
+        return result
+        
+    
+    def SetWeKnowItExistedAsOfNow( self, value: bool ):
+        
+        self._last_successful_exists_time = HydrusTime.GetNowFloat()
         
     

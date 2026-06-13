@@ -407,6 +407,11 @@ class ParseFormulaZipper( ParseFormula ):
             streams.append( stream )
             
         
+        if len( streams ) == 0:
+            
+            return []
+            
+        
         # let's make a text result for every item in the longest list of subtexts
         num_raw_texts_to_make = max( ( len( stream ) for stream in streams ) )
         

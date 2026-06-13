@@ -424,7 +424,7 @@ class ListAccountsPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._account_list = ClientGUIListBoxes.BetterQListWidget( self._accounts_box )
         self._account_list.setSelectionMode( QW.QAbstractItemView.SelectionMode.ExtendedSelection )
         
-        ( min_width, min_height ) = ClientGUIFunctions.ConvertTextToPixels( self._account_list, ( 74, 16 ) )
+        ( min_width, min_height ) = ClientGUIFunctions.ConvertTextToPixels( self._account_list, ( 60, 16 ) )
         
         self._account_list.setMinimumSize( min_width, min_height )
         
@@ -513,7 +513,7 @@ class ReviewAccountsPanel( QW.QWidget ):
         self._account_list = ClientGUICommon.BetterCheckBoxList( self._accounts_box )
         self._account_list.setSelectionMode( QW.QAbstractItemView.SelectionMode.SingleSelection )
         
-        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._account_list, 74 )
+        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._account_list, 60 )
         
         self._account_list.setMinimumWidth( min_width )
         
@@ -524,7 +524,7 @@ class ReviewAccountsPanel( QW.QWidget ):
         self._account_info_box = QW.QTextEdit( self._accounts_box )
         self._account_info_box.setReadOnly( True )
         
-        ( min_width, min_height ) = ClientGUIFunctions.ConvertTextToPixels( self._account_info_box, ( 16, 8 ) )
+        min_height = ClientGUIFunctions.ConvertTextToPixelHeight( self._account_info_box, 8 )
         
         self._account_info_box.setMinimumHeight( min_height )
         

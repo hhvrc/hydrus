@@ -1,65 +1,136 @@
+import base64
+import json
 from PIL import Image as PILImage
 
 from hydrus.core import HydrusExceptions
 
-def GetEmbeddedFileText( pil_image: PILImage.Image ) -> str | None:
+def render_char_card( chara_text: str, indent_depth: int ):
     
-    def render_dict( d, prefix ):
+    try:
         
-        texts = []
+        card_json = json.loads( base64.b64decode( chara_text ).decode( 'utf-8' ) )
         
-        keys = sorted( d.keys() )
+    except Exception as e:
         
-        for key in keys:
+        return render_key_value( indent_depth, 'chara', chara_text )
+        
+    
+    if isinstance( card_json, dict ):
+        
+        spec = { 'spec': 'chara_card_v2', 'spec_version': '2.0' }
+        
+        if any( ( item in card_json.items() for item in spec.items() ) ):
             
-            if key in ( 'exif', 'icc_profile' ):
-                
-                continue
-                
+            key = 'Character Card'
             
-            value = d[ key ]
-            
-            if isinstance( value, bytes ):
-                
-                continue
-                
-            
-            if isinstance( value, dict ):
-                
-                value_string = render_dict( value, prefix = '    ' + prefix )
-                
-                if value_string is None:
-                    
-                    continue
-                    
-                
-            else:
-                
-                value_string = '    {}{}'.format( prefix, value )
-                
-            
-            row_text = '{}{}:'.format( prefix, key )
-            row_text += '\n'
-            row_text += value_string
-            
-            texts.append( row_text )
+            # this is so ugly to achieve the propagation to lower levels but whatever
+            return render_key_value( indent_depth, key, card_json, keys_to_put_at_the_top = [ 'name', 'description', 'personality' ] )
             
         
-        if len( texts ) > 0:
+    
+    return render_key_value( indent_depth, 'Character Card?', card_json )
+    
+
+def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None ):
+    
+    if keys_to_put_at_the_top is None:
+        
+        keys_to_put_at_the_top = []
+        
+    
+    def muh_sort( k ):
+        
+        if k in keys_to_put_at_the_top:
             
-            return '\n'.join( texts )
+            return ( 0, keys_to_put_at_the_top.index( k ), k )
             
         else:
             
-            return None
+            return ( 1, 0, k )
             
         
+    
+    texts = []
+    
+    keys = sorted( d.keys(), key = muh_sort )
+    
+    if indent_depth == 0 and 'chara' in keys:
+        
+        keys.remove( 'chara' )
+        
+        texts.append( render_char_card( d[ 'chara' ], indent_depth ) )
+        
+    
+    for key in keys:
+        
+        if key in ( 'exif', 'icc_profile' ):
+            
+            continue
+            
+        
+        value = d[ key ]
+        
+        row_text = render_key_value( indent_depth, key, value, keys_to_put_at_the_top = keys_to_put_at_the_top )
+        
+        texts.append( row_text )
+        
+    
+    if len( texts ) > 0:
+        
+        return '\n'.join( texts )
+        
+    else:
+        
+        return None
+        
+    
+
+def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) -> str | None:
+    
+    if isinstance( value, bytes ):
+        
+        return None
+        
+    
+    if keys_to_put_at_the_top is None:
+        
+        keys_to_put_at_the_top = []
+        
+    
+    indent = '    '
+    
+    if isinstance( value, dict ):
+        
+        value_string = render_dict( value, indent_depth = indent_depth + 1, keys_to_put_at_the_top = keys_to_put_at_the_top )
+        
+        if value_string is None:
+            
+            value_string = '{}{}'.format( indent * ( indent_depth + 1 ), 'empty/unknown' )
+            
+        
+    else:
+        
+        raw_value = f'{value}'
+        raw_value_lines = raw_value.splitlines()
+        indented_lines = [ ( indent * ( indent_depth + 1 ) ) + line for line in raw_value_lines ]
+        
+        value_string = '\n'.join( indented_lines )
+        
+    
+    row_text = '{}{}:'.format( indent * indent_depth, key )
+    row_text += '\n'
+    row_text += value_string
+    
+    return row_text
+    
+
+def GetEmbeddedFileText( pil_image: PILImage.Image ) -> str | None:
     
     if hasattr( pil_image, 'info' ):
         
         try:
             
-            return render_dict( pil_image.info, '' )
+            return render_dict( pil_image.info, indent_depth = 0 )
             
         except Exception as e:
             

@@ -69,13 +69,17 @@ def GetPrettyMediaResultInfoLines( media_result: ClientMediaResult.MediaResult, 
         info_string += f' ({ClientData.ResolutionToPrettyString( ( width, height ) )})'
         
     
+    bitrate_duration_ms = None
+    
     if duration_ms is not None:
         
+        bitrate_duration_ms = duration_ms
         info_string += f', {HydrusTime.MillisecondsDurationToPrettyTime( duration_ms )}'
         
     elif media_result.HasSimulatedDuration():
         
         ( simulated_duration_ms, source_string ) = media_result.GetSimulatedDurationMSAndSource()
+        bitrate_duration_ms = simulated_duration_ms
         
         info_string += f', {HydrusTime.MillisecondsDurationToPrettyTime( simulated_duration_ms )} ({source_string})'
         
@@ -121,6 +125,13 @@ def GetPrettyMediaResultInfoLines( media_result: ClientMediaResult.MediaResult, 
     if file_info_manager.size is not None:
         
         pretty_info_lines.append( ClientMediaResultPrettyInfoObjects.PrettyMediaResultInfoLine( f'{HydrusNumbers.ToHumanInt( file_info_manager.size )} bytes', False ) )
+        
+        if bitrate_duration_ms is not None:
+            
+            approx_b_per_second = file_info_manager.size / ( bitrate_duration_ms / 1000 )
+            
+            pretty_info_lines.append( ClientMediaResultPrettyInfoObjects.PrettyMediaResultInfoLine( f'approx bitrate: {HydrusData.ToHumanBytes(approx_b_per_second)}/s', False ) )
+            
         
     
     if file_info_manager.FiletypeIsForced():

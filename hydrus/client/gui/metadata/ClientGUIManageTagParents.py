@@ -197,7 +197,7 @@ class ManageTagParents( ClientGUIScrolledPanels.ManagePanel ):
             
             self._listctrl_panel.AddMenuButton( 'export', menu_template_items, enabled_only_on_selection = True )
             
-            ( gumpf, preview_height ) = ClientGUIFunctions.ConvertTextToPixels( self._children, ( 12, 6 ) )
+            preview_height = ClientGUIFunctions.ConvertTextToPixelHeight( self._children, 6 )
             
             self._children.setMinimumHeight( preview_height )
             self._parents.setMinimumHeight( preview_height )

@@ -27,10 +27,6 @@ except Exception as e:
     SOCKS_PROXY_OK = False
     
 
-DOING_CURL_CFFI_TEST = False
-CURL_CFFI_DEFINITION = ''
-CURL_CFFI_HTTP_VERSION = -1
-
 def AddCookieToSession( session, name, value, domain, path, expires, secure = False, rest = None ):
     
     version = 0
@@ -39,7 +35,7 @@ def AddCookieToSession( session, name, value, domain, path, expires, secure = Fa
     domain_specified = True
     domain_initial_dot = domain.startswith( '.' )
     path_specified = True
-    discard = False
+    discard = expires is None
     comment = None
     comment_url = None
     
@@ -84,6 +80,12 @@ def CleanseHeadersForSession( ambiguous_session, headers: dict[ str, str ] ):
     
 
 def ClearExpiredCookies( ambiguous_session ):
+    """
+    This is not super important since expired cookies are not sent, but it is useful as cleanup and login expiry detection, so we do it regularly.
+    
+    THIS DOES NOT REMOVE SESSION COOKIES
+    clear_session_cookies does that, and we are planning some options around it
+    """
     
     cookies = GetRequestsSessionCookieJar( ambiguous_session )
     
@@ -122,7 +124,6 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
     SERIALISABLE_VERSION = 2
     
     POOL_CONNECTION_TIMEOUT = 5 * 60
-    SESSION_TIMEOUT = 45 * 60
     
     def __init__( self, name, network_context = None, session = None ):
         
@@ -149,14 +150,38 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
     
     def _CreateEmptySession( self ):
         
-        if DOING_CURL_CFFI_TEST:
+        # TODO: This is pretty horrible, so fix it so this container can be in an 'invalid' state with a reason, and then in this curl cffi situation we set that.
+        # Network UI can block DomainOK on an invalid session with reason yeah
+        
+        curl_cffi_definition = CG.client_controller.new_options.GetNoneableString( 'curl_cffi_definition' )
+        
+        if curl_cffi_definition is not None and not ClientNetworkingCurlCFFI.CURL_CFFI_OK:
             
-            if CURL_CFFI_DEFINITION == '' or CURL_CFFI_HTTP_VERSION == -1:
+            if CG.client_controller.IsBooted():
                 
-                raise Exception( 'The curl cffi test was engaged without correct initialisation??' )
+                HydrusData.ShowText( 'You are set up to use the curl_cffi test, but it is not available! Pausing all network traffic and resetting the setting! Fix the situation and restart the client.' )
+                
+                CG.client_controller.network_engine.PauseNewJobs()
+                
+            else:
+                
+                HydrusData.ShowText( 'You are set up to use the curl_cffi test, but it is not available! Resetting the setting! Fix the situation and restart the client.' )
                 
             
-            session = ClientNetworkingCurlCFFI.CreateCurlCFFISession( CURL_CFFI_DEFINITION, CURL_CFFI_HTTP_VERSION )
+            curl_cffi_definition = None
+            
+            CG.client_controller.new_options.SetNoneableString( 'curl_cffi_definition', curl_cffi_definition )
+            
+        
+        if self.network_context.context_type == CC.NETWORK_CONTEXT_HYDRUS:
+            
+            # disabled for now
+            curl_cffi_definition = None
+            
+        
+        if curl_cffi_definition is not None:
+            
+            session = ClientNetworkingCurlCFFI.CreateCurlCFFISession( curl_cffi_definition )
             
         else:
             
@@ -176,8 +201,6 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
         serialisable_network_context = self.network_context.GetSerialisableTuple()
         
         cookies = GetRequestsSessionCookieJar( self.session )
-        
-        cookies.clear_session_cookies()
         
         pickled_cookies_hex = pickle.dumps( cookies ).hex()
         
@@ -199,8 +222,6 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
             
             cookies = typing.cast( requests.sessions.RequestsCookieJar, pickle.loads( bytes.fromhex( pickled_cookies_hex ) ) )
             
-            cookies.clear_session_cookies()
-            
             if ClientNetworkingCurlCFFI.SessionIsCurlCFFI( self.session ):
                 
                 ClientNetworkingCurlCFFI.SetCURLCFFISessionCookiesWithRequestsCookieJar( self.session, cookies )
@@ -209,6 +230,8 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
                 
                 self.session.cookies = cookies
                 
+            
+            ClearExpiredCookies( self.session )
             
         except Exception as e:
             
@@ -282,15 +305,7 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
     
     def PrepareForNewWork( self ):
         
-        if HydrusTime.TimeHasPassed( self.last_touched_time + self.SESSION_TIMEOUT ):
-            
-            cookies = GetRequestsSessionCookieJar( self.session )
-            
-            cookies.clear_session_cookies()
-            
-            EnsureSessionCookiesAreSynced( self.session, cookies )
-            
-        
+        # this is useful here as 'are we logged in' tracking
         ClearExpiredCookies( self.session )
         
         self.last_touched_time = HydrusTime.GetNow()
@@ -628,5 +643,13 @@ class NetworkSessionManager( HydrusSerialisable.SerialisableBase ):
                 
             
         
+    
+    def SetSessionDirtyForDomain( self, domain: str ):
+        
+        network_context = ClientNetworkingContexts.NetworkContext( context_type = CC.NETWORK_CONTEXT_DOMAIN, context_data = domain )
+        
+        self.SetSessionDirty( network_context )
+        
+    
     
 HydrusSerialisable.SERIALISABLE_TYPES_TO_OBJECT_TYPES[ HydrusSerialisable.SERIALISABLE_TYPE_NETWORK_SESSION_MANAGER ] = NetworkSessionManager

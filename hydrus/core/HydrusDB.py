@@ -689,7 +689,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
                 
                 if len( missing_external_db_paths ) > 0:
                     
-                    message = f'While the main database file, "{main_db_path}", exists, the external files {missing_external_paths_summary} do not!\n\nIf this is a surprise to you, you have probably had a hard drive failure. You must close this process immediately and diagnose what has happened. Check the "help my db is broke.txt" document in the install_dir/db directory for additional help.\n\nIf this is not a surprise, then you may continue if you wish, and hydrus will do its best to reconstruct the missing files. You will see more error prompts.'
+                    message = f'While the main database file, "{main_db_path}", exists, the external files {missing_external_paths_summary} do not!\n\nIf this is a surprise to you, you have probably had a hard drive failure. You must close this process immediately and diagnose what has happened. Check the \'Recovery->Help my db is broke\' document in the help for additional reading.\n\nIf this is not a surprise, then you may continue if you wish, and hydrus will do its best to reconstruct the missing files. You will see more error prompts.'
                     
                     self._controller.BlockingSafeShowCriticalMessage( 'missing database file!', message )
                     
@@ -725,7 +725,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
                     
                     message = f'The "version" table in your "{main_db_path}" database was missing. I cannot recover from this automatically.'
                     message += '\n\n'
-                    message += 'If you have used this database many times before, then you have probably had a hard drive failure. Hydrus will now close. Check the "help my db is broke.txt" document in the install_dir/db directory.'
+                    message += 'If you have used this database many times before, then you have probably had a hard drive failure. Hydrus will now close. Check the \'Recovery->Help my db is broke\' document in the help.'
                     message += '\n\n'
                     message += 'If you recently tried to start hydrus for the first time but got an error and are now trying again, your database files failed to initialise that first time and are now in the way. Go to your database folder (probably install_dir/db) and look at the .db files. Are they very small? Delete them and any .db-shm or .db-wal files with them and then try booting the program again. If you get the same problem over and over, you probably have a hard drive permission problem where hydrus can create the database files but not write to them. If the issue seems complicated, hydev can help you figure it all out.'
                     
@@ -1003,23 +1003,6 @@ class HydrusDB( HydrusDBBase.DBBase ):
     def _UpdateDBFolderWithSupplementaryFiles( self ):
         
         from hydrus.core import HydrusStaticDir
-        
-        db_files_dir = os.path.join( HydrusStaticDir.INSTALL_STATIC_DIR, 'db_files' )
-        
-        if os.path.exists( db_files_dir ) and os.path.isdir( db_files_dir ):
-            
-            for filename in os.listdir( db_files_dir ):
-                
-                source_path = os.path.join( db_files_dir, filename )
-                
-                if filename.endswith( '.txt' ) and os.path.isfile( source_path ):
-                    
-                    dest_path = os.path.join( self._db_dir, filename )
-                    
-                    HydrusPaths.MirrorFile( source_path, dest_path )
-                    
-                
-            
         
         if HC.PLATFORM_WINDOWS:
             

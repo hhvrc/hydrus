@@ -378,12 +378,11 @@ class PairComparatorRelativeFileInfo( PairComparator ):
         
         we_duration_pred = self._system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DURATION
         
-        what_we_are_testing = 'B'
+        we_ratio = self._system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO
         
-        if self._multiplier != 1.0:
-            
-            what_we_are_testing = f'{self._multiplier:.2f}x {what_we_are_testing}'
-            
+        absolute_number_renderer = None
+        delta_string = self._delta
+        alternate_operator_lookup = None
         
         if we_time_pred or we_duration_pred:
             
@@ -391,10 +390,18 @@ class PairComparatorRelativeFileInfo( PairComparator ):
             
             delta_string = absolute_number_renderer( self._delta )
             
-        else:
+            alternate_operator_lookup = ClientNumberTest.number_test_operator_to_timestamp_str_lookup
             
-            absolute_number_renderer = None
-            delta_string = self._delta
+        elif we_ratio:
+            
+            alternate_operator_lookup = ClientNumberTest.number_test_operator_to_ratio_str_lookup
+            
+        
+        what_we_are_testing = 'B'
+        
+        if self._multiplier != 1.0:
+            
+            what_we_are_testing = f'{self._multiplier:.2f}x {what_we_are_testing}'
             
         
         if self._delta > 0:
@@ -406,7 +413,7 @@ class PairComparatorRelativeFileInfo( PairComparator ):
             what_we_are_testing = f'{what_we_are_testing} {delta_string}'
             
         
-        number_test_string = self._number_test.ToString( absolute_number_renderer = absolute_number_renderer, replacement_value_string = what_we_are_testing, use_time_operators = we_time_pred )
+        number_test_string = self._number_test.ToString( absolute_number_renderer = absolute_number_renderer, replacement_value_string = what_we_are_testing, alternate_operator_lookup = alternate_operator_lookup )
         
         return f'A has "{pred_string}" {number_test_string}'
         
@@ -451,7 +458,7 @@ class PairComparatorRelativeFileInfo( PairComparator ):
             return False
             
         
-        prepared_value_b = int( value_b * self._multiplier ) + self._delta
+        prepared_value_b = value_b * self._multiplier + self._delta
         
         return self._number_test.Test( value_a, replacement_test_value = prepared_value_b )
         

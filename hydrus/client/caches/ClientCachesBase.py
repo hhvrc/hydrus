@@ -1,11 +1,11 @@
 import collections
 import collections.abc
 import threading
+import time
 import typing
 
 from hydrus.core import HydrusData
 from hydrus.core import HydrusGlobals as HG
-from hydrus.core import HydrusTime
 
 from hydrus.client import ClientGlobals as CG
 
@@ -22,6 +22,21 @@ class CacheableObject( object ):
         
     
 
+class DataCacheEntry( object ):
+    
+    def __init__( self, data: CacheableObject ):
+        
+        self.data = data
+        self.size_estimate = data.GetEstimatedMemoryFootprint()
+        self.last_access_time = time.monotonic()
+        
+    
+    def touch( self ):
+        
+        self.last_access_time = time.monotonic()
+        
+    
+
 class DataCache( object ):
     
     def __init__( self, controller: "CG.ClientController.Controller", name, cache_size, timeout = 1200 ):
@@ -31,8 +46,7 @@ class DataCache( object ):
         self._cache_size = cache_size
         self._timeout = timeout
         
-        self._keys_to_data: dict[ typing.Any, tuple[ CacheableObject, int ] ] = {}
-        self._keys_fifo = collections.OrderedDict()
+        self._keys_to_data: collections.OrderedDict[ typing.Any, DataCacheEntry ] = collections.OrderedDict()
         
         self._total_estimated_memory_footprint = 0
         
@@ -43,45 +57,94 @@ class DataCache( object ):
     
     def _Delete( self, key ):
         
-        if key in self._keys_fifo:
-            
-            del self._keys_fifo[ key ]
-            
-        
         if key not in self._keys_to_data:
             
             return
             
         
-        ( data, size_estimate ) = self._keys_to_data[ key ]
+        entry = self._keys_to_data[ key ]
         
         del self._keys_to_data[ key ]
         
-        self._total_estimated_memory_footprint -= size_estimate
+        self._total_estimated_memory_footprint -= entry.size_estimate
         
         if HG.cache_report_mode:
             
-            HydrusData.ShowText( 'Cache "{}" removing "{}", size "{}". Current size {}.'.format( self._name, key, HydrusData.ToHumanBytes( size_estimate ), HydrusData.ConvertValueRangeToBytes( self._total_estimated_memory_footprint, self._cache_size ) ) )
+            HydrusData.ShowText( 'Cache "{}" removing specific item "{}", size "{}". Current size {}.'.format( self._name, key, HydrusData.ToHumanBytes( entry.size_estimate ), HydrusData.ConvertValueRangeToBytes( self._total_estimated_memory_footprint, self._cache_size ) ) )
             
         
     
-    def _DeleteItem( self ):
+    def _DeleteLoadedItemsUntilFreeSpace( self, free_space_desired: int ) -> bool:
         
-        ( deletee_key, last_access_time ) = self._keys_fifo.popitem( last = False )
+        current_free_space = self._cache_size - self._total_estimated_memory_footprint
         
-        self._Delete( deletee_key )
+        if current_free_space > free_space_desired:
+            
+            return True
+            
+        
+        deletee_keys = []
+        
+        expected_free_space = self._cache_size - self._total_estimated_memory_footprint
+        
+        for ( key, entry ) in self._keys_to_data.items():
+            
+            if not entry.data.IsFinishedLoading():
+                
+                # this guy is still rendering, let's not push him out for a different prefetch
+                continue
+                
+            
+            deletee_keys.append( key )
+            expected_free_space += entry.size_estimate
+            
+            if expected_free_space > free_space_desired:
+                
+                break
+                
+            
+        
+        if expected_free_space > free_space_desired:
+            
+            for key in deletee_keys:
+                
+                self._Delete( key )
+                
+            
+            return True
+            
+        else:
+            
+            # we went through the whole cache and couldn't find enough easy freed-up space to fit this new guy in. not a good time to prefetch it!
+            return False
+            
+        
+    
+    def _DeleteOldestItem( self ):
+        
+        ( key, entry ) = self._keys_to_data.popitem( last = False )
+        
+        self._total_estimated_memory_footprint -= entry.size_estimate
+        
+        if HG.cache_report_mode:
+            
+            HydrusData.ShowText( 'Cache "{}" removing oldest item "{}", size "{}". Current size {}.'.format( self._name, key, HydrusData.ToHumanBytes( entry.size_estimate ), HydrusData.ConvertValueRangeToBytes( self._total_estimated_memory_footprint, self._cache_size ) ) )
+            
         
     
     def _GetData( self, key ) -> CacheableObject:
         
         if key not in self._keys_to_data:
             
-            raise Exception( 'Cache error! Looking for {}, but it was missing.'.format( key ) )
+            raise Exception( f'Cache error! Looking for "{key}", but it was missing.' )
             
         
         self._TouchKey( key )
 
-        ( data, size_estimate ) = self._keys_to_data[ key ]
+        entry = self._keys_to_data[ key ]
+        
+        data = entry.data
+        size_estimate = entry.size_estimate
         
         new_estimate = data.GetEstimatedMemoryFootprint()
         
@@ -89,7 +152,7 @@ class DataCache( object ):
             
             self._total_estimated_memory_footprint += new_estimate - size_estimate
             
-            self._keys_to_data[ key ] = ( data, new_estimate )
+            entry.size_estimate = new_estimate
             
         
         return data
@@ -97,21 +160,15 @@ class DataCache( object ):
     
     def _TouchKey( self, key ):
         
-        # have to delete first, rather than overwriting, so the ordereddict updates its internal order
-        if key in self._keys_fifo:
-            
-            del self._keys_fifo[ key ]
-            
-        
-        self._keys_fifo[ key ] = HydrusTime.GetNow()
+        self._keys_to_data[ key ].touch()
+        self._keys_to_data.move_to_end( key )
         
     
     def Clear( self ):
         
         with self._lock:
             
-            self._keys_to_data = {}
-            self._keys_fifo = collections.OrderedDict()
+            self._keys_to_data.clear()
             
             self._total_estimated_memory_footprint = 0
             
@@ -125,16 +182,16 @@ class DataCache( object ):
                 
                 while self._total_estimated_memory_footprint > self._cache_size:
                     
-                    self._DeleteItem()
+                    self._DeleteOldestItem()
                     
                 
-                size_estimate = data.GetEstimatedMemoryFootprint()
+                # an implicit touch is happening here
                 
-                self._keys_to_data[ key ] = ( data, size_estimate )
+                entry = DataCacheEntry( data )
                 
-                self._total_estimated_memory_footprint += size_estimate
+                self._keys_to_data[ key ] = entry
                 
-                self._TouchKey( key )
+                self._total_estimated_memory_footprint += entry.size_estimate
                 
                 if HG.cache_report_mode:
                     
@@ -142,7 +199,7 @@ class DataCache( object ):
                         'Cache "{}" adding "{}" ({}). Current size {}.'.format(
                             self._name,
                             key,
-                            HydrusData.ToHumanBytes( size_estimate ),
+                            HydrusData.ToHumanBytes( entry.size_estimate ),
                             HydrusData.ConvertValueRangeToBytes( self._total_estimated_memory_footprint, self._cache_size )
                         )
                     )
@@ -210,28 +267,34 @@ class DataCache( object ):
         
         with self._lock:
             
-            while self._total_estimated_memory_footprint > self._cache_size:
+            while self._total_estimated_memory_footprint > self._cache_size and len( self._keys_to_data ) > 0: # little sanity check haha
                 
-                self._DeleteItem()
+                self._DeleteOldestItem()
                 
             
-            while True:
+            if len( self._keys_to_data ) > 0:
                 
-                if len( self._keys_fifo ) == 0:
+                older_than_this_has_timed_out = time.monotonic() - self._timeout
+                
+                num_to_remove = 0
+                
+                for entry in self._keys_to_data.values():
                     
-                    break
-                    
-                else:
-                    
-                    ( key, last_access_time ) = next( iter( self._keys_fifo.items() ) )
-                    
-                    if HydrusTime.TimeHasPassed( last_access_time + self._timeout ):
+                    if entry.last_access_time < older_than_this_has_timed_out:
                         
-                        self._DeleteItem()
+                        num_to_remove += 1
                         
                     else:
                         
                         break
+                        
+                    
+                
+                if num_to_remove > 0:
+                    
+                    for i in range( num_to_remove ):
+                        
+                        self._DeleteOldestItem()
                         
                     
                 
@@ -253,41 +316,13 @@ class DataCache( object ):
         
         with self._lock:
             
+            if key not in self._keys_to_data:
+                
+                return
+                
+            
             self._TouchKey( key )
             
-        
-    
-    def _DeleteLoadedItemsUntilFreeSpace( self, free_space_desired: int ) -> bool:
-        
-        current_free_space = self._cache_size - self._total_estimated_memory_footprint
-        
-        if current_free_space > free_space_desired:
-            
-            return True
-            
-        
-        for key in list( self._keys_fifo.keys() ):
-            
-            ( data, size_estimate ) = self._keys_to_data[ key ]
-            
-            if not data.IsFinishedLoading():
-                
-                # this guy is still rendering, let's not push him out for a different prefetch
-                continue
-                
-            
-            self._Delete( key )
-            
-            current_free_space = self._cache_size - self._total_estimated_memory_footprint
-            
-            if current_free_space > free_space_desired:
-                
-                return True
-                
-            
-        
-        # we went through the whole cache and couldn't find enough easy freed-up space to fit this new guy in. not a good time to prefetch it!
-        return False
         
     
     def TryToFlushEasySpaceForPrefetch( self, free_space_desired: int ):

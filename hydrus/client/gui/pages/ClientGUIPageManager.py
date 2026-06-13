@@ -15,7 +15,7 @@ from hydrus.client.importing import ClientImportLocal
 from hydrus.client.importing import ClientImportSimpleURLs
 from hydrus.client.importing import ClientImportWatchers
 from hydrus.client.importing.options import FileFilteringImportOptions
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import LocationImportOptions
 from hydrus.client.importing.options import PrefetchImportOptions
 from hydrus.client.media import ClientMediaCollect
@@ -111,25 +111,25 @@ def CreatePageManagerImportSimpleDownloader():
     return page_manager
     
 
-def CreatePageManagerImportHDD( paths, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy, metadata_routers: collections.abc.Collection[ ClientMetadataMigration.SingleFileMetadataRouter ], paths_to_additional_service_keys_to_tags, delete_after_success ):
+def CreatePageManagerImportHDD( paths, import_options_container: ImportOptionsContainer.ImportOptionsContainer, metadata_routers: collections.abc.Collection[ ClientMetadataMigration.SingleFileMetadataRouter ], paths_to_additional_service_keys_to_tags, delete_after_success ):
     
     page_manager = CreatePageManager( 'import', ClientGUIPagesCore.PAGE_TYPE_IMPORT_HDD )
     
-    hdd_import = ClientImportLocal.HDDImport( paths = paths, file_import_options = file_import_options, metadata_routers = metadata_routers, paths_to_additional_service_keys_to_tags = paths_to_additional_service_keys_to_tags, delete_after_success = delete_after_success )
+    hdd_import = ClientImportLocal.HDDImport( paths = paths, import_options_container = import_options_container, metadata_routers = metadata_routers, paths_to_additional_service_keys_to_tags = paths_to_additional_service_keys_to_tags, delete_after_success = delete_after_success )
     
     page_manager.SetVariable( 'hdd_import', hdd_import )
     
     return page_manager
     
 
-def CreatePageManagerImportMultipleWatcher( page_name = None, url = None ):
+def CreatePageManagerImportMultipleWatcher( page_name = None, url = None, destination_import_options_container = None ):
     
     if page_name is None:
         
         page_name = 'watcher'
         
     
-    multiple_watcher_import = ClientImportWatchers.MultipleWatcherImport( url = url )
+    multiple_watcher_import = ClientImportWatchers.MultipleWatcherImport( url = url, import_options_container = destination_import_options_container )
     
     page_manager = CreatePageManager( page_name, ClientGUIPagesCore.PAGE_TYPE_IMPORT_MULTIPLE_WATCHER )
     
@@ -138,14 +138,14 @@ def CreatePageManagerImportMultipleWatcher( page_name = None, url = None ):
     return page_manager
     
 
-def CreatePageManagerImportURLs( page_name = None, destination_location_context = None, destination_tag_import_options = None ):
+def CreatePageManagerImportURLs( page_name = None, destination_import_options_container = None ):
     
     if page_name is None:
         
         page_name = 'url import'
         
     
-    urls_import = ClientImportSimpleURLs.URLsImport( destination_location_context = destination_location_context, destination_tag_import_options = destination_tag_import_options )
+    urls_import = ClientImportSimpleURLs.URLsImport( import_options_container = destination_import_options_container )
     
     page_manager = CreatePageManager( page_name, ClientGUIPagesCore.PAGE_TYPE_IMPORT_URLS )
     
@@ -270,15 +270,15 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
                 
                 location_import_options.SetAutomaticallyArchives( advanced_import_options[ 'automatic_archive' ] )
                 
-                file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
+                import_options_container = ImportOptionsContainer.ImportOptionsContainer()
                 
-                file_import_options.SetPrefetchImportOptions( prefetch_import_options )
-                file_import_options.SetFileFilteringImportOptions( file_filtering_import_options )
-                file_import_options.SetLocationImportOptions( location_import_options )
+                import_options_container.SetImportOptions( prefetch_import_options )
+                import_options_container.SetImportOptions( file_filtering_import_options )
+                import_options_container.SetImportOptions( location_import_options )
                 
                 paths_to_tags = { path : { bytes.fromhex( service_key ) : tags for ( service_key, tags ) in additional_service_keys_to_tags } for ( path, additional_service_keys_to_tags ) in paths_to_tags.items() }
                 
-                hdd_import = ClientImportLocal.HDDImport( paths = paths, file_import_options = file_import_options, paths_to_additional_service_keys_to_tags = paths_to_tags, delete_after_success = delete_after_success )
+                hdd_import = ClientImportLocal.HDDImport( paths = paths, import_options_container = import_options_container, paths_to_additional_service_keys_to_tags = paths_to_tags, delete_after_success = delete_after_success )
                 
                 serialisable_serialisables[ 'hdd_import' ] = hdd_import.GetSerialisableTuple()
                 
@@ -725,15 +725,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
                 
                 source = self._variables[ source_name ]
                 
-                if hasattr( source, 'GetFileImportOptions' ):
-                    
-                    file_import_options = source.GetFileImportOptions()
-                    
-                    location_context = FileImportOptionsLegacy.GetRealFileImportOptions( file_import_options, FileImportOptionsLegacy.IMPORT_TYPE_LOUD ).GetLocationImportOptions().GetDestinationLocationContext()
-                    
-                    return location_context
-                    
-                elif hasattr( source, 'GetLocationContext' ):
+                if hasattr( source, 'GetLocationContext' ):
                     
                     location_context = source.GetLocationContext()
                     

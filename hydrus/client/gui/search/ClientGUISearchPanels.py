@@ -31,6 +31,10 @@ class EditFavouriteSearchPanel( ClientGUIScrolledPanels.EditPanel ):
         self._foldername = QW.QLineEdit( self )
         self._name = QW.QLineEdit( self )
         
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._foldername, 40 )
+        
+        self._foldername.setMinimumWidth( width )
+        
         self._media_sort = ClientGUIMediaResultsPanelSortCollect.MediaSortControl( self, media_sort = media_sort )
         self._media_collect = ClientGUIMediaResultsPanelSortCollect.MediaCollectControl( self )
         
@@ -42,10 +46,6 @@ class EditFavouriteSearchPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._include_media_sort = QW.QCheckBox( self )
         self._include_media_collect = QW.QCheckBox( self )
-        
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._include_media_collect, 48 )
-        
-        self._include_media_collect.setMinimumWidth( width )
         
         self._include_media_sort.stateChanged.connect( self._UpdateWidgets )
         self._include_media_collect.stateChanged.connect( self._UpdateWidgets )

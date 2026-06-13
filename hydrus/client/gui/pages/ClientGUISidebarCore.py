@@ -1,3 +1,5 @@
+import collections.abc
+
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
@@ -20,6 +22,8 @@ from hydrus.client.search import ClientSearchTagContext
 
 class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
     
+    predicatesEntered = QC.Signal( ClientGUIACDropdown.PredicatesBroadcast )
+    
     def __init__( self, parent: QW.QWidget, page_manager: ClientGUIPageManager.PageManager, page_key, tag_display_type = ClientTags.TAG_DISPLAY_SELECTION_LIST, tag_autocomplete: ClientGUIACDropdown.AutoCompleteDropdownTagsRead | None = None ):
         
         super().__init__( parent, tag_display_type, CC.TAG_PRESENTATION_SEARCH_PAGE, include_counts = True )
@@ -29,6 +33,11 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
         
         self._page_key = page_key
         self._tag_autocomplete = tag_autocomplete
+        
+        if self._tag_autocomplete is not None:
+            
+            self.predicatesEntered.connect( self._tag_autocomplete.EnterPredicatesFromSignal )
+            
         
     
     def _Activate( self, ctrl_down, shift_down ) -> bool:
@@ -47,6 +56,8 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
                 predicates = ( ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_OR_CONTAINER, value = predicates ), )
                 
             
+            self._EmitPredicates( predicates )
+            
             CG.client_controller.pub( 'enter_predicates', self._page_key, predicates )
             
             return True
@@ -58,6 +69,18 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
     def _CanProvideCurrentPagePredicates( self ):
         
         return self._tag_autocomplete is not None
+        
+    
+    def _EmitPredicates( self, predicates: collections.abc.Collection[ ClientSearchPredicate.Predicate ], permit_add: bool = True, permit_remove: bool = True, start_or_predicate: bool = False ):
+        
+        predicates_broadcast = ClientGUIACDropdown.PredicatesBroadcast(
+            list( predicates ),
+            permit_add = permit_add,
+            permit_remove = permit_remove,
+            start_or_predicate = start_or_predicate
+        )
+        
+        self.predicatesEntered.emit( predicates_broadcast )
         
     
     def _GetCurrentLocationContext( self ):
@@ -73,7 +96,7 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
             
         else:
             
-            return self._tag_autocomplete.GetPredicates()
+            return set( self._tag_autocomplete.GetPredicates() )
             
         
     
@@ -81,13 +104,13 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
         
         ( predicates, or_predicate, inverse_predicates, namespace_predicate, inverse_namespace_predicate ) = self._GetSelectedPredicatesAndInverseCopies()
         
-        p = None
+        default_predicates_to_emit = None
         permit_remove = True
         permit_add = True
         
         if command == 'add_predicates':
             
-            p = predicates
+            default_predicates_to_emit = predicates
             permit_remove = False
             
         elif command == 'add_or_predicate':
@@ -97,7 +120,7 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
                 return
                 
             
-            p = ( or_predicate, )
+            default_predicates_to_emit = ( or_predicate, )
             permit_remove = False
             
         elif command == 'dissolve_or_predicate':
@@ -105,6 +128,9 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
             or_preds = [ p for p in predicates if p.IsORPredicate() ]
             
             sub_preds = HydrusLists.MassUnion( [ p.GetValue() for p in or_preds ] )
+            
+            self._EmitPredicates( or_preds, permit_add = False, permit_remove = True )
+            self._EmitPredicates( sub_preds, permit_add = True, permit_remove = False )
             
             CG.client_controller.pub( 'enter_predicates', self._page_key, or_preds, permit_remove = True, permit_add = False )
             CG.client_controller.pub( 'enter_predicates', self._page_key, sub_preds, permit_remove = False, permit_add = True )
@@ -116,37 +142,44 @@ class ListBoxTagsMediaSidebar( ClientGUIListBoxes.ListBoxTagsMedia ):
                 return
                 
             
+            self._EmitPredicates( predicates, permit_add = False, permit_remove = True )
+            self._EmitPredicates( ( or_predicate, ), permit_add = True, permit_remove = False )
+            
             CG.client_controller.pub( 'enter_predicates', self._page_key, predicates, permit_remove = True, permit_add = False )
             CG.client_controller.pub( 'enter_predicates', self._page_key, ( or_predicate, ), permit_remove = False, permit_add = True )
             
         elif command == 'start_or_predicate':
             
+            self._EmitPredicates( predicates, start_or_predicate = True )
+            
             CG.client_controller.pub( 'enter_predicates', self._page_key, predicates, start_or_predicate = True )
             
         elif command == 'remove_predicates':
             
-            p = predicates
+            default_predicates_to_emit = predicates
             permit_add = False
             
         elif command == 'add_inverse_predicates':
             
-            p = inverse_predicates
+            default_predicates_to_emit = inverse_predicates
             permit_remove = False
             
         elif command == 'add_namespace_predicate':
             
-            p = ( namespace_predicate, )
+            default_predicates_to_emit = ( namespace_predicate, )
             permit_remove = False
             
         elif command == 'add_inverse_namespace_predicate':
             
-            p = ( inverse_namespace_predicate, )
+            default_predicates_to_emit = ( inverse_namespace_predicate, )
             permit_remove = False
             
         
-        if p is not None:
+        if default_predicates_to_emit is not None:
             
-            CG.client_controller.pub( 'enter_predicates', self._page_key, p, permit_remove = permit_remove, permit_add = permit_add )
+            self._EmitPredicates( default_predicates_to_emit, permit_add = permit_add, permit_remove = permit_remove )
+            
+            CG.client_controller.pub( 'enter_predicates', self._page_key, default_predicates_to_emit, permit_remove = permit_remove, permit_add = permit_add )
             
         
     
@@ -269,7 +302,7 @@ class Sidebar( QW.QScrollArea ):
         pass
         
     
-    def EnterPredicates( self, predicates = None ):
+    def EnterPredicates( self, predicates: list[ ClientSearchPredicate.Predicate ] ):
         
         pass
         

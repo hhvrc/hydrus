@@ -20,7 +20,7 @@ from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUINumberTest
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import CheckerImportOptions
 from hydrus.client.search import ClientNumberTest
 
 # TODO: maybe break this into ClientGUITimeWidgets for gui.widgets and then shoot EditCheckerOptions off to something appropriate
@@ -310,7 +310,7 @@ class EditCheckerOptions( ClientGUIScrolledPanels.EditPanel ):
             never_slower_than = self._never_slower_than.GetValue()
             
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check, never_faster_than, never_slower_than, death_file_velocity )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check, never_faster_than, never_slower_than, death_file_velocity )
         
     
     def SetValue( self, checker_options ):
@@ -721,7 +721,7 @@ class DateTimesButton( ClientGUICommon.BetterButton ):
         self._has_user_changes = False
         
         # XXXX-XX-XX XX:XX:XX = 19 chars, so add a bit of padding
-        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 23 )
+        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 21 )
         
         self.setMinimumWidth( min_width )
         

@@ -375,6 +375,8 @@ PREDICATE_TYPES_WE_CAN_TEST_ON_MEDIA_RESULTS = [
     PREDICATE_TYPE_SYSTEM_MIME,
     PREDICATE_TYPE_SYSTEM_WIDTH,
     PREDICATE_TYPE_SYSTEM_HEIGHT,
+    PREDICATE_TYPE_SYSTEM_NUM_PIXELS,
+    PREDICATE_TYPE_SYSTEM_RATIO,
     PREDICATE_TYPE_SYSTEM_DURATION,
     PREDICATE_TYPE_SYSTEM_FRAMERATE,
     PREDICATE_TYPE_SYSTEM_NUM_FRAMES,
@@ -405,6 +407,7 @@ PREDICATE_TYPES_WE_CAN_EXTRACT_FROM_MEDIA_RESULTS = [
     PREDICATE_TYPE_SYSTEM_WIDTH,
     PREDICATE_TYPE_SYSTEM_HEIGHT,
     PREDICATE_TYPE_SYSTEM_NUM_PIXELS,
+    PREDICATE_TYPE_SYSTEM_RATIO,
     PREDICATE_TYPE_SYSTEM_DURATION,
     PREDICATE_TYPE_SYSTEM_FRAMERATE,
     PREDICATE_TYPE_SYSTEM_NUM_FRAMES,
@@ -978,9 +981,22 @@ class Predicate( HydrusSerialisable.SerialisableBase ):
             
             file_info_manager = media_result.GetFileInfoManager()
             
-            if file_info_manager.height is not None and file_info_manager.width is not None:
+            if file_info_manager.width is not None and file_info_manager.height is not None:
                 
-                return file_info_manager.height * file_info_manager.width
+                return file_info_manager.width * file_info_manager.height
+                
+            else:
+                
+                return None
+                
+            
+        elif self._predicate_type == PREDICATE_TYPE_SYSTEM_RATIO:
+            
+            file_info_manager = media_result.GetFileInfoManager()
+            
+            if file_info_manager.width is not None and file_info_manager.height is not None:
+                
+                return file_info_manager.width / file_info_manager.height
                 
             else:
                 
@@ -1588,6 +1604,35 @@ class Predicate( HydrusSerialisable.SerialisableBase ):
             number_test: ClientNumberTest.NumberTest = self._value
             
             return number_test.Test( media_result.GetFileInfoManager().width )
+            
+        elif self._predicate_type == PREDICATE_TYPE_SYSTEM_NUM_PIXELS:
+            
+            ( operator, num_pixels, unit ) = self._value
+            
+            number_test = ClientNumberTest.NumberTest.STATICCreateFromCharacters( operator, num_pixels * unit )
+            
+            num_pixels = self.ExtractValueFromMediaResult( media_result )
+            
+            return number_test.Test( num_pixels )
+            
+        elif self._predicate_type == PREDICATE_TYPE_SYSTEM_RATIO:
+            
+            ( operator, width, height ) = self._value
+            
+            if operator == 'taller than':
+                
+                operator = '<'
+                
+            elif operator == 'wider than':
+                
+                operator = '>'
+                
+            
+            number_test = ClientNumberTest.NumberTest.STATICCreateFromCharacters( operator, width / height )
+            
+            ratio = self.ExtractValueFromMediaResult( media_result )
+            
+            return number_test.Test( ratio )
             
         elif self._predicate_type == PREDICATE_TYPE_SYSTEM_DURATION:
             

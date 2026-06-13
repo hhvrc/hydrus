@@ -43,16 +43,31 @@ def ColourIsGreyish( colour: QG.QColor ):
 NUM_CHARS_FOR_WIDTH_CALCULATIONS = 32
 MAGIC_TEXT_PADDING = 1.1
 
-def GetOneCharacterPixelHeight( window ) -> float:
+def GetOneCharacterPixelHeight( window: QW.QWidget ) -> float:
     
     return window.fontMetrics().height() * MAGIC_TEXT_PADDING
     
 
-def GetOneCharacterPixelWidth( window ) -> float:
+def GetOneCharacterPixelWidth( window: QW.QWidget ) -> float:
     
-    char_block_width = window.fontMetrics().boundingRect( NUM_CHARS_FOR_WIDTH_CALCULATIONS * 'x' ).width() * MAGIC_TEXT_PADDING
+    # ok we tried just averageCharWidth and got some crazy values for, for instance, the 'Terminus' font, which is monospaced so lol
+    # we are adding a sanity check
     
-    one_char_width = char_block_width / NUM_CHARS_FOR_WIDTH_CALCULATIONS
+    one_char_width = window.fontMetrics().averageCharWidth() * MAGIC_TEXT_PADDING
+    
+    do_fallback = False
+    
+    if one_char_width <= 0 or one_char_width > window.fontMetrics().height() * 2:
+        
+        do_fallback = True
+        
+    
+    if do_fallback:
+        
+        chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        
+        one_char_width = window.fontMetrics().horizontalAdvance( chars ) / len( chars )
+        
     
     return one_char_width
     
@@ -71,6 +86,13 @@ def ConvertPixelsToTextWidth( window, pixels, round_down = False ) -> int:
         
     
 
+def ConvertTextToPixelHeight( window, char_rows: float | int ) -> int:
+    
+    one_char_height = GetOneCharacterPixelHeight( window )
+    
+    return round( char_rows * one_char_height )
+    
+
 def ConvertTextToPixels( window, char_dimensions ) -> tuple[ int, int ]:
     
     ( char_cols, char_rows ) = char_dimensions
@@ -81,7 +103,7 @@ def ConvertTextToPixels( window, char_dimensions ) -> tuple[ int, int ]:
     return ( round( char_cols * one_char_width ), round( char_rows * one_char_height ) )
     
 
-def ConvertTextToPixelWidth( window, char_cols ) -> int:
+def ConvertTextToPixelWidth( window, char_cols: float | int ) -> int:
     
     one_char_width = GetOneCharacterPixelWidth( window )
     

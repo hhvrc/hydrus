@@ -36,7 +36,12 @@ There are several different downloader types, each with its own purpose:
 **Simple downloader**
 :    Advanced. Intended for simple one-off jobs with a single simple parsing rule, like 'get all the linked images from this page'.
 
+
 ### Gallery download
+
+!!! warning
+    The file limit and import options on the upper panel of a gallery or watcher page, if changed, will only apply to **new** queries. If you want to change the options for an existing queue, either do so on its highlight panel below or use the 'set options to queries' button.
+
 ![](images/downloader_page.png)
 
 The gallery page can download from multiple sources at the same time. Each entry in the list represents a basic combination of two things:
@@ -111,70 +116,21 @@ The **simple downloader** will do very simple parsing for unusual jobs. If you w
 
 ## Import options
 
-!!! note "This is changing!"
-    Hey, this whole system is being migrated soon. The bulky file/tag/note import options are being split up, and a favourites/template system is being introduced.
-    
-    A draft of the help for this new options system is [here](getting_started_import_options.md).
-
-Every importer in Hydrus has some 'import options' that change what is allowed, what is blacklisted, and whether tags or notes should be saved.
-
-In previous versions these were split into completely different windows called `file import options` and `tag import options` so if you see those anywhere, this is what they're talking about and not some hidden menu anywhere.
-
-Importers that download from websites rely on a flexible 'defaults' system, so you do not have to set them up every time you start a new downloader. While you should play around with your import options, once you know what works for you, you should set that as the default under _network->downloaders->manage default import options_. You can set them for all file posts generally, all watchers, and for specific sites as well.
-
-### File import options
-This deals with the files being downloaded and what should happen to them. There's a few more tickboxes if you turn on advanced mode.
-
-![](images/file_import.png)
-
-**pre-import checks**
-:    Pretty self-explanatory for the most part. If you want to redownload previously deleted files turning off `exclude previously deleted files` will have Hydrus ignore deletion status.  
-A few of the options have more information if you hover over them.
-
-**import destinations**
-:    See [multiple file services](advanced_multiple_local_file_services.md), an advanced feature.
-
-**post import actions**
-:    See the [files section on filtering](getting_started_files.md#inbox_and_archive) for the first option, the other two have information if you hover over them.
+Every import in Hydrus operates under a flexible set of 'import options' that change what is allowed, what file properties or tags are blacklisted, and whether metadata like tags or notes should be saved. The defaults for this system are fine, but if you wish to read more, the full help is [here](getting_started_import_options.md).
 
 ### Tag Parsing
-By default, hydrus now starts with a local tag domain called 'downloader tags' and it will parse (get) all the tags from normal gallery sites and put them in this service. You don't have to do anything, you will get some decent tags. As you use the client, you will figure out which tags you like and where you want them. On the downloader page, click `import options`:
 
-![](images/tag_import_options_default.png)
-
-
-This is an important dialog, although you will not need to use it much. It governs which tags are parsed and where they go. To keep things easy to manage, a new downloader will refer to the 'default' tag import options for a website, but for now let's set some values just for this downloader:
-
-![](images/tag_import_options_specific.png)
-
-You can see that each tag service on your client has a separate section. If you add the PTR, that will get a new box too. A new client is set to _get all tags_ for 'downloader tags' service. Things can get much more complicated. Have a play around with the options here as you figure things out. Most of the controls have tooltips or longer explainers in sub-dialogs, so don't be afraid to try things.
-
-It is easy to get tens of thousands of tags by downloading this way. Different sites offer different kinds and qualities of tags, and the client's downloaders (which were designed by me, the dev, or a user) may parse all or only some of them. Many users like to just get everything on offer, but others only ever want, say, `creator`, `series`, and `character` tags. Once you feel comfortable with tags, try clicking that 'adding: all tags' button, which will take you into hydrus's advanced 'tag filter', which allows you to select which of the incoming tags will be added.
-
-The 'additional tags' adds some fixed personal tags to all files coming in--for instance, you might like to add 'this came from the xxxxx subscription' or 'process into favourites' to your 'my tags' so you can find those files again later. That little 'cog' icon button can also do some advanced things.
-
-The blacklist button will let you skip downloading files that have certain tags, again using the tag filter, while the whitelist enables you to only allow files that have at least one of a set of tags.
-
-![](images/tag_filter_blacklist_example.png)
-
-!!! warning
-    The file limit and import options on the upper panel of a gallery or watcher page, if changed, will only apply to **new** queries. If you want to change the options for an existing queue, either do so on its highlight panel below or use the 'set options to queries' button.
+By default, hydrus starts with a local tag domain called 'downloader tags' and it will parse (get) all the tags from normal gallery sites and put them in this service. You don't have to do anything, you will get some decent tags. As you use the client, you will figure out which tags you like and perhaps decide you want them to go to different areas. Revisit the import options help when you are ready to make decisions here.
 
 #### Force Page Fetch
 
-By default, hydrus will not revisit web pages or API endpoints for URLs it knows A) refer to one known file only, and B) that file is already in your database or has previously been deleted. The way it navigates this can be a complicated mix of hash and URL data, and in certain logical situations hydrus will determine its own records are untrustworthy and decide to check the source again. This saves bandwidth and time as you run successive queries that include the same results. You should not disable the capability for normal operation.
+By default, hydrus will not revisit web pages or API endpoints for URLs it knows A) refer to one known file only, and B) that file is already in your database or has previously been deleted. This means if you run a normal download twice, hydrus will not fetch the tags that second time.
 
-But if you mess up your tag import options somewhere and need to re-run a download with forced tag re-fetching, how to do it?
-
-At the moment, this is in tag import options, the `force page fetch even if...` checkboxes. You can either set up a one-time downloader page with specific tag import options that check both of these checkboxes and then paste URLs in, or you can right-click a selection of thumbnails and have hydrus create the page for you under the _urls->force metadata refetch_ menu. Once you are done with the downloader page, delete it and do not use it for normal jobs--again, this method of downloading is inefficient and should not be used for repeating, long-term, or speculative jobs. Only use it to fill in specific holes.
+If you mess up your tag import options the first time and need to re-run a download, right-click a selection of thumbnails and hit `urls->force metadata refetch`. This creates a new page with special Prefetch Import Options allowing for refetching the tags (while still skipping the actual file redownload)!
 
 ### Note Parsing
 
-Hydrus also parses 'notes' from some sites. This is a young feature, and a little advanced at times, but it generally means the comments that artists leave on certain gallery sites, or something like a tweet text. Notes are editable by you and appear in a hovering window on the right side of the media viewer.
-
-![](images/note_import_options_normal.png)
-
-Most of the controls here ensure that successive parses do not duplicate existing notes. The default settings are fine for all normal purposes, and you can leave them alone unless you know you want something special (e.g. turning note parsing off completely).
+Hydrus also parses 'notes' from some sites. This generally means the comments that artists leave on certain gallery sites, or something like a tweet text. Notes are editable by you and appear in a hovering window on the right side of the media viewer.
 
 ## Bandwidth
 

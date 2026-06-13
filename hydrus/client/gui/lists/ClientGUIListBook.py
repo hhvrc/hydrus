@@ -34,7 +34,7 @@ class ListBookList( ClientGUIListBoxes.BetterQListWidget ):
                 
             else:
                 
-                ( _, height ) = ClientGUIFunctions.ConvertTextToPixels( self, ( 20, self._list_chars_height ) )
+                height = ClientGUIFunctions.ConvertTextToPixelHeight( self, self._list_chars_height )
                 
             
             size.setHeight( height + ( 2 * self.frameWidth() ) )
@@ -70,6 +70,12 @@ class ListBook( QW.QWidget ):
             
             self._page_list.setVerticalScrollBarPolicy( QC.Qt.ScrollBarPolicy.ScrollBarAlwaysOff )
             self._page_list.verticalScrollBar().setEnabled( False ) # this disables mouse wheel too
+            
+        
+        if list_chars_height is not None:
+            
+            self._page_list.setHorizontalScrollBarPolicy( QC.Qt.ScrollBarPolicy.ScrollBarAlwaysOff )
+            self._page_list.horizontalScrollBar().setEnabled( False ) # this disables mouse wheel too
             
         
         self._widget_stack = QW.QStackedWidget( self )

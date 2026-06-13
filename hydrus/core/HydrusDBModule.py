@@ -238,7 +238,7 @@ class HydrusDBModule( HydrusDBBase.DBBase ):
                 
                 message = 'Unfortunately, this database is missing one or more critical tables! This database is non functional and cannot be repaired.'
                 message += '\n\n'
-                message += 'If you have used this database many times before, please check out "install_dir/db/help my db is broke.txt" for the next steps.'
+                message += 'If you have used this database many times before, please check the \'Recovery->Help my db is broke\' document in the help for the next steps.'
                 message += '\n\n'
                 message += 'If you are trying to initialise a new database and have yet to boot into it successfully, then the database files are damaged stubs. Go into your db dir (probably install_dir/db) and delete the small .db files and any .db-shm or .db-wal files with them, and then try booting the program again. If the problem keeps happening, you probably have a hard drive permission error to fix.'
                 message += '\n\n'

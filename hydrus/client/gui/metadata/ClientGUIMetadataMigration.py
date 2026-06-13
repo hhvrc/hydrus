@@ -312,7 +312,7 @@ class SingleFileMetadataRoutersControl( ClientGUIListBoxes.AddEditDeleteListBox 
         
         self.AddDatas( routers )
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 64 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 60 )
         
         self.setMinimumWidth( width )
         

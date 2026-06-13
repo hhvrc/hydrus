@@ -203,7 +203,7 @@ class ManageTagSiblings( ClientGUIScrolledPanels.ManagePanel ):
             
             self._listctrl_panel.AddMenuButton( 'export', menu_template_items, enabled_only_on_selection = True )
             
-            ( gumpf, preview_height ) = ClientGUIFunctions.ConvertTextToPixels( self._old_siblings, ( 12, 4 ) )
+            preview_height = ClientGUIFunctions.ConvertTextToPixelHeight( self._old_siblings, 4 )
             
             self._old_siblings.setMinimumHeight( preview_height )
             

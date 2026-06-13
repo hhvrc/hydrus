@@ -1,6 +1,7 @@
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusStaticDir
+from hydrus.core import HydrusTime
 from hydrus.core.networking import HydrusServerRequest
 from hydrus.core.networking import HydrusServerResources
 
@@ -68,6 +69,25 @@ class HydrusResourceClientAPIRestrictedAccount( ClientLocalServerResources.Hydru
         pass
         
     
+
+class HydrusResourceClientAPIRestrictedAccountClientInfo( HydrusResourceClientAPIRestrictedAccount ):
+    
+    def _threadDoGETJob( self, request: HydrusServerRequest.HydrusRequest ):
+        
+        body_dict = {}
+        
+        body_dict[ 'boot_id' ] = CG.client_controller.GetBootId().hex()
+        body_dict[ 'boot_time' ] = HydrusTime.SecondiseMSFloat( CG.client_controller.GetTimestampMS( 'boot' ) )
+        body_dict[ 'currently_idle' ] = CG.client_controller.CurrentlyIdle()
+        
+        body = ClientLocalServerCore.Dumps( body_dict, request.preferred_mime )
+        
+        response_context = HydrusServerResources.ResponseContext( 200, mime = request.preferred_mime, body = body )
+        
+        return response_context
+        
+    
+
 class HydrusResourceClientAPIRestrictedAccountSessionKey( HydrusResourceClientAPIRestrictedAccount ):
     
     def _threadDoGETJob( self, request: HydrusServerRequest.HydrusRequest ):
@@ -85,6 +105,7 @@ class HydrusResourceClientAPIRestrictedAccountSessionKey( HydrusResourceClientAP
         return response_context
         
     
+
 class HydrusResourceClientAPIRestrictedAccountVerify( HydrusResourceClientAPIRestrictedAccount ):
     
     def _threadDoGETJob( self, request: HydrusServerRequest.HydrusRequest ):
@@ -118,6 +139,7 @@ class HydrusResourceClientAPIRestrictedAccountVerify( HydrusResourceClientAPIRes
         return response_context
         
     
+
 class HydrusResourceClientAPIRestrictedGetService( ClientLocalServerResources.HydrusResourceClientAPIRestricted ):
     
     def _CheckAPIPermissions( self, request: HydrusServerRequest.HydrusRequest ):

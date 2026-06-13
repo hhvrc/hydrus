@@ -11,6 +11,7 @@ from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusLists
 from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusSerialisable
+from hydrus.core import HydrusTime
 
 from hydrus.client import ClientApplicationCommand as CAC
 from hydrus.client import ClientConstants as CC
@@ -2871,6 +2872,10 @@ class CanvasHoverFrameTags( CanvasHoverFrame ):
         
         self.setLayout( vbox )
         
+        self._last_wheel_direction = 0
+        self._last_wheel_direction_event_time = 0
+        self._last_media_transition_time = 0
+        
         CG.client_controller.sub( self, 'ProcessContentUpdatePackage', 'content_updates_gui' )
         
     
@@ -2945,23 +2950,87 @@ class CanvasHoverFrameTags( CanvasHoverFrame ):
     
     def SetMedia( self, media ):
         
+        
+        # on a new media from a scroll, we reset the times but _retain_ the direction. if the user wants to keep scrolling through all this, that's fine, we won't block them
+        # if it looks like they hit page_up or whatever, we reset the situation
+        if HydrusTime.TimeHasPassedFloat( self._last_wheel_direction_event_time + 250 ):
+            
+            self._last_wheel_direction = 0
+            
+        
+        self._last_media_transition_time = HydrusTime.GetNowFloat()
+        
         super().SetMedia( media )
         
         self._ResetTags()
         
     
-    def wheelEvent( self, event ):
+    def wheelEvent( self, event: QG.QWheelEvent ):
         
-        # need the mouse test here since some weird event passing happens on mouse events on other stuff, I think because this hover is child 0 of the parent, it somehow gets 'focus'
-        if self.rect().contains( self.mapFromGlobal( ClientGUIFunctions.GetMousePos() ) ):
+        # used to need this for funny parent/child stuff
+        # if self.rect().contains( self.mapFromGlobal( ClientGUIFunctions.GetMousePos() ) ):
+        # not sure if we do any more
+        
+        media_viewer_tags_scrolling_behaviour = CG.client_controller.new_options.GetInteger( 'media_viewer_tags_scrolling_behaviour' )
+        
+        allow_propagation = True
+        
+        if media_viewer_tags_scrolling_behaviour == CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_NEVER_PROPAGATE:
             
-            # we do not want to send taglist wheel events up to the canvas lad
+            allow_propagation = False
+            
+        elif media_viewer_tags_scrolling_behaviour == CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_ONLY_PROPAGATE_ON_NO_SCROLLBAR:
+            
+            if self._tags.verticalScrollBar().isVisible():
+                
+                allow_propagation = False
+                
+            
+        elif media_viewer_tags_scrolling_behaviour == CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_ONLY_PROPAGATE_AFTER_DELAY:
+            
+            wheel_direction = 1 if event.angleDelta().y() > 0 else -1
+            
+            THIS_IS_INTENTIONAL_DELAY = 0.57
+            
+            self._last_wheel_direction_event_time = max( self._tags.GetLastWheelEventThatScrolledTime(), self._last_wheel_direction_event_time )
+            
+            # if the user is looking at a scrollbar and hasn't just flicked to it...
+            if self._tags.verticalScrollBar().isVisible() and HydrusTime.TimeHasPassedFloat( self._last_media_transition_time + THIS_IS_INTENTIONAL_DELAY ):
+                
+                if self._last_wheel_direction == 0:
+                    
+                    self._last_wheel_direction = self._tags.GetLastWheelEventThatScrolledDirection()
+                    
+                
+                if self._last_wheel_direction == wheel_direction:
+                    
+                    if not HydrusTime.TimeHasPassedFloat( self._last_wheel_direction_event_time + THIS_IS_INTENTIONAL_DELAY ):
+                        
+                        # we are still in a scroll cascade from the taglist
+                        
+                        allow_propagation = False
+                        
+                    
+                else:
+                    
+                    # user changed direction recently; hold up
+                    
+                    allow_propagation = False
+                    
+                
+            
+            self._last_wheel_direction_event_time = HydrusTime.GetNowFloat()
+            self._last_wheel_direction = wheel_direction
+            
+        
+        if allow_propagation:
+            
+            # allow the normal stuff to happen
+            super().wheelEvent( event )
+            
+        else:
             
             event.accept()
             
-            return
-            
-        
-        CanvasHoverFrame.wheelEvent( self, event )
         
     

@@ -17,6 +17,21 @@ PIL_SRGB_PROFILE = PILImageCms.createProfile( 'sRGB' )
 
 DO_ICC_PROFILE_NORMALISATION = True
 
+def GetLinearGammaFromPILPNG( pil_image: PILImage.Image ):
+    
+    # gamma is actually independant from 'chromaticity' metadata and _can_ be missing
+    # there is no perfect thing to do here, but 0.45455, which is inverse of 2.2, is the best fallback
+    
+    if 'gamma' in pil_image.info:
+        
+        return pil_image.info[ 'gamma' ]
+        
+    else:
+        
+        return 0.45455
+        
+    
+
 def ConvertGammaChromaticityPNGToSRGB( pil_image ):
     
     # this is no longer used. it is ten times slower than the ICC Profile solution and may be unstable for very large images
@@ -26,7 +41,8 @@ def ConvertGammaChromaticityPNGToSRGB( pil_image ):
         return pil_image
         
     
-    linear_gamma = pil_image.info[ 'gamma' ] # 0.45455
+    linear_gamma = GetLinearGammaFromPILPNG( pil_image )
+    
     display_gamma = 1 / linear_gamma # 2.2
     
     chroma = pil_image.info[ 'chromaticity' ]
@@ -141,18 +157,11 @@ def ConvertGammaChromaticityPNGToSRGB( pil_image ):
 
 def GenerateICCProfileBytesFromGammaAndChromaticityPNG( pil_image: PILImage.Image ):
     
-    file_gamma = pil_image.info[ 'gamma' ]  # e.g. 0.45455
+    linear_gamma = GetLinearGammaFromPILPNG( pil_image )
     
-    # PNG gAMA stores "file gamma" = 1/encoding_gamma.
+    # PNG gAMA stores "file/linear gamma" = 1/encoding_gamma.
     # We want encoding_gamma for an ICC TRC.
-    if not file_gamma:
-        
-        encoding_gamma = 2.2
-        
-    else:
-        
-        encoding_gamma = 1.0 / float( file_gamma )
-        
+    encoding_gamma = 1.0 / float( linear_gamma ) # this is probably 2.2
     
     chroma = pil_image.info[ 'chromaticity' ]
     
@@ -275,16 +284,42 @@ def DequantizeFreshlyLoadedNumPyImage( numpy_image: numpy.ndarray ) -> numpy.nda
 
 def PILImageIsPNGWithGammaAndChromaticity( pil_image: PILImage.Image ):
     
-    if pil_image.format == 'PNG' and pil_image.mode in ( 'RGB', 'RGBA' ) and 'gamma' in pil_image.info and 'chromaticity' in pil_image.info:
+    # we no longer look for 'gamma' explicitly here since it _can_ be missing. best fallback in that case is subbing in the 0.45455 value
+    
+    if pil_image.format == 'PNG' and pil_image.mode in ( 'RGB', 'RGBA' ) and 'chromaticity' in pil_image.info:
         
-        linear_gamma = pil_image.info[ 'gamma' ]
+        if 'gamma' in pil_image.info:
+            
+            linear_gamma = pil_image.info[ 'gamma' ]
+            
+            try:
+                
+                if linear_gamma == 0.0:
+                    
+                    return False
+                    
+                
+            except Exception as e:
+                
+                return False
+                
+            
         
-        if linear_gamma == 0.0:
+        chromaticity = pil_image.info[ 'chromaticity' ]
+        
+        if isinstance( chromaticity, str ):
             
             return False
             
         
-        if 0.0 in pil_image.info[ 'chromaticity' ]:
+        try:
+            
+            if 0.0 in chromaticity:
+                
+                return False
+                
+            
+        except Exception as e:
             
             return False
             

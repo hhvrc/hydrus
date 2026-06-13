@@ -26,7 +26,7 @@ class PNGExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._filepicker = ClientGUIPathWidgets.FilePickerCtrl( self, wildcard = 'PNG (*.png)' )
         self._filepicker.SetSaveMode( True )
         
-        flp_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._filepicker, 64 )
+        flp_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._filepicker, 60 )
         
         self._filepicker.setMinimumWidth( flp_width )
         
@@ -194,7 +194,7 @@ class PNGsExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         
         self._directory_picker = ClientGUIPathWidgets.DirPickerCtrl( self )
         
-        dp_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._directory_picker, 52 )
+        dp_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._directory_picker, 60 )
         
         self._directory_picker.setMinimumWidth( dp_width )
         

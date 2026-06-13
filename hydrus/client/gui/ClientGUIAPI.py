@@ -1,6 +1,8 @@
 from qtpy import QtWidgets as QW
 
 from hydrus.core import HydrusConstants as HC
+from hydrus.core import HydrusData
+from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusTime
 
 from hydrus.client import ClientAPI
@@ -8,6 +10,7 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client.gui import ClientGUIFunctions
 from hydrus.client.gui import ClientGUIDialogsMessage
+from hydrus.client.gui import ClientGUIDialogsQuick
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.metadata import ClientGUITagFilter
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
@@ -73,9 +76,11 @@ class EditAPIPermissionsPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._access_key.setReadOnly( True )
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._access_key, 66 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._access_key, 64 )
         
-        self.setMinimumWidth( width )
+        self._access_key.setMinimumWidth( width )
+        
+        self._edit_access_key_button = ClientGUICommon.BetterButton( self, 'I want to change the Access Key', self._EditAccessKey )
         
         self._name = QW.QLineEdit( self )
         
@@ -124,6 +129,7 @@ class EditAPIPermissionsPanel( ClientGUIScrolledPanels.EditPanel ):
         rows = []
         
         rows.append( ( 'access key: ', self._access_key ) )
+        rows.append( self._edit_access_key_button )
         rows.append( ( 'name: ', self._name ) )
         
         gridbox = ClientGUICommon.WrapInGrid( self, rows )
@@ -154,6 +160,46 @@ class EditAPIPermissionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
             self._basic_permissions.Check( i )
             
+        
+    
+    def _EditAccessKey( self ):
+        
+        try:
+            
+            message = 'Enter your new Access Key here. It must be 64 characters of hex. The button below has a valid random key.'
+            message += '\n' * 2
+            message += 'OBVIOUSLY ANYTHING THAT USES THIS CURRENT ACCESS KEY WILL LOSE ACCESS ONCE YOU CHANGE IT'
+            
+            suggestions = [ HydrusData.GenerateKey().hex() ]
+            
+            new_access_key_hex = ClientGUIDialogsQuick.EnterText( self, message, default = self._access_key.text(), suggestions = suggestions )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        new_access_key_hex = new_access_key_hex.strip()
+        
+        if len( new_access_key_hex ) != 64:
+            
+            ClientGUIDialogsMessage.ShowCritical( self, 'wrong key length', f'Sorry, the key you submitted was {len(new_access_key_hex)} characters long. It needs to be 64.' )
+            
+            return
+            
+        
+        try:
+            
+            bytes.fromhex( new_access_key_hex )
+            
+        except:
+            
+            ClientGUIDialogsMessage.ShowCritical( self, 'did not encode', 'Sorry, the key you submitted did not seem to be hexadecimal.' )
+            
+            return
+            
+        
+        self._access_key.setText( new_access_key_hex )
         
     
     def _UpdateEnabled( self ):

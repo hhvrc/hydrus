@@ -115,6 +115,22 @@ class TestPredicateTesting( unittest.TestCase ):
         self.assertFalse( pred.TestMediaResult( media_result_fail ) )
         
     
+    def test_type_inbox( self ):
+        
+        pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_INBOX )
+        
+        self.assertTrue( pred.CanTestMediaResult() )
+        
+        media_result_pass = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
+        media_result_fail = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
+        
+        media_result_pass.GetLocationsManager().inbox = True
+        media_result_fail.GetLocationsManager().inbox = False
+        
+        self.assertTrue( pred.TestMediaResult( media_result_pass ) )
+        self.assertFalse( pred.TestMediaResult( media_result_fail ) )
+        
+    
     def test_type_filetype( self ):
         
         pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_MIME, value = { HC.IMAGE_JPEG } )
@@ -193,22 +209,6 @@ class TestPredicateTesting( unittest.TestCase ):
         self.assertFalse( pred.TestMediaResult( media_result_fail ) )
         
     
-    def test_type_inbox( self ):
-        
-        pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_INBOX )
-        
-        self.assertTrue( pred.CanTestMediaResult() )
-        
-        media_result_pass = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
-        media_result_fail = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
-        
-        media_result_pass.GetLocationsManager().inbox = True
-        media_result_fail.GetLocationsManager().inbox = False
-        
-        self.assertTrue( pred.TestMediaResult( media_result_pass ) )
-        self.assertFalse( pred.TestMediaResult( media_result_fail ) )
-        
-    
     def test_type_width( self ):
         
         pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_WIDTH, ClientNumberTest.NumberTest.STATICCreateFromCharacters( '<', 200 ) )
@@ -220,6 +220,44 @@ class TestPredicateTesting( unittest.TestCase ):
         
         media_result_pass.GetFileInfoManager().width = 195
         media_result_fail.GetFileInfoManager().width = 205
+        
+        self.assertTrue( pred.TestMediaResult( media_result_pass ) )
+        self.assertFalse( pred.TestMediaResult( media_result_fail ) )
+        
+    
+    def test_type_num_pixels( self ):
+        
+        pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_NUM_PIXELS, ( '<', 50, 1000 ) )
+        
+        self.assertTrue( pred.CanTestMediaResult() )
+        
+        media_result_pass = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
+        media_result_fail = media_result_pass.Duplicate()
+        
+        media_result_pass.GetFileInfoManager().width = 200
+        media_result_pass.GetFileInfoManager().height = 200
+        
+        media_result_fail.GetFileInfoManager().width = 200
+        media_result_fail.GetFileInfoManager().height = 300
+        
+        self.assertTrue( pred.TestMediaResult( media_result_pass ) )
+        self.assertFalse( pred.TestMediaResult( media_result_fail ) )
+        
+    
+    def test_type_ratio( self ):
+        
+        pred = ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO, ( '<', 4, 3 ) )
+        
+        self.assertTrue( pred.CanTestMediaResult() )
+        
+        media_result_pass = HelperFunctions.GetFakeMediaResult( HydrusData.GenerateKey(), mime = HC.IMAGE_JPEG )
+        media_result_fail = media_result_pass.Duplicate()
+        
+        media_result_pass.GetFileInfoManager().width = 640
+        media_result_pass.GetFileInfoManager().height = 490
+        
+        media_result_fail.GetFileInfoManager().width = 640
+        media_result_fail.GetFileInfoManager().height = 470
         
         self.assertTrue( pred.TestMediaResult( media_result_pass ) )
         self.assertFalse( pred.TestMediaResult( media_result_fail ) )
@@ -1365,6 +1403,14 @@ class TestPredicateValueExtraction( unittest.TestCase ):
         
         self.assertTrue( system_predicate.CanExtractValueFromMediaResult() )
         self.assertEqual( system_predicate.ExtractValueFromMediaResult( fake_media_result ), fake_media_result.GetFileInfoManager().width * fake_media_result.GetFileInfoManager().height )
+        self.assertEqual( system_predicate.ExtractValueFromMediaResult( fake_non_image_media_result ), None )
+        
+        # ratio
+        
+        system_predicate = ClientSearchPredicate.Predicate( predicate_type = ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO )
+        
+        self.assertTrue( system_predicate.CanExtractValueFromMediaResult() )
+        self.assertEqual( system_predicate.ExtractValueFromMediaResult( fake_media_result ), fake_media_result.GetFileInfoManager().width / fake_media_result.GetFileInfoManager().height )
         self.assertEqual( system_predicate.ExtractValueFromMediaResult( fake_non_image_media_result ), None )
         
         # duration

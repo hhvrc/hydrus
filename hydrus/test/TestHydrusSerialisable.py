@@ -13,10 +13,9 @@ from hydrus.client.duplicates import ClientDuplicates
 from hydrus.client.gui import ClientGUIShortcuts
 from hydrus.client.importing import ClientImportSubscriptions
 from hydrus.client.importing import ClientImportSubscriptionQuery
-from hydrus.client.importing.options import ClientImportOptions
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import CheckerImportOptions
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import TagImportOptions
-from hydrus.client.importing.options import TagImportOptionsLegacy
 from hydrus.client.media import ClientMediaManagers
 from hydrus.client.media import ClientMediaResult
 from hydrus.client.metadata import ClientContentUpdates
@@ -532,8 +531,7 @@ class TestSerialisables( unittest.TestCase ):
             self.assertEqual( obj._periodic_file_limit, dupe_obj._periodic_file_limit )
             self.assertEqual( obj._paused, dupe_obj._paused )
             
-            self.assertEqual( obj._file_import_options.GetSerialisableTuple(), dupe_obj._file_import_options.GetSerialisableTuple() )
-            self.assertEqual( obj._tag_import_options.GetSerialisableTuple(), dupe_obj._tag_import_options.GetSerialisableTuple() )
+            self.assertEqual( obj._import_options_container.GetSerialisableTuple(), dupe_obj._import_options_container.GetSerialisableTuple() )
             
             self.assertEqual( obj._no_work_until, dupe_obj._no_work_until )
             
@@ -554,18 +552,10 @@ class TestSerialisables( unittest.TestCase ):
         q.SetQueryText( 'test query 2' )
         query_headers.append( q )
         
-        checker_options = ClientImportOptions.CheckerOptions()
+        checker_options = CheckerImportOptions.CheckerOptions()
         initial_file_limit = 100
         periodic_file_limit = 50
         paused = False
-        
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        
-        service_tag_import_options = TagImportOptions.ServiceTagImportOptions( get_tags = False, additional_tags = { 'test additional tag', 'and another' } )
-        
-        tag_import_options = TagImportOptions.TagImportOptions( service_keys_to_service_tag_import_options = { HydrusData.GenerateKey() : service_tag_import_options } )
-        
-        tag_import_options_legacy = TagImportOptionsLegacy.TagImportOptionsLegacy( tag_import_options = tag_import_options )
         
         no_work_until = HydrusTime.GetNow() - 86400 * 20
         
@@ -576,15 +566,22 @@ class TestSerialisables( unittest.TestCase ):
         
         sub.SetPaused( paused )
         
-        sub.SetFileImportOptions( file_import_options )
-        sub.SetTagImportOptions( tag_import_options_legacy )
+        service_tag_import_options = TagImportOptions.ServiceTagImportOptions( get_tags = False, additional_tags = { 'test additional tag', 'and another' } )
+        
+        tag_import_options = TagImportOptions.TagImportOptions( service_keys_to_service_tag_import_options = { HydrusData.GenerateKey() : service_tag_import_options } )
+        
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+        
+        import_options_container.SetImportOptions( tag_import_options )
+        
+        sub.SetImportOptionsContainer( import_options_container )
         
         sub.SetNoWorkUntil( no_work_until )
         
         sub.SetQueryHeaders( query_headers )
         
         self.assertEqual( sub.GetGUGKeyAndName(), gug_key_and_name )
-        self.assertEqual( sub.GetTagImportOptions().DumpToString(), tag_import_options_legacy.DumpToString() )
+        self.assertEqual( sub.GetImportOptionsContainer().DumpToString(), import_options_container.DumpToString() )
         self.assertEqual( sub.GetQueryHeaders(), query_headers )
         
         self.assertEqual( sub._paused, False )

@@ -19,10 +19,8 @@ from hydrus.client import ClientLocation
 from hydrus.client import ClientPaths
 from hydrus.client.files.images import ClientImagePerceptualHashes
 from hydrus.client.importing import ClientImportFiles
-from hydrus.client.importing.options import FileImportOptionsLegacy
-from hydrus.client.importing.options import ImportOptionsContainerMigration
-from hydrus.client.importing.options import NoteImportOptionsLegacy
-from hydrus.client.importing.options import TagImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.metadata import ClientFileMigration
 from hydrus.client.networking.api import ClientLocalServerCore
@@ -70,29 +68,18 @@ class HydrusResourceClientAPIRestrictedAddFilesAddFile( HydrusResourceClientAPIR
         
         ( os_file_handle, temp_path ) = request.temp_file_info
         
-        file_import_options = CG.client_controller.new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_QUIET ).Duplicate()
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+        
+        full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_CLIENT_API )
         
         custom_location_context = ClientLocalServerCore.ParseLocalFileDomainLocationContext( request )
         
         if custom_location_context is not None:
             
-            file_import_options.GetLocationImportOptions().SetDestinationLocationContext( custom_location_context )
+            full_import_options_container.GetLocationImportOptions().SetDestinationLocationContext( custom_location_context )
             
         
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
-        
-        import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-            file_import_options,
-            FileImportOptionsLegacy.IMPORT_TYPE_LOUD,
-            tag_import_options,
-            note_import_options,
-            None,
-            'api file'
-        )
-        
-        file_import_job = ClientImportFiles.FileImportJob( temp_path, import_options_container, human_file_description = f'API POSTed File' )
+        file_import_job = ClientImportFiles.FileImportJob( temp_path, full_import_options_container, human_file_description = f'API POSTed File' )
         
         body_dict = {}
         

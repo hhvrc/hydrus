@@ -58,7 +58,7 @@ class ORPredicateControl( QW.QWidget ):
             self._search_control = ClientGUIACDropdown.AutoCompleteDropdownTagsRead( self, page_key, file_search_context, hide_favourites_edit_actions = True )
             
         
-        self._search_control.setMinimumWidth( ClientGUIFunctions.ConvertTextToPixelWidth( self._search_control, 64 ) )
+        self._search_control.setMinimumWidth( ClientGUIFunctions.ConvertTextToPixelWidth( self._search_control, 60 ) )
         
         vbox = QP.VBoxLayout()
         

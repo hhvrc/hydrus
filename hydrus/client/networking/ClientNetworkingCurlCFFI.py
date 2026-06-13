@@ -7,8 +7,6 @@ import requests.exceptions
 
 # cribbed and hydrus-wangled and -simplified from ideas here https://codeberg.org/mikf/gallery-dl/pulls/28/files
 
-curl_cffi_http_versions_to_str_lookup = {}
-
 CURL_CFFI_OK = True
 CURL_CFFI_MODULE_NOT_FOUND = False
 CURL_CFFI_IMPORT_ERROR = 'curl_cffi seems fine!'
@@ -17,23 +15,6 @@ try:
     
     import curl_cffi.requests
     import curl_cffi.requests.exceptions
-    
-    try:
-        
-        curl_cffi_http_versions_to_str_lookup = {
-            curl_cffi.CurlHttpVersion.V1_0 : 'http/1',
-            curl_cffi.CurlHttpVersion.V1_1 : 'http/1.1',
-            curl_cffi.CurlHttpVersion.V2_0 : 'http/2',
-            curl_cffi.CurlHttpVersion.V2TLS : 'http/2 for https, http/1.1 for http',
-            curl_cffi.CurlHttpVersion.V2_PRIOR_KNOWLEDGE : 'http/2 without http/1.1 upgrade',
-            curl_cffi.CurlHttpVersion.V3 : 'http/3',
-            curl_cffi.CurlHttpVersion.V3ONLY : 'http/3 with no fallback',
-        }
-        
-    except:
-        
-        print( 'Could not set up curl_cffi http versions--I guess the enums changed?' )
-        
     
     class MyCurlCFFISession( curl_cffi.requests.Session ):
         
@@ -76,22 +57,20 @@ except Exception as e:
     
 
 def CreateCurlCFFISession(
-    definition: str,
-    http_version: "curl_cffi.CurlHttpVersion"
+    definition: str
 ):
     
-    curl_cffi_session = MyCurlCFFISession( impersonate = definition, http_version = http_version )
+    curl_cffi_session = MyCurlCFFISession( impersonate = definition )
     
     return curl_cffi_session
     
 
 def ConvertRequestsSessionToCurlCFFISession(
     definition: str,
-    http_version: "curl_cffi.CurlHttpVersion",
     requests_session: requests.Session
 ):
     
-    curl_cffi_session = CreateCurlCFFISession( definition, http_version )
+    curl_cffi_session = CreateCurlCFFISession( definition )
     
     # we out here
     proxies = typing.cast( object, requests_session.proxies )
@@ -103,6 +82,17 @@ def ConvertRequestsSessionToCurlCFFISession(
     SetCURLCFFISessionCookiesWithRequestsCookieJar( curl_cffi_session, requests_session.cookies )
     
     return curl_cffi_session
+    
+
+def GetBrowserNames() -> list[ str ]:
+    
+    import curl_cffi.requests.impersonate
+    
+    from hydrus.core import HydrusText
+    
+    browser_names = sorted( typing.get_args( curl_cffi.requests.impersonate.BrowserTypeLiteral ), key = HydrusText.HumanTextSortKey )
+    
+    return browser_names
     
 
 def GetRequestsCookiesFromCurlCFFISession( curl_cffi_session: "curl_cffi.requests.Session" ) -> requests.sessions.RequestsCookieJar:

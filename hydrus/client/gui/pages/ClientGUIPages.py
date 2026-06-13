@@ -477,11 +477,11 @@ class Page( QW.QWidget ):
         CG.client_controller.ReleasePageKey( self._page_key )
         
     
-    def EnterPredicates( self, predicates ):
+    def EnterPredicates( self, predicates: list[ ClientSearchPredicate.Predicate ] ):
         
-        self._sidebar.EnterPredicates( self._page_key, predicates )
+        self._sidebar.EnterPredicates( predicates )
         
-        
+    
     def EventPreviewUnsplit( self, event ):
         
         QP.Unsplit( self._search_preview_split, self._preview_panel )
@@ -2370,6 +2370,32 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
         
     
+    def RenameCurrentPage( self ):
+        
+        selection = self.currentIndex()
+        
+        if selection != -1:
+            
+            page = self.widget( selection )
+            
+            if isinstance( page, PagesNotebook ):
+                
+                if page.GetNumPagesHeld() > 0:
+                    
+                    page.RenameCurrentPage()
+                    
+                else:
+                    
+                    self._RenamePage( selection )
+                    
+                
+            else:
+                
+                self._RenamePage( selection )
+                
+            
+        
+    
     def eventFilter( self, watched, event ):
         
         try:
@@ -2615,13 +2641,11 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
             for page in self._GetPages():
                 
+                total += 1
+                
                 if isinstance( page, PagesNotebook ):
                     
                     total += page.GetNumPagesHeld( only_my_level = False )
-                    
-                else:
-                    
-                    total += 1
                     
                 
             
@@ -2663,7 +2687,7 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
         
     
-    def GetOrMakeMultipleWatcherPage( self, desired_page_name = None, desired_page_key = None, select_page = True ):
+    def GetOrMakeMultipleWatcherPage( self, desired_page_name = None, desired_page_key = None, select_page = True, destination_import_options_container = None ):
         
         potential_watcher_pages = [ page for page in self._GetMediaPages( False ) if page.IsMultipleWatcherPage() ]
         
@@ -2674,6 +2698,25 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
         elif desired_page_name is not None:
             
             potential_watcher_pages = [ page for page in potential_watcher_pages if page.GetName() == desired_page_name ]
+            
+        
+        if destination_import_options_container is not None:
+            
+            good_watcher_pages = []
+            
+            for watcher_page in potential_watcher_pages:
+                
+                multiple_watcher_import = watcher_page.GetPageManager().GetVariable( 'multiple_watcher_import' )
+                
+                watcher_import_options_container = multiple_watcher_import.GetImportOptionsContainer()
+                
+                if watcher_import_options_container.DumpToString() == destination_import_options_container.DumpToString():
+                    
+                    good_watcher_pages.append( watcher_page )
+                    
+                
+            
+            potential_watcher_pages = good_watcher_pages
             
         
         if len( potential_watcher_pages ) > 0:
@@ -2693,11 +2736,11 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
         else:
             
-            return self.NewPageImportMultipleWatcher( page_name = desired_page_name, on_deepest_notebook = True, select_page = select_page )
+            return self.NewPageImportMultipleWatcher( page_name = desired_page_name, on_deepest_notebook = True, select_page = select_page, destination_import_options_container = destination_import_options_container )
             
         
     
-    def GetOrMakeURLImportPage( self, desired_page_name = None, desired_page_key = None, select_page = True, destination_location_context = None, destination_tag_import_options = None ):
+    def GetOrMakeURLImportPage( self, desired_page_name = None, desired_page_key = None, select_page = True, destination_import_options_container = None ):
         
         potential_url_import_pages = [ page for page in self._GetMediaPages( False ) if page.IsURLImportPage() ]
         
@@ -2710,7 +2753,7 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             potential_url_import_pages = [ page for page in potential_url_import_pages if page.GetName() == desired_page_name ]
             
         
-        if destination_location_context is not None:
+        if destination_import_options_container is not None:
             
             good_url_import_pages = []
             
@@ -2718,28 +2761,9 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
                 
                 urls_import = url_import_page.GetPageManager().GetVariable( 'urls_import' )
                 
-                file_import_options = urls_import.GetFileImportOptions()
+                url_import_import_options_container = urls_import.GetImportOptionsContainer()
                 
-                if not file_import_options.IsDefault() and file_import_options.GetLocationImportOptions().GetDestinationLocationContext() == destination_location_context:
-                    
-                    good_url_import_pages.append( url_import_page )
-                    
-                
-            
-            potential_url_import_pages = good_url_import_pages
-            
-        
-        if destination_tag_import_options is not None:
-            
-            good_url_import_pages = []
-            
-            for url_import_page in potential_url_import_pages:
-                
-                urls_import = url_import_page.GetPageManager().GetVariable( 'urls_import' )
-                
-                tag_import_options = urls_import.GetTagImportOptions()
-                
-                if tag_import_options.GetSerialisableTuple() == destination_tag_import_options.GetSerialisableTuple():
+                if url_import_import_options_container.DumpToString() == destination_import_options_container.DumpToString():
                     
                     good_url_import_pages.append( url_import_page )
                     
@@ -2765,7 +2789,7 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
             
         else:
             
-            return self.NewPageImportURLs( page_name = desired_page_name, on_deepest_notebook = True, select_page = select_page, destination_location_context = destination_location_context, destination_tag_import_options = destination_tag_import_options )
+            return self.NewPageImportURLs( page_name = desired_page_name, on_deepest_notebook = True, select_page = select_page, destination_import_options_container = destination_import_options_container )
             
         
     
@@ -3409,16 +3433,16 @@ class PagesNotebook( QP.TabWidgetWithDnD ):
         return self.NewPage( page_manager, on_deepest_notebook = on_deepest_notebook )
         
     
-    def NewPageImportMultipleWatcher( self, page_name = None, url = None, on_deepest_notebook = False, select_page = True ):
+    def NewPageImportMultipleWatcher( self, page_name = None, url = None, on_deepest_notebook = False, select_page = True, destination_import_options_container = None ):
         
-        page_manager = ClientGUIPageManager.CreatePageManagerImportMultipleWatcher( page_name = page_name, url = url )
+        page_manager = ClientGUIPageManager.CreatePageManagerImportMultipleWatcher( page_name = page_name, url = url, destination_import_options_container = destination_import_options_container )
         
         return self.NewPage( page_manager, on_deepest_notebook = on_deepest_notebook, select_page = select_page )
         
     
-    def NewPageImportURLs( self, page_name = None, on_deepest_notebook = False, select_page = True, destination_location_context = None, destination_tag_import_options = None ):
+    def NewPageImportURLs( self, page_name = None, on_deepest_notebook = False, select_page = True,  destination_import_options_container = None ):
         
-        page_manager = ClientGUIPageManager.CreatePageManagerImportURLs( page_name = page_name, destination_location_context = destination_location_context, destination_tag_import_options = destination_tag_import_options )
+        page_manager = ClientGUIPageManager.CreatePageManagerImportURLs( page_name = page_name, destination_import_options_container = destination_import_options_container )
         
         return self.NewPage( page_manager, on_deepest_notebook = on_deepest_notebook, select_page = select_page )
         

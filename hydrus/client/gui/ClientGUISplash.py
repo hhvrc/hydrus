@@ -28,7 +28,7 @@ class FrameSplashPanel( QW.QWidget ):
         
         self._my_status.SetWindow( self )
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 64 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 60 )
         
         self.setMinimumWidth( width )
         
@@ -61,7 +61,7 @@ class FrameSplashPanel( QW.QWidget ):
         QP.AddToLayout( vbox, self._status_label, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._status_sub_label, CC.FLAGS_EXPAND_PERPENDICULAR )
         
-        margin = ClientGUIFunctions.ConvertTextToPixelWidth( self, 3 )
+        margin = ClientGUIFunctions.ConvertTextToPixelWidth( self, 2 )
         
         self._image_label.setMargin( margin )
         

@@ -71,7 +71,7 @@ def build_help( venv_path ):
     
     python_exe = get_python_exe_path( venv_path )
     
-    subprocess.check_call( [ python_exe, '-m', 'mkdocs', 'build', '-d', 'help' ] )
+    subprocess.check_call( [ python_exe, '-m', 'mkdocs', 'build', '-d', 'help', '-f', 'mkdocs-offline.yml' ] )
     
 
 def main():

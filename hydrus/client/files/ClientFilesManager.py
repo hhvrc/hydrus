@@ -823,6 +823,7 @@ class ClientFilesManager( object ):
 
 
 
+
         # multi-root fallback: try alternative roots before giving up
         if self._multi_root_config.IsActive():
 
@@ -840,10 +841,7 @@ class ClientFilesManager( object ):
 
                         return ( alt_path, potential_mime )
 
-
-
-
-
+        # ruh roh, we cannot find the file
 
         subfolders = self._GetPossibleSubfoldersForFile( hash, 'f' )
         
@@ -891,12 +889,12 @@ class ClientFilesManager( object ):
             self._missing_subfolders = {
                 subfolder for subfolders in self._prefixes_to_client_files_subfolders.values()
                 for subfolder in subfolders
-                if not subfolder.PathExists() and not self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir )
+                if not subfolder.PathExists( lazy_check_ok = True ) and not self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir )
             }
 
         else:
 
-            self._missing_subfolders = { subfolder for subfolders in self._prefixes_to_client_files_subfolders.values() for subfolder in subfolders if not subfolder.PathExists() }
+            self._missing_subfolders = { subfolder for subfolders in self._prefixes_to_client_files_subfolders.values() for subfolder in subfolders if not subfolder.PathExists( lazy_check_ok = True ) }
         
     
     def _WaitOnWakeup( self ):

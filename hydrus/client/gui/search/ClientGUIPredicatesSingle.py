@@ -1178,7 +1178,7 @@ class PanelPredicateSystemHash( PanelPredicateSystemSingle ):
         
         self._hashes.setPlaceholderText( 'enter hash (paste newline-separated for multiple hashes)' )
         
-        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._hashes, ( 66, 10 ) )
+        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._hashes, ( 60, 10 ) )
         
         self._hashes.setMinimumSize( QC.QSize( init_width, init_height ) )
         
@@ -1250,6 +1250,10 @@ class PanelPredicateSystemHash( PanelPredicateSystemSingle ):
                 stripped_hashes.append( hash )
                 
                 we_split_some = True
+                
+            else:
+                
+                stripped_hashes.append( line )
                 
             
         
@@ -2787,7 +2791,7 @@ class PanelPredicateSystemSimilarToData( PanelPredicateSystemSingle ):
         
         self._perceptual_hashes = QW.QPlainTextEdit( self )
         
-        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._pixel_hashes, ( 66, 4 ) )
+        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._pixel_hashes, ( 60, 4 ) )
         
         self._pixel_hashes.setMinimumWidth( init_width )
         self._pixel_hashes.setMaximumHeight( init_height )
@@ -3010,7 +3014,7 @@ class PanelPredicateSystemSimilarToFiles( PanelPredicateSystemSingle ):
         
         self._hashes = QW.QPlainTextEdit( self )
         
-        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._hashes, ( 66, 6 ) )
+        ( init_width, init_height ) = ClientGUIFunctions.ConvertTextToPixels( self._hashes, ( 60, 6 ) )
         
         self._hashes.setMinimumWidth( init_width )
         self._hashes.setMaximumHeight( init_height )
@@ -3212,7 +3216,7 @@ class PanelPredicateSystemTagAdvanced( PanelPredicateSystemSingle ):
         
         self._tag.setText( tag )
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._tag, 48 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._tag, 40 )
         
         self._tag.setMinimumWidth( width )
         

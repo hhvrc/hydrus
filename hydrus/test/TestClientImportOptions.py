@@ -13,7 +13,7 @@ from hydrus.core import HydrusTime
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientLocation
 from hydrus.client.importing import ClientImportFileSeeds
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import CheckerImportOptions
 from hydrus.client.importing.options import FileFilteringImportOptions
 from hydrus.client.importing.options import LocationImportOptions
 from hydrus.client.importing.options import NoteImportOptions
@@ -33,10 +33,10 @@ class TestCheckerOptions( unittest.TestCase ):
     
     def test_checker_options( self ):
         
-        regular_checker_options = ClientImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
-        fast_checker_options = ClientImportOptions.CheckerOptions( intended_files_per_check = 2, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
-        slow_checker_options = ClientImportOptions.CheckerOptions( intended_files_per_check = 10, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
-        callous_checker_options = ClientImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 60 ) )
+        regular_checker_options = CheckerImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
+        fast_checker_options = CheckerImportOptions.CheckerOptions( intended_files_per_check = 2, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
+        slow_checker_options = CheckerImportOptions.CheckerOptions( intended_files_per_check = 10, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 86400 ) )
+        callous_checker_options = CheckerImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 30, never_slower_than = 86400, death_file_velocity = ( 1, 60 ) )
         
         empty_file_seed_cache = ClientImportFileSeeds.FileSeedCache()
         
@@ -200,7 +200,7 @@ class TestCheckerOptions( unittest.TestCase ):
         
         # Let's test the static timings, where if faster_than == slower_than
         
-        static_checker_options = ClientImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 3600, never_slower_than = 3600, death_file_velocity = ( 1, 3600 ) )
+        static_checker_options = CheckerImportOptions.CheckerOptions( intended_files_per_check = 5, never_faster_than = 3600, never_slower_than = 3600, death_file_velocity = ( 1, 3600 ) )
         
         self.assertTrue( static_checker_options.IsDead( bare_file_seed_cache, last_check_time ) )
         

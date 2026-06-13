@@ -19,9 +19,9 @@ pip install mkdocs-material
 
 To build the help, run:
 ```
-mkdocs build -d help
+mkdocs build -d help -f mkdocs-offline.yml
 ```
-In the base hydrus directory (same as the `mkdocs.yml` file), which will build it into the `help` directory. You will then be good!
+In the base hydrus install directory, which will build it into the `help` directory. You will then be good!
 
 Repeat the command and MkDocs will clear out the old directory and rebuild it, so you can fold this into any update script.
 

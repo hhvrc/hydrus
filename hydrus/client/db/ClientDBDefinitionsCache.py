@@ -5,6 +5,7 @@ from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusDB
 from hydrus.core import HydrusDBBase
+from hydrus.core import HydrusDBPopulateCache
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusLists
 from hydrus.core import HydrusNumbers
@@ -29,7 +30,7 @@ class ClientDBCacheLocalHashes( ClientDBModule.ClientDBModule ):
         self.modules_services = modules_services
         self.modules_files_storage = modules_files_storage
         
-        self._hash_ids_to_hashes_cache = {}
+        self._hash_ids_to_hashes_cache = HydrusDBPopulateCache.IdToPrimitiveCache( 'local hash', 125000 )
         
         super().__init__( 'client hashes local cache', cursor )
         
@@ -52,19 +53,13 @@ class ClientDBCacheLocalHashes( ClientDBModule.ClientDBModule ):
     
     def _PopulateHashIdsToHashesCache( self, hash_ids, error_on_missing_hash_ids = False ):
         
-        if len( self._hash_ids_to_hashes_cache ) > 100000:
-            
-            if not isinstance( hash_ids, set ):
-                
-                hash_ids = set( hash_ids )
-                
-            
-            self._hash_ids_to_hashes_cache = { hash_id : hash for ( hash_id, hash ) in self._hash_ids_to_hashes_cache.items() if hash_id in hash_ids }
-            
+        self._hash_ids_to_hashes_cache.maintain_touch_record()
         
         uncached_hash_ids = { hash_id for hash_id in hash_ids if hash_id not in self._hash_ids_to_hashes_cache }
         
         if len( uncached_hash_ids ) > 0:
+            
+            local_uncached_hash_ids_to_hashes = {}
             
             if len( uncached_hash_ids ) == 1:
                 
@@ -84,7 +79,7 @@ class ClientDBCacheLocalHashes( ClientDBModule.ClientDBModule ):
             
             self._hash_ids_to_hashes_cache.update( local_uncached_hash_ids_to_hashes )
             
-            uncached_hash_ids = { hash_id for hash_id in uncached_hash_ids if hash_id not in self._hash_ids_to_hashes_cache }
+            uncached_hash_ids = { hash_id for hash_id in uncached_hash_ids if hash_id not in local_uncached_hash_ids_to_hashes }
             
         
         if len( uncached_hash_ids ) > 0:
@@ -113,7 +108,7 @@ class ClientDBCacheLocalHashes( ClientDBModule.ClientDBModule ):
         
         self._Execute( 'DELETE FROM local_hashes_cache;' )
         
-        self._hash_ids_to_hashes_cache = {}
+        self._hash_ids_to_hashes_cache.clear()
         
     
     def DropHashIdsFromCache( self, hash_ids ):
@@ -384,7 +379,7 @@ class ClientDBCacheLocalTags( ClientDBModule.ClientDBModule ):
         self.modules_services = modules_services
         self.modules_mappings_counts = modules_mappings_counts
         
-        self._tag_ids_to_tags_cache = {}
+        self._tag_ids_to_tags_cache = HydrusDBPopulateCache.IdToPrimitiveCache( 'local tag', 250000 )
         
         super().__init__( 'client tags local cache', cursor )
         
@@ -398,19 +393,13 @@ class ClientDBCacheLocalTags( ClientDBModule.ClientDBModule ):
     
     def _PopulateTagIdsToTagsCache( self, tag_ids ):
         
-        if len( self._tag_ids_to_tags_cache ) > 100000:
-            
-            if not isinstance( tag_ids, set ):
-                
-                tag_ids = set( tag_ids )
-                
-            
-            self._tag_ids_to_tags_cache = { tag_id : tag for ( tag_id, tag ) in self._tag_ids_to_tags_cache.items() if tag_id in tag_ids }
-            
+        self._tag_ids_to_tags_cache.maintain_touch_record()
         
         uncached_tag_ids = { tag_id for tag_id in tag_ids if tag_id not in self._tag_ids_to_tags_cache }
         
         if len( uncached_tag_ids ) > 0:
+            
+            local_uncached_tag_ids_to_tags = {}
             
             if len( uncached_tag_ids ) == 1:
                 
@@ -430,7 +419,7 @@ class ClientDBCacheLocalTags( ClientDBModule.ClientDBModule ):
             
             self._tag_ids_to_tags_cache.update( local_uncached_tag_ids_to_tags )
             
-            uncached_tag_ids = { tag_id for tag_id in uncached_tag_ids if tag_id not in self._tag_ids_to_tags_cache }
+            uncached_tag_ids = { tag_id for tag_id in uncached_tag_ids if tag_id not in local_uncached_tag_ids_to_tags }
             
         
         if len( uncached_tag_ids ) > 0:
@@ -459,7 +448,7 @@ class ClientDBCacheLocalTags( ClientDBModule.ClientDBModule ):
         
         self._Execute( 'DELETE FROM local_tags_cache;' )
         
-        self._tag_ids_to_tags_cache = {}
+        self._tag_ids_to_tags_cache.clear()
         
     
     def DropTagIdsFromCache( self, tag_ids ):
@@ -532,7 +521,7 @@ class ClientDBCacheLocalTags( ClientDBModule.ClientDBModule ):
         
         if tag_id in self._tag_ids_to_tags_cache:
             
-            del self._tag_ids_to_tags_cache[ tag_id ]
+            self._tag_ids_to_tags_cache[ tag_id ] = tag
             
         
     

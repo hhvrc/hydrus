@@ -2,6 +2,7 @@ from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
 from hydrus.core import HydrusConstants as HC
+from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusNumbers
 
@@ -19,23 +20,25 @@ from hydrus.client.gui.lists import ClientGUIListCtrl
 from hydrus.client.gui.panels.options import ClientGUIOptionsPanelBase
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIMenuButton
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import ImportOptionsContainer
-
-PASTE_REPLACE = 0
-PASTE_MERGE = 1
-PASTE_FILL_IN = 2
+from hydrus.client.importing.options import ImportOptionsManager
 
 class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
     
-    def __init__( self, parent, new_options, import_options_manager: ImportOptionsContainer.ImportOptionsManager ):
+    def __init__( self, parent, new_options, import_options_manager: ImportOptionsManager.ImportOptionsManager ):
         super().__init__( parent )
         
         self._new_options = new_options
-        self._import_options_container_manager: ImportOptionsContainer.ImportOptionsManager = import_options_manager.Duplicate()
+        self._import_options_manager: ImportOptionsManager.ImportOptionsManager = import_options_manager.Duplicate()
         
-        menu_template_items = [ ]
+        menu_template_items = []
         
-        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open help dialog', 'Open a dialog with more information about this panel.', self._ShowHelp ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open tl;dr', 'Open a dialog with brief information about this panel.', self._ShowTLDR ) )
+        
+        page_func = HydrusData.Call( ClientGUIDialogsQuick.OpenDocumentation, self, HC.DOCUMENTATION_IMPORT_OPTIONS )
+        
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open the import options help', 'Open the HTML help that talks about this whole system.', page_func ) )
         
         help_button = ClientGUIMenuButton.MenuIconButton( self, CC.global_icons().help, menu_template_items )
         
@@ -74,7 +77,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         default_import_options_list_panel.AddMenuIconButton( CC.global_icons().paste, 'paste a new set of options from the clipboard', menu_template_items, enabled_only_on_selection = True )
         
-        self._default_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, self._import_options_container_manager, edit_allowed = True )
+        self._default_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, self._import_options_manager, edit_allowed = True )
         default_import_options_list_panel.AddWindow( self._default_favourites_button )
         
         default_import_options_list_panel.AddButton( 'edit', self._EditDefault, enabled_only_on_single_selection = True )
@@ -108,7 +111,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         url_class_import_options_list_panel.AddMenuIconButton( CC.global_icons().paste, 'paste a new set of options from the clipboard', menu_template_items, enabled_only_on_selection = True )
         
-        self._url_class_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, self._import_options_container_manager, edit_allowed = True )
+        self._url_class_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, self._import_options_manager, edit_allowed = True )
         url_class_import_options_list_panel.AddWindow( self._url_class_favourites_button )
         
         url_class_import_options_list_panel.AddButton( 'edit', self._EditURLClass, enabled_only_on_single_selection = True )
@@ -116,7 +119,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         #
         
-        self._default_import_options_list.AddDatas( ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPES_EDITABLE_CANONICAL_ORDER )
+        self._default_import_options_list.AddDatas( IOC.IMPORT_OPTIONS_CALLER_TYPES_EDITABLE_CANONICAL_ORDER )
         
         self._default_import_options_list.Sort()
         
@@ -135,7 +138,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         vbox = QP.VBoxLayout()
         
-        label = 'HEY YOU ONLY SEE THIS PANEL IF YOU BOOT THE OPTIONS DIALOG IN ADVANCED MODE. THIS DOES NOT CHANGE OR SAVE ANYTHING REAL BUT IT SHOWS PREVIEW OF WHAT THE NEW IMPORT OPTIONS SYSTEM WILL LOOK LIKE.\n\nIt loads up your current settings and migrates them to the new objects. Everything is edited in this one options panel, and we are moving from file/tag/note import options to a finer prefetch/file filtering/tag filtering/locations/tags/notes/presentation system. I, hydev, am happy with the technical side, but the onboarding is not there yet. I would like feedback on what is good/bad/confusing, thank you!'
+        label = 'This is a new system that has migrated the three old file/tag/note import options into seven sub-types and allowing more sophisticated mix-and-match defaults and favourites/templating. I would like feedback on what is good/bad/confusing, thank you!'
         
         test_st = ClientGUICommon.BetterStaticText( self, label = label )
         test_st.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
@@ -151,16 +154,18 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self.setLayout( vbox )
         
         self._default_favourites_button.loadFavourite.connect( self._LoadFavouriteDefault )
+        self._default_favourites_button.loadFavouriteCustom.connect( self._LoadFavouriteDefaultCustom )
         self._url_class_favourites_button.loadFavourite.connect( self._LoadFavouriteURLClass )
+        self._url_class_favourites_button.loadFavouriteCustom.connect( self._LoadFavouriteURLClassCustom )
         
     
     def _ClearDefault( self ):
         
         selected = self._default_import_options_list.GetData( only_selected = True )
         
-        if ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL in selected:
+        if IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL in selected:
             
-            selected.remove( ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
+            selected.remove( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
             
             if len( selected ) == 0:
                 
@@ -170,7 +175,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                 
             
         
-        summary = ', '.join( [ ImportOptionsContainer.import_options_caller_type_str_lookup[ import_options_caller_type ] for import_options_caller_type in selected ] )
+        summary = ', '.join( [ IOC.import_options_caller_type_str_lookup[ import_options_caller_type ] for import_options_caller_type in selected ] )
         
         message = f'Clear all custom import options from {summary}?'
         
@@ -183,7 +188,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         for import_options_caller_type in selected:
             
-            self._import_options_container_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, ImportOptionsContainer.ImportOptionsContainer() )
+            self._import_options_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, ImportOptionsContainer.ImportOptionsContainer() )
             
         
         self._default_import_options_list.UpdateDatas( selected )
@@ -211,7 +216,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         for url_class in selected:
             
-            self._import_options_container_manager.SetDefaultImportOptionsContainerForURLClass( url_class.GetClassKey(), ImportOptionsContainer.ImportOptionsContainer() )
+            self._import_options_manager.SetDefaultImportOptionsContainerForURLClass( url_class.GetClassKey(), ImportOptionsContainer.ImportOptionsContainer() )
             
         
         self._url_class_import_options_list.UpdateDatas( selected )
@@ -219,15 +224,13 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
     
     def _ConvertDefaultDataToDisplayTuple( self, import_options_caller_type: int ):
         
-        pretty_name = ImportOptionsContainer.import_options_caller_type_str_lookup[ import_options_caller_type ]
+        pretty_name = IOC.import_options_caller_type_str_lookup[ import_options_caller_type ]
         
         try:
             
-            import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+            import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
             
-            show_downloader_options = not import_options_caller_type in ImportOptionsContainer.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
-            
-            pretty_defaults = import_options_container.GetSummary( show_downloader_options = show_downloader_options )
+            pretty_defaults = import_options_container.GetSummary( import_options_caller_type )
             
         except Exception as e:
             
@@ -243,7 +246,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         ( pretty_name, pretty_defaults ) = self._ConvertDefaultDataToDisplayTuple( import_options_caller_type )
         
-        sort_name = - ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER.index( import_options_caller_type )
+        sort_name = - IOC.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER.index( import_options_caller_type )
         
         sort_tuple = ( sort_name, pretty_defaults )
         
@@ -260,7 +263,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         pretty_name = name
         pretty_url_type = HC.url_type_string_lookup[ url_type ]
         
-        import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
+        import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
         
         if import_options_container is None:
             
@@ -268,7 +271,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             
         else:
             
-            pretty_defaults_set = import_options_container.GetSummary( show_downloader_options = True )
+            pretty_defaults_set = import_options_container.GetSummary( IOC.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS )
             
         
         display_tuple = ( pretty_name, pretty_url_type, pretty_defaults_set )
@@ -289,7 +292,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         import_options_caller_type = selected
         
-        import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+        import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
         
         payload = import_options_container.DumpToString()
         
@@ -307,7 +310,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         url_class_key = selected.GetClassKey()
         
-        import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
+        import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
         
         if import_options_container is None:
             
@@ -332,11 +335,18 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         import_options_caller_type = selected
         
-        import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+        import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+        
         
         with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit import options' ) as dlg:
             
-            panel = ClientGUIImportOptionsContainer.EditImportOptionsContainerPanel( dlg, self._import_options_container_manager, import_options_container, import_options_caller_type, simple_mode = self._simple_mode.isChecked() )
+            panel = ClientGUIImportOptionsContainer.EditImportOptionsContainerPanel(
+                dlg,
+                self._import_options_manager,
+                import_options_caller_type,
+                import_options_container,
+                simple_mode = self._simple_mode.isChecked()
+            )
             
             dlg.SetPanel( panel )
             
@@ -344,7 +354,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                 
                 edited_import_options_container = panel.GetValue()
                 
-                self._import_options_container_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, edited_import_options_container )
+                self._import_options_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, edited_import_options_container )
                 
                 self._default_import_options_list.UpdateDatas( ( selected, ) )
                 
@@ -360,9 +370,11 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             return
             
         
-        url_class_key = selected.GetClassKey()
+        url_class = selected
         
-        import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
+        url_class_key = url_class.GetClassKey()
+        
+        import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
         
         if import_options_container is None:
             
@@ -371,7 +383,14 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit import options' ) as dlg:
             
-            panel = ClientGUIImportOptionsContainer.EditImportOptionsContainerPanel( dlg, self._import_options_container_manager, import_options_container, ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS, url_class_key = url_class_key, simple_mode = self._simple_mode.isChecked() )
+            panel = ClientGUIImportOptionsContainer.EditImportOptionsContainerPanel(
+                dlg,
+                self._import_options_manager,
+                IOC.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS,
+                import_options_container,
+                url_class_keys = [ url_class_key ],
+                simple_mode = self._simple_mode.isChecked()
+            )
             
             dlg.SetPanel( panel )
             
@@ -379,103 +398,152 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                 
                 edited_import_options_container = panel.GetValue()
                 
-                self._import_options_container_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, edited_import_options_container )
+                self._import_options_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, edited_import_options_container )
                 
-                self._url_class_import_options_list.UpdateDatas( ( selected, ) )
+                self._url_class_import_options_list.UpdateDatas( ( url_class, ) )
                 
             
         
     
     def _LoadFavouriteDefault( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
-        selected = self._default_import_options_list.GetTopSelectedData()
+        self._LoadFavouriteDefaultDoIt( incoming_import_options_container, False )
         
-        if selected is None:
+    
+    def _LoadFavouriteDefaultCustom( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        self._LoadFavouriteDefaultDoIt( incoming_import_options_container, True )
+        
+    
+    def _LoadFavouriteDefaultDoIt( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer, do_custom_merge: bool ):
+        
+        selected_import_options_caller_types = self._default_import_options_list.GetData( only_selected = True )
+        
+        if len( selected_import_options_caller_types ) == 0:
             
             ClientGUIDialogsMessage.ShowInformation( self, 'Hey, nothing is selected in the default list--select something and try loading again.' )
             
             return
             
         
-        if not self._default_import_options_list.HasOneSelected():
+        if do_custom_merge:
             
-            ClientGUIDialogsMessage.ShowInformation( self, 'Hey, multiple items in the default list are selected. I am only going to do this on the topmost selected.' )
+            if not self._default_import_options_list.HasOneSelected():
+                
+                ClientGUIDialogsMessage.ShowInformation( self, 'Hey, multiple items in the default list are selected. I am only going to do this on the topmost selected.' )
+                
+            
+            import_options_caller_type = self._default_import_options_list.GetTopSelectedData()
+            
+            current_import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+            
+            try:
+                
+                final_import_options_container = ClientGUIImportOptionsContainer.DoCustomOverwrite(
+                    self,
+                    self._simple_mode.isChecked(),
+                    import_options_caller_type,
+                    current_import_options_container,
+                    incoming_import_options_container
+                )
+                
+            except HydrusExceptions.CancelledException:
+                
+                return
+                
+            
+        else:
+            
+            final_import_options_container = incoming_import_options_container
             
         
-        import_options_caller_type = selected
-        
-        current_import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
-        
-        try:
+        if IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL in selected_import_options_caller_types and not final_import_options_container.IsFull():
             
-            final_import_options_container = ClientGUIImportOptionsContainer.DoCustomOverwrite(
-                self,
-                self._simple_mode.isChecked(),
-                import_options_caller_type,
-                current_import_options_container,
-                incoming_import_options_container
-            )
-            
-        except HydrusExceptions.CancelledException:
+            ClientGUIDialogsMessage.ShowInformation( self, 'Hey, the import options that was entered was not full, but the Global entry has to have something for everything. Please try again!' )
             
             return
             
         
-        self._import_options_container_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, final_import_options_container )
+        for import_options_caller_type in selected_import_options_caller_types:
+            
+            self._import_options_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, final_import_options_container )
+            
         
-        self._default_import_options_list.UpdateDatas( ( selected, ) )
+        self._default_import_options_list.UpdateDatas( selected_import_options_caller_types )
         
     
     def _LoadFavouriteURLClass( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
-        selected = self._url_class_import_options_list.GetTopSelectedData()
+        self._LoadFavouriteURLClassDoIt( incoming_import_options_container, False )
         
-        if selected is None:
+    
+    def _LoadFavouriteURLClassCustom( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        self._LoadFavouriteURLClassDoIt( incoming_import_options_container, True )
+        
+    
+    def _LoadFavouriteURLClassDoIt( self, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer, do_custom_merge: bool ):
+        
+        selected_url_classes = self._url_class_import_options_list.GetData( only_selected = True )
+        
+        if len( selected_url_classes ) == 0:
             
             ClientGUIDialogsMessage.ShowInformation( self, 'Hey, nothing is selected in the URL Class list--select something and try loading again.' )
             
             return
             
         
-        if not self._url_class_import_options_list.HasOneSelected():
+        if do_custom_merge:
             
-            ClientGUIDialogsMessage.ShowInformation( self, 'Hey, multiple items in the URL Class list are selected. I am only going to do this on the topmost selected. If you need to do this to multiple entries, set up one exactly how you want and then copy/replace-paste to the rest.' )
+            if not self._url_class_import_options_list.HasOneSelected():
+                
+                ClientGUIDialogsMessage.ShowInformation( self, 'Hey, multiple items in the URL Class list are selected. I am only going to do this on the topmost selected. If you need to do this to multiple entries, set up one exactly how you want and then copy/replace-paste to the rest.' )
+                
+            
+            url_class = self._url_class_import_options_list.GetTopSelectedData()
+            
+            url_class_key = url_class.GetClassKey()
+            
+            current_import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
+            
+            if current_import_options_container is None:
+                
+                current_import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+                
+            
+            import_options_caller_type = IOC.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS
+            
+            try:
+                
+                final_import_options_container = ClientGUIImportOptionsContainer.DoCustomOverwrite(
+                    self,
+                    self._simple_mode.isChecked(),
+                    import_options_caller_type,
+                    current_import_options_container,
+                    incoming_import_options_container
+                )
+                
+            except HydrusExceptions.CancelledException:
+                
+                return
+                
+            
+        else:
+            
+            final_import_options_container = incoming_import_options_container
             
         
-        url_class = selected
-        
-        url_class_key = url_class.GetClassKey()
-        
-        current_import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
-        
-        if current_import_options_container is None:
+        for url_class in selected_url_classes:
             
-            current_import_options_container = ImportOptionsContainer.ImportOptionsContainer()
+            url_class_key = url_class.GetClassKey()
+            
+            self._import_options_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, final_import_options_container )
             
         
-        import_options_caller_type = ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS
-        
-        try:
-            
-            final_import_options_container = ClientGUIImportOptionsContainer.DoCustomOverwrite(
-                self,
-                self._simple_mode.isChecked(),
-                import_options_caller_type,
-                current_import_options_container,
-                incoming_import_options_container
-            )
-            
-        except HydrusExceptions.CancelledException:
-            
-            return
-            
-        
-        self._import_options_container_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, final_import_options_container )
-        
-        self._url_class_import_options_list.UpdateDatas( ( selected, ) )
+        self._url_class_import_options_list.UpdateDatas( selected_url_classes )
         
     
-    def _PasteDefault( self, paste_type = PASTE_REPLACE ):
+    def _PasteDefault( self, paste_type = ClientGUIImportOptionsContainer.PASTE_REPLACE ):
         
         try:
             
@@ -490,13 +558,13 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         for import_options_caller_type in import_options_caller_types:
             
-            if paste_type in ( PASTE_MERGE, PASTE_FILL_IN ):
+            if paste_type in ( ClientGUIImportOptionsContainer.PASTE_MERGE, ClientGUIImportOptionsContainer.PASTE_FILL_IN ):
                 
-                existing_import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
+                existing_import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForCallerType( import_options_caller_type )
                 
                 edited_import_options_container = existing_import_options_container.Duplicate()
                 
-                if paste_type == PASTE_MERGE:
+                if paste_type == ClientGUIImportOptionsContainer.PASTE_MERGE:
                     
                     edited_import_options_container.OverwriteWithThisSlice( pasted_import_options_container )
                     
@@ -507,24 +575,18 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                 
             else:
                 
-                if import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+                if import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
                     
-                    try:
-                        
-                        pasted_import_options_container.SetAndCheckFull()
-                        
-                    except:
+                    if not pasted_import_options_container.IsFull():
                         
                         ClientGUIDialogsMessage.ShowInformation( self, 'Hey, you tried to paste a non-full import options container into the "global" entry. Did you mean to do a merge-paste instead?' )
-                        
-                        continue
                         
                     
                 
                 edited_import_options_container = pasted_import_options_container.Duplicate()
                 
             
-            self._import_options_container_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, edited_import_options_container )
+            self._import_options_manager.SetDefaultImportOptionsContainerForCallerType( import_options_caller_type, edited_import_options_container )
             
         
         self._default_import_options_list.UpdateDatas( import_options_caller_types )
@@ -546,15 +608,15 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
     
     def _PasteDefaultFillIn( self ):
         
-        self._PasteDefault( paste_type = PASTE_FILL_IN )
+        self._PasteDefault( paste_type = ClientGUIImportOptionsContainer.PASTE_FILL_IN )
         
     
     def _PasteDefaultMerge( self ):
         
-        self._PasteDefault( paste_type = PASTE_MERGE )
+        self._PasteDefault( paste_type = ClientGUIImportOptionsContainer.PASTE_MERGE )
         
     
-    def _PasteURLClass( self, paste_type = PASTE_REPLACE ):
+    def _PasteURLClass( self, paste_type = ClientGUIImportOptionsContainer.PASTE_REPLACE ):
         
         try:
             
@@ -571,9 +633,9 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             
             url_class_key = url_class.GetClassKey()
             
-            if paste_type in ( PASTE_MERGE, PASTE_FILL_IN ):
+            if paste_type in ( ClientGUIImportOptionsContainer.PASTE_MERGE, ClientGUIImportOptionsContainer.PASTE_FILL_IN ):
                 
-                existing_import_options_container = self._import_options_container_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
+                existing_import_options_container = self._import_options_manager.GetDefaultImportOptionsContainerForURLClass( url_class_key )
                 
                 if existing_import_options_container is None:
                     
@@ -583,7 +645,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                     
                     edited_import_options_container = existing_import_options_container.Duplicate()
                     
-                    if paste_type == PASTE_MERGE:
+                    if paste_type == ClientGUIImportOptionsContainer.PASTE_MERGE:
                         
                         edited_import_options_container.OverwriteWithThisSlice( pasted_import_options_container )
                         
@@ -598,7 +660,7 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
                 edited_import_options_container = pasted_import_options_container.Duplicate()
                 
             
-            self._import_options_container_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, edited_import_options_container )
+            self._import_options_manager.SetDefaultImportOptionsContainerForURLClass( url_class_key, edited_import_options_container )
             
         
         self._url_class_import_options_list.UpdateDatas( url_classes )
@@ -620,12 +682,12 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
     
     def _PasteURLClassFillIn( self ):
         
-        self._PasteURLClass( paste_type = PASTE_FILL_IN )
+        self._PasteURLClass( paste_type = ClientGUIImportOptionsContainer.PASTE_FILL_IN )
         
     
     def _PasteURLClassMerge( self ):
         
-        self._PasteURLClass( paste_type = PASTE_MERGE )
+        self._PasteURLClass( paste_type = ClientGUIImportOptionsContainer.PASTE_MERGE )
         
     
     def _ResetDefaultToDefault( self ):
@@ -656,28 +718,28 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         if default_reset_result == 'defaults':
             
-            ImportOptionsContainer.ImportOptionsManager.STATICPopulateManagerWithDefaultDefaults( self._import_options_container_manager )
+            ImportOptionsManager.ImportOptionsManager.STATICPopulateManagerWithDefaultDefaults( self._import_options_manager )
             
             self._default_import_options_list.UpdateDatas()
             
         elif default_reset_result == 'url_classes':
             
-            url_class_keys = list( self._import_options_container_manager.GetURLClassKeysToDefaultImportOptionsContainers().keys() )
+            url_class_keys = list( self._import_options_manager.GetURLClassKeysToDefaultImportOptionsContainers().keys() )
             
             for url_class_key in url_class_keys:
                 
-                self._import_options_container_manager.DeleteDefaultImportOptionsContainerForURLClass( url_class_key )
+                self._import_options_manager.DeleteDefaultImportOptionsContainerForURLClass( url_class_key )
                 
             
-            ImportOptionsContainer.ImportOptionsManager.STATICPopulateManagerWithDefaultURLClassDefaults( self._import_options_container_manager )
+            ImportOptionsManager.ImportOptionsManager.STATICPopulateManagerWithDefaultURLClassDefaults( self._import_options_manager )
             
             self._url_class_import_options_list.UpdateDatas()
             
         elif default_reset_result == 'favourites':
             
-            self._import_options_container_manager.SetFavouriteImportOptionContainers( {} )
+            self._import_options_manager.SetFavouriteImportOptionContainers( {} )
             
-            ImportOptionsContainer.ImportOptionsManager.STATICPopulateManagerWithDefaultFavourites( self._import_options_container_manager )
+            ImportOptionsManager.ImportOptionsManager.STATICPopulateManagerWithDefaultFavourites( self._import_options_manager )
             
         
     
@@ -692,15 +754,15 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         import_options_caller_type = selected
         
-        if import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+        if import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
             
             message = 'The "global" set is the fallback default that all the other options will eventually use as the options-of-last-resort. No importer uses "global" as its primary import context.'
             
         else:
             
-            preference_stack_description = ImportOptionsContainer.GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller_type )
+            preference_stack_description = ImportOptionsManager.GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller_type )
             
-            message = f'The stack for {ImportOptionsContainer.import_options_caller_type_str_lookup[ import_options_caller_type ]}, from first- to last-checked, is:'
+            message = f'The stack for {IOC.import_options_caller_type_str_lookup[ import_options_caller_type ]}, from first- to last-checked, is:'
             message += '\n\n'
             message += preference_stack_description
             
@@ -717,10 +779,10 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             return
             
         
-        import_options_caller_type = ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS
+        import_options_caller_type = IOC.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS
         url_class = selected
         
-        preference_stack_description = ImportOptionsContainer.GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller_type, url_class_key = url_class.GetClassKey() )
+        preference_stack_description = ImportOptionsManager.GetImportOptionsCallerTypesPreferenceOrderDescription( import_options_caller_type, url_class_key = url_class.GetClassKey() )
         
         message = f'The stack for when this url class is encountered, from first- to last-checked, is:'
         message += '\n\n'
@@ -729,40 +791,17 @@ class ImportOptionsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         ClientGUIDialogsMessage.ShowInformation( self, message )
         
     
-    def _ShowHelp( self ):
-        message = '''tl;dr: Go into "global" and set every panel how you want. Set "gallery/post urls" to parse tags where you want. Never touch this again, and rarely set a "custom" import options override on a specific downloader.
-
-------
-
-Hydrus can import files in different ways. Sometimes you are watching and interacting with the import, sometimes it happens in the background, without any UI at all. You can customise the various "import options" these different importers refer to extensively.
-
-There are options governing how files are pre-screened, where they are imported to, and what metadata is added with them. Each of these is separated to let you mix and match depending on the situation.
-
-There is a "global" options structure that represents a basic default for all imports. If nothing else has anything set, your imports will use whatever is in the global set.
-
-Atop "global" sits a stack of increasingly specific contexts, for instance, for a local hard drive import, you would have:
-
-- the specific page's import options, which you set with a button in the UI
-- the general "local hard drive import" import options
-- the global import options
-
-When the import engine needs to check the "file filtering" options, it checks the top-most layer to see if it has anything set. If that layer has those options, that is what is used. If the layer is set to "use the default", the import engine goes down a layer and checks again. This is how the custom import options on a particular page can override anything else while global will act as the final backstop.
-
-Most of the time, just set what sounds correct. If you want subscriptions to generally only publish "new inbox files" to their buttons/pages, then set up "presentation" options for your subs, easy as that. If you want to override that setting on some specific subscription, then set it so on that sub in the "edit subscriptions" dialog.
-
-Every edit panel has a short description of the context being edited and which options are appropriate to edit for it. The one wrinkle to watch out for is the "url class" settings, which generally override the other layers, which allows you to set a tag blacklist for a particular domain. Click "show stack" to see exactly how a particular import context stacks up.
-
-Keep things simple and deliberate!'''
+    def _ShowTLDR( self ):
+        
+        message = '''tl;dr: Go into "gallery/post urls" and make sure tags are going where you want. Never touch this again, and, on occasion, set a "custom" import options override on a specific downloader.'''
         
         ClientGUIDialogsMessage.ShowInformation( self, message )
         
     
     def UpdateOptions( self ):
-        # set our updated manager to be the main manager of the controller
-        # don't do it yet though obviously, only once we actually have one
+        
+        CG.client_controller.import_options_manager = self._import_options_manager
         
         self._new_options.SetBoolean( 'import_options_simple_mode', self._simple_mode.isChecked() )
-        
-        pass
         
     

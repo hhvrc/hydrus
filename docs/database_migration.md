@@ -105,7 +105,9 @@ It works at about:
 - NAS/SMB: 50-250 files/s
 - Cloud storage: Assumed to be awful.
 
-Since this can mean an 8-hour job on very large clients--the very clients I want to improve latency for--I am planning to break this job into pieces.
+Although sophisticated new filesystems like BTRFS and EXT 4 may be up to 10x this speed.
+
+This can mean an 8-hour job on very large clients--the very clients I want to improve latency for, so consider this carefully.
 
 ### you have to repeat the operation on your backups
 

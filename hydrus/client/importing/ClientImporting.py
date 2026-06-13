@@ -9,10 +9,8 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientThreading
 from hydrus.client.importing import ClientImportFileSeeds
-from hydrus.client.importing.options import FileImportOptionsLegacy
-from hydrus.client.importing.options import ImportOptionsContainerMigration
-from hydrus.client.importing.options import TagImportOptionsLegacy
-from hydrus.client.importing.options import NoteImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.networking import ClientNetworkingJobs
 from hydrus.client.parsing import ClientParsingResults
 
@@ -157,26 +155,15 @@ def THREADDownloadURL( job_status, url, url_string ):
     
     file_seed = ClientImportFileSeeds.FileSeed( ClientImportFileSeeds.FILE_SEED_TYPE_URL, url )
     
-    file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-    file_import_options.SetIsDefault( True )
-    tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-    note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-    note_import_options.SetIsDefault( True )
+    import_options_container = ImportOptionsContainer.ImportOptionsContainer()
     
-    import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-        file_import_options,
-        FileImportOptionsLegacy.IMPORT_TYPE_LOUD,
-        tag_import_options,
-        note_import_options,
-        file_seed.GetReferralURL(),
-        file_seed.file_seed_data
-    )
+    full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, urls = file_seed.GetURLsForOptionsLookup() )
     
     #
     
     try:
         
-        file_seed.DownloadAndImportRawFile( url, import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook )
+        file_seed.DownloadAndImportRawFile( url, full_import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook )
         
         status = file_seed.status
         
@@ -208,6 +195,7 @@ def THREADDownloadURL( job_status, url, url_string ):
         job_status.Finish()
         
     
+
 def THREADDownloadURLs( job_status: ClientThreading.JobStatus, urls, title ):
     
     job_status.SetStatusTitle( title )
@@ -251,24 +239,13 @@ def THREADDownloadURLs( job_status: ClientThreading.JobStatus, urls, title ):
         
         file_seed = ClientImportFileSeeds.FileSeed( ClientImportFileSeeds.FILE_SEED_TYPE_URL, url )
         
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        file_import_options.SetIsDefault( True )
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        import_options_container = ImportOptionsContainerMigration.ConvertLegacyOptionsToContainerPipelineBridge(
-            file_import_options,
-            FileImportOptionsLegacy.IMPORT_TYPE_LOUD,
-            tag_import_options,
-            note_import_options,
-            file_seed.GetReferralURL(),
-            file_seed.file_seed_data
-        )
+        full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, urls = file_seed.GetURLsForOptionsLookup() )
         
         try:
             
-            file_seed.DownloadAndImportRawFile( url, import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook )
+            file_seed.DownloadAndImportRawFile( url, full_import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook )
             
             status = file_seed.status
             

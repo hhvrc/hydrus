@@ -90,7 +90,7 @@ class DialogPageChooser( ClientGUIDialogs.Dialog ):
         
         self.setLayout( gridbox )
         
-        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self, ( 64, 14 ) )
+        ( width, height ) = ClientGUIFunctions.ConvertTextToPixels( self, ( 60, 14 ) )
         
         self.setMinimumWidth( width )
         self.setMinimumHeight( height )

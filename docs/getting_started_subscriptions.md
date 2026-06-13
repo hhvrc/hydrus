@@ -52,7 +52,7 @@ If you discover your subscription workflow tends to be the same for each sub, yo
 
 Some very advanced hydrus users do not publish anywere!
 
-Note that subscription file import options will, by default, only present 'new' files. Anything already in the db will still be recorded in the internal import cache and used to calculate next check times and so on, but it won't clutter your import stream. This is different to the default for all the other importers, but when you are ready to enter the ranks of the Patricians, you will know to edit your 'loud' default file import options under _options->importing_ to behave this way as well. Efficient workflows only care about new files.
+Note that subscription presentation import options will, by default, only present 'new' files. Anything already in the db will still be recorded in the internal import cache and used to calculate next check times and so on, but it won't clutter your import stream. This is different to the default for normal gallery pages, but when you are ready to enter the ranks of the Patricians, you might like to explore `options->import options` to see if this sort of behaviour might work for you elsewhere. Efficient workflows only care about new files.
 
 ## how exactly does the sync work? { id="syncing_explanation" }
 

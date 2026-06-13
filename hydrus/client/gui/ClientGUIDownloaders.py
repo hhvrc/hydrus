@@ -294,7 +294,7 @@ class EditGUGPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._url_template = QW.QLineEdit( self )
         
-        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._url_template, 74 )
+        min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._url_template, 60 )
         
         QP.SetMinClientSize( self._url_template, (min_width,-1) )
         

@@ -10,7 +10,6 @@ from hydrus.client import ClientAPI
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
-from hydrus.client import ClientOptions
 from hydrus.client import ClientThreading
 from hydrus.client.networking.api import ClientLocalServerCore
 from hydrus.client.networking.api import ClientLocalServerResources
@@ -138,7 +137,7 @@ class HydrusResourceClientAPIRestrictedManageDatabaseGetClientOptions( HydrusRes
         
         old_options = { key : value for ( key, value ) in old_options.items() if key in OLD_OPTIONS_DEFAULT }
         
-        new_options: ClientOptions.ClientOptions = CG.client_controller.new_options
+        new_options = CG.client_controller.new_options
 
         options_dict = {
             'booleans' : new_options.GetAllBooleans(),
@@ -150,10 +149,6 @@ class HydrusResourceClientAPIRestrictedManageDatabaseGetClientOptions( HydrusRes
             'colors' : new_options.GetAllColours(),
             'media_zooms' : new_options.GetMediaZooms(),
             'slideshow_durations' : new_options.GetSlideshowDurations(),
-            'default_file_import_options' : {
-                'loud' : new_options.GetDefaultFileImportOptions('loud').GetSummary(),
-                'quiet' : new_options.GetDefaultFileImportOptions('quiet').GetSummary()
-            },
             'default_namespace_sorts' : [ sort.ToDictForAPI() for sort in new_options.GetDefaultNamespaceSorts() ],
             'default_sort' : new_options.GetDefaultSort().ToDictForAPI(),
             'default_tag_sort' : new_options.GetDefaultTagSort( CC.TAG_PRESENTATION_SEARCH_PAGE ).ToDictForAPI(),

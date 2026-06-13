@@ -39,7 +39,7 @@ class EditPotentialDuplicatesSearchContextPanel( ClientGUICommon.StaticBox ):
         
         self._num_potential_duplicate_pairs = 0
         
-        self._count_paused = False
+        self._count_paused = CG.client_controller.new_options.GetBoolean( 'potential_duplicate_pairs_search_starts_paused' )
         
         self._count_work_updater = self._InitialiseCountWorkUpdater()
         
@@ -76,15 +76,26 @@ class EditPotentialDuplicatesSearchContextPanel( ClientGUICommon.StaticBox ):
         self._max_hamming_distance.setSingleStep( 2 )
         
         self._num_potential_duplicate_pairs_label = ClientGUICommon.BetterStaticText( self, ellipsize_end = True )
-        self._pause_count_button = ClientGUICommon.IconButton( self, CC.global_icons().pause, self._PausePlayCount )
+        
+        pause_icon = CC.global_icons().play if self._count_paused else CC.global_icons().pause
+        
+        self._pause_count_button = ClientGUICommon.IconButton( self, pause_icon, self._PausePlayCount )
         self._refresh_dupe_counts_button = ClientGUICommon.IconButton( self, CC.global_icons().refresh, self._RefreshPotentialDuplicateIdPairsAndDistances )
         
         menu_template_items = []
         
+        check_manager = ClientGUICommon.CheckboxManagerOptions( 'potential_duplicate_pairs_search_starts_paused' )
+        
+        tt = 'If you use a lot of these and the CPU lag on reviewing each new panel is annoying, try initialising them to paused.'
+        
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCheck( 'start new potential duplicate pair search panels paused', tt, check_manager ) )
+        
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemSeparator() )
+        
         check_manager = ClientGUICommon.CheckboxManagerOptions( 'potential_duplicate_pairs_search_context_panel_stops_to_estimate' )
         check_manager.AddNotifyCall( self.NotifyCountOptionsChanged )
         
-        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCheck( 'try to state an estimate of final count rather than counting everything', 'You can choose to have this panel produce an exact count every time, or stop early and estimate.', check_manager ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCheck( 'optimisation: try to state an estimate of final count rather than counting everything', 'You can choose to have this panel produce an exact count every time, or stop early and estimate.', check_manager ) )
         
         check_manager = ClientGUICommon.CheckboxManagerOptions( 'potential_duplicate_pairs_search_can_do_file_search_based_optimisation' )
         
@@ -92,7 +103,7 @@ class EditPotentialDuplicatesSearchContextPanel( ClientGUICommon.StaticBox ):
         tt += '\n\n'
         tt += 'In complicated edge cases, this optimisation has very bad performance, so if you see a block or two of work and then your search halts for 30+ seconds, you can turn it off here.'
         
-        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCheck( 'allow single slow search optimisation when seeing low hit-rate', tt, check_manager ) )
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCheck( 'optimisation: allow single slow search optimisation when seeing low hit-rate', tt, check_manager ) )
         
         self._cog_button = ClientGUIMenuButton.CogIconButton( self, menu_template_items )
         

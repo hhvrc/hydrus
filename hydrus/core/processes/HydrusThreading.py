@@ -101,6 +101,11 @@ def IsThreadShuttingDown() -> bool:
 
 def ShutdownThread( thread ) -> None:
     
+    if HG.shutdown_report_mode:
+        
+        HydrusData.DebugPrint( f'Thread "{thread}" is getting an external shutdown call.' )
+        
+    
     thread_info = GetThreadInfo( thread )
     
     thread_info[ 'shutting_down' ] = True
@@ -196,6 +201,7 @@ class DAEMON( threading.Thread ):
         self._event.set()
         
     
+
 class DAEMONWorker( DAEMON ):
     
     def __init__( self, controller, name, callable, topics = None, period = 3600, init_wait = 3, pre_call_wait = 0 ):
@@ -298,6 +304,11 @@ class DAEMONWorker( DAEMON ):
                     
                 except HydrusExceptions.ShutdownException:
                     
+                    if HG.shutdown_report_mode:
+                        
+                        HydrusData.DebugPrint( f'Daemon worker "{self._name}" encountered a Shutdown exception inside of the main callable.' )
+                        
+                    
                     return
                     
                 except Exception as e:
@@ -312,7 +323,19 @@ class DAEMONWorker( DAEMON ):
             
         except HydrusExceptions.ShutdownException:
             
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'Daemon worker "{self._name}" encountered a Shutdown exception outside of the main callable.' )
+                
+            
             return
+            
+        finally:
+            
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'Daemon CallToWorker "{self._name}" is shut down!' )
+                
             
         
     
@@ -321,6 +344,7 @@ class DAEMONWorker( DAEMON ):
         self._event.set()
         
     
+
 # Big stuff like DB maintenance that we don't want to run while other important stuff is going on, like user interaction or vidya on another process
 class DAEMONBackgroundWorker( DAEMONWorker ):
     
@@ -422,6 +446,11 @@ class THREADCallToThread( DAEMON ):
                     
                 except HydrusExceptions.ShutdownException:
                     
+                    if HG.shutdown_report_mode:
+                        
+                        HydrusData.DebugPrint( f'Daemon CallToWorker "{self._name}" encountered a Shutdown exception while processing a job.' )
+                        
+                    
                     return
                     
                 except Exception as e:
@@ -440,7 +469,19 @@ class THREADCallToThread( DAEMON ):
             
         except HydrusExceptions.ShutdownException:
             
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'Daemon CallToWorker "{self._name}" encountered a Shutdown exception while waiting on its job queue.' )
+                
+            
             return
+            
+        finally:
+            
+            if HG.shutdown_report_mode:
+                
+                HydrusData.DebugPrint( f'Daemon CallToWorker "{self._name}" is shut down!' )
+                
             
         
     
@@ -692,6 +733,11 @@ class JobScheduler( threading.Thread ):
                 self._StartWork()
                 
             except HydrusExceptions.ShutdownException:
+                
+                if HG.shutdown_report_mode:
+                    
+                    HydrusData.DebugPrint( f'Job Scheduler encountered a Shutdown exception in its mainloop.' )
+                    
                 
                 return
                 

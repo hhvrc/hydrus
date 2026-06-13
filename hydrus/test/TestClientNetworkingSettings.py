@@ -5,34 +5,41 @@ from unittest import mock
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusTime
 
-from hydrus.client.networking import ClientNetworkingDomainSettings
+from hydrus.client.networking import ClientNetworkingConstants as CNC
+from hydrus.client.networking import ClientNetworkingNetworkContextSettings
 
-class TestDomainSettings( unittest.TestCase ):
+class TestSettings( unittest.TestCase ):
     
     def test_normal( self ):
         
-        domain_settings = ClientNetworkingDomainSettings.DomainSettings()
+        network_context_settings = ClientNetworkingNetworkContextSettings.NetworkContextSettings()
         
-        self.assertRaises( HydrusExceptions.DataMissing, domain_settings.GetSettingOrRaise, ClientNetworkingDomainSettings.DOMAIN_SETTING_MAX_ACTIVE_NETWORK_JOBS )
-        self.assertRaises( NotImplementedError, domain_settings.GetSettingOrRaise, 'hello' )
+        self.assertRaises( HydrusExceptions.DataMissing, network_context_settings.GetSettingOrRaise, CNC.NETWORK_CONTEXT_SETTING_MAX_ACTIVE_NETWORK_JOBS )
+        self.assertRaises( NotImplementedError, network_context_settings.GetSettingOrRaise, 'hello' )
         
-        domain_settings.SetSetting( ClientNetworkingDomainSettings.DOMAIN_SETTING_MAX_ACTIVE_NETWORK_JOBS, 3 )
+        network_context_settings.SetSetting( CNC.NETWORK_CONTEXT_SETTING_MAX_ACTIVE_NETWORK_JOBS, 3 )
         
-        self.assertEqual( domain_settings.GetSettingOrRaise( ClientNetworkingDomainSettings.DOMAIN_SETTING_MAX_ACTIVE_NETWORK_JOBS ), 3 )
+        self.assertEqual( network_context_settings.GetSettingOrRaise( CNC.NETWORK_CONTEXT_SETTING_MAX_ACTIVE_NETWORK_JOBS ), 3 )
         
         #
         
-        domain_settings.SetSetting( ClientNetworkingDomainSettings.DOMAIN_SETTING_NETWORK_INFRASTRUCTURE_PROBLEMS_HALT_VELOCITY, [ 2, None ] )
+        network_context_settings.SetSetting( CNC.NETWORK_CONTEXT_SETTING_NETWORK_INFRASTRUCTURE_PROBLEMS_HALT_VELOCITY, [ 2, None ] )
         
-        self.assertEqual( domain_settings.Duplicate().GetSettingOrRaise( ClientNetworkingDomainSettings.DOMAIN_SETTING_NETWORK_INFRASTRUCTURE_PROBLEMS_HALT_VELOCITY ), [ 2, None ] )
+        self.assertEqual( network_context_settings.Duplicate().GetSettingOrRaise( CNC.NETWORK_CONTEXT_SETTING_NETWORK_INFRASTRUCTURE_PROBLEMS_HALT_VELOCITY ), [ 2, None ] )
+        
+        #
+        
+        network_context_settings.SetSetting( CNC.NETWORK_CONTEXT_SETTING_CURL_CFFI_NAME, 'muh_browser' )
+        
+        self.assertEqual( network_context_settings.Duplicate().GetSettingOrRaise( CNC.NETWORK_CONTEXT_SETTING_CURL_CFFI_NAME ), 'muh_browser' )
         
     
 
-class TestDomainStatus( unittest.TestCase ):
+class TestStatus( unittest.TestCase ):
     
     def test_normal( self ):
         
-        domain_status = ClientNetworkingDomainSettings.DomainStatus()
+        domain_status = ClientNetworkingNetworkContextSettings.NetworkContextStatus()
         
         time_delta_s = 0.5
         time_delta_ms = int( time_delta_s * 1000 )
@@ -52,55 +59,55 @@ class TestDomainStatus( unittest.TestCase ):
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = older_than_limit_ms ):
             
-            domain_status.RegisterDomainEvent( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE )
+            domain_status.RegisterDomainEvent( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = now_ms ):
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = within_limit_ms ):
             
-            domain_status.RegisterDomainEvent( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE )
+            domain_status.RegisterDomainEvent( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = now_ms ):
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 1 )
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 1 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = within_limit_ms + 5 ):
             
-            domain_status.RegisterDomainEvent( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE )
+            domain_status.RegisterDomainEvent( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = now_ms ):
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 2 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 2 )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 2 ), 3 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 2 ), 3 )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 0.25 ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 0.25 ), 0 )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
             
             domain_status.CleanseOldRecords( time_delta_s )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 2 ), 2 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s * 2 ), 2 )
             
         
         with mock.patch.object( HydrusTime, 'GetNowMS', return_value = much_later_ms ):
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_SERVERSIDE_BANDWIDTH, time_delta_s ), 0 )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
             
             domain_status.CleanseOldRecords( time_delta_s )
             
-            self.assertEqual( domain_status.NumberOfEvents( ClientNetworkingDomainSettings.DOMAIN_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
+            self.assertEqual( domain_status.NumberOfEvents( CNC.NETWORK_CONTEXT_EVENT_NETWORK_INFRASTRUCTURE, time_delta_s ), 0 )
             
             self.assertTrue( domain_status.IsStub() )
             

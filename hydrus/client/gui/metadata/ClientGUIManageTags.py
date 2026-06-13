@@ -433,7 +433,7 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
             self._incremental_tagging_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Incremental Tagging' ) )
             self._incremental_tagging_button.setVisible( len( media ) > 1 )
             
-            width = ClientGUIFunctions.ConvertTextToPixelWidth( self._incremental_tagging_button, 5 )
+            width = ClientGUIFunctions.ConvertTextToPixelWidth( self._incremental_tagging_button, 4.5 )
             self._incremental_tagging_button.setFixedWidth( width )
             
             self._cog_button = ClientGUIMenuButton.CogIconButton( self._tags_box_sorter, menu_template_items )

@@ -13,7 +13,8 @@ from hydrus.client.db import ClientDB
 from hydrus.client.duplicates import ClientDuplicates
 from hydrus.client.duplicates import ClientPotentialDuplicatesSearchContext
 from hydrus.client.importing import ClientImportFiles
-from hydrus.client.importing.options import ImportOptionsContainer
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsManager
 from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.search import ClientSearchFileSearchContext
 from hydrus.client.search import ClientSearchPredicate
@@ -157,11 +158,11 @@ class TestClientDBDuplicates( unittest.TestCase ):
         
         ( size, mime, width, height, duration_ms, num_frames, has_audio, num_words ) = ( 65535, HC.IMAGE_JPEG, 640, 480, None, None, False, None )
         
-        import_options_container = ImportOptionsContainer.ImportOptionsManager.STATICGetDefaultInitialisedManager().GetDefaultImportOptionsContainerForCallerType( ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
+        full_import_options_container = ImportOptionsManager.ImportOptionsManager.STATICGetDefaultInitialisedManager().GetDefaultImportOptionsContainerForCallerType( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
         
         for hash in self._all_hashes:
             
-            fake_file_import_job = ClientImportFiles.FileImportJob( 'fake path', import_options_container )
+            fake_file_import_job = ClientImportFiles.FileImportJob( 'fake path', full_import_options_container )
             
             fake_file_import_job._pre_import_file_status = ClientImportFiles.FileImportStatus( CC.STATUS_UNKNOWN, hash )
             fake_file_import_job._file_info = ( size, mime, width, height, duration_ms, num_frames, has_audio, num_words )

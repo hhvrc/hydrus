@@ -17,6 +17,7 @@ from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusSerialisable
 from hydrus.core import HydrusTags
 from hydrus.core import HydrusText
+from hydrus.core import HydrusTime
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
@@ -429,6 +430,7 @@ class BetterQListWidget( QW.QListWidget ):
             
         
     
+
 class AddEditDeleteListBox( QW.QWidget ):
     
     listBoxChanged = QC.Signal()
@@ -1624,6 +1626,9 @@ class ListBox( QW.QScrollArea ):
         self._positional_indices_to_terms = {}
         self._selected_terms = set()
         self._total_positional_rows = 0
+        
+        self._last_wheel_event_that_scrolled_direction = 0
+        self._last_wheel_event_that_scrolled_time = 0
         
         self._last_hit_logical_index = None
         self._shift_click_start_logical_index = None
@@ -2973,6 +2978,16 @@ class ListBox( QW.QScrollArea ):
         return text_height * self._total_positional_rows + 20
         
     
+    def GetLastWheelEventThatScrolledDirection( self ):
+        
+        return self._last_wheel_event_that_scrolled_direction
+        
+    
+    def GetLastWheelEventThatScrolledTime( self ):
+        
+        return self._last_wheel_event_that_scrolled_time
+        
+    
     def GetNumTerms( self ):
         
         return len( self._ordered_terms )
@@ -3121,6 +3136,17 @@ class ListBox( QW.QScrollArea ):
         size_hint.setHeight( ideal_height )
         
         return size_hint
+        
+    
+    def wheelEvent( self, event: QG.QWheelEvent ):
+        
+        super().wheelEvent( event )
+        
+        if event.isAccepted():
+            
+            self._last_wheel_event_that_scrolled_direction = 1 if event.angleDelta().y() > 0 else -1
+            self._last_wheel_event_that_scrolled_time = HydrusTime.GetNowFloat()
+            
         
     
 

@@ -79,29 +79,7 @@ class ManageOptionsPanel( ClientGUIScrolledPanels.ManagePanel ):
         self._listbook.AddPage( 'file viewing statistics', FileViewingStatisticsPanel.FileViewingStatisticsPanel( self._listbook ) )
         self._listbook.AddPage( 'gui pages', GUIPagesPanel.GUIPagesPanel( self._listbook, self._new_options ) )
         self._listbook.AddPage( 'gui sessions', GUISessionsPanel.GUISessionsPanel( self._listbook, self._new_options ) )
-        
-        if self._new_options.GetBoolean( 'advanced_mode' ):
-            
-            from hydrus.client.importing.options import FileImportOptionsLegacy
-            from hydrus.client.importing.options import ImportOptionsContainerMigration
-            
-            ( file_post_default_tag_import_options, watchable_default_tag_import_options, url_class_keys_to_default_tag_import_options ) = CG.client_controller.network_engine.domain_manager.GetDefaultTagImportOptions()
-            ( file_post_default_note_import_options, watchable_default_note_import_options, url_class_keys_to_default_note_import_options ) = CG.client_controller.network_engine.domain_manager.GetDefaultNoteImportOptions()
-            
-            import_options_manager = ImportOptionsContainerMigration.GenerateImportOptionsManagerFromOldSystem(
-                file_post_default_tag_import_options,
-                watchable_default_tag_import_options,
-                url_class_keys_to_default_tag_import_options,
-                file_post_default_note_import_options,
-                watchable_default_note_import_options,
-                url_class_keys_to_default_note_import_options,
-                self._new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_QUIET ),
-                self._new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_LOUD ),
-            )
-            
-            self._listbook.AddPage( 'PREVIEW: import options', ImportOptionsPanel.ImportOptionsPanel( self._listbook, self._new_options, import_options_manager ) )
-            
-        
+        self._listbook.AddPage( 'import options', ImportOptionsPanel.ImportOptionsPanel( self._listbook, self._new_options, CG.client_controller.import_options_manager ) )
         self._listbook.AddPage( 'maintenance and processing', MaintenanceAndProcessingPanel.MaintenanceAndProcessingPanel( self._listbook ) )
         self._listbook.AddPage( 'media viewer', MediaViewerPanel.MediaViewerPanel( self._listbook ) )
         self._listbook.AddPage( 'media viewer hovers', MediaViewerHoversPanel.MediaViewerHoversPanel( self._listbook ) )
@@ -254,6 +232,13 @@ class ManageOptionsPanel( ClientGUIScrolledPanels.ManagePanel ):
             if res_changed or type_changed or dpr_changed:
                 
                 CG.client_controller.pub( 'clear_thumbnail_cache' )
+                
+            
+            curl_cffi_changes = self._original_new_options.GetNoneableString( 'curl_cffi_definition' ) != test_new_options.GetNoneableString( 'curl_cffi_definition' )
+            
+            if curl_cffi_changes:
+                
+                CG.client_controller.network_engine.session_manager.ReinitialiseSessions()
                 
             
         except Exception as e:

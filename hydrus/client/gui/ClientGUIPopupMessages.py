@@ -142,8 +142,9 @@ class PopupMessage( PopupWindow ):
         self._network_job_ctrl.hide()
         self._time_network_job_disappeared = 0
         
+        # TODO: fix this as part of the layout overhaul here; we can do better
         # this is kind of stupid, but whatever for now
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._network_job_ctrl, 58 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._network_job_ctrl, 52 )
         self._network_job_ctrl.setMinimumWidth( width )
         
         self._copy_to_clipboard_button = ClientGUICommon.BetterButton( self, 'copy to clipboard', self.CopyToClipboard )

@@ -9,8 +9,8 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client.importing import ClientImporting
 from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing import ClientImportGallerySeeds
-from hydrus.client.importing.options import ClientImportOptions
-from hydrus.client.importing.options import TagImportOptionsLegacy
+from hydrus.client.importing.options import CheckerImportOptions
+from hydrus.client.importing.options import TagImportOptions
 from hydrus.client.networking import ClientNetworking
 from hydrus.client.networking import ClientNetworkingBandwidth
 from hydrus.client.networking import ClientNetworkingContexts
@@ -83,7 +83,7 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_SUBSCRIPTION_QUERY_HEADER
     SERIALISABLE_NAME = 'Subscription Query Summary'
-    SERIALISABLE_VERSION = 2
+    SERIALISABLE_VERSION = 3
     
     def __init__( self ):
         
@@ -101,7 +101,7 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
         self._file_seed_cache_status = ClientImportFileSeeds.FileSeedCacheStatus()
         self._file_seed_cache_compaction_number = 250
         self._gallery_seed_log_compaction_number = 100
-        self._tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy()
+        self._tag_import_options = TagImportOptions.TagImportOptions()
         self._raw_file_velocity = ( 0, 1 )
         self._pretty_file_velocity = 'unknown'
         self._example_file_seed = None
@@ -329,6 +329,57 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
                 )
             
             return ( 2, new_serialisable_info )
+            
+        
+        if version == 2:
+            
+            (
+                query_log_container_name,
+                query_text,
+                display_name,
+                check_now,
+                last_check_time,
+                next_check_time,
+                paused,
+                checker_status,
+                query_log_container_status,
+                serialisable_file_seed_cache_status,
+                file_seed_cache_compaction_number,
+                gallery_seed_log_compaction_number,
+                serialisable_tag_import_options,
+                raw_file_velocity,
+                pretty_file_velocity,
+                serialisable_example_file_seed,
+                serialisable_example_gallery_seed
+                ) = old_serialisable_info
+            
+            tag_import_options_legacy = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_import_options )
+            
+            tag_import_options = tag_import_options_legacy.GetTagImportOptions()
+            
+            serialisable_tag_import_options = tag_import_options.GetSerialisableTuple()
+            
+            new_serialisable_info = (
+                query_log_container_name,
+                query_text,
+                display_name,
+                check_now,
+                last_check_time,
+                next_check_time,
+                paused,
+                checker_status,
+                query_log_container_status,
+                serialisable_file_seed_cache_status,
+                file_seed_cache_compaction_number,
+                gallery_seed_log_compaction_number,
+                serialisable_tag_import_options,
+                raw_file_velocity,
+                pretty_file_velocity,
+                serialisable_example_file_seed,
+                serialisable_example_gallery_seed
+                )
+            
+            return ( 3, new_serialisable_info )
             
         
     
@@ -647,7 +698,7 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
         return self._query_text
         
     
-    def GetTagImportOptions( self ):
+    def GetTagImportOptions( self ) -> TagImportOptions.TagImportOptions:
         
         return self._tag_import_options
         
@@ -732,7 +783,7 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
         self._paused = not self._paused
         
     
-    def RegisterSyncComplete( self, checker_options: ClientImportOptions.CheckerOptions, query_log_container: SubscriptionQueryLogContainer ):
+    def RegisterSyncComplete( self, checker_options: CheckerImportOptions.CheckerOptions, query_log_container: SubscriptionQueryLogContainer ):
         
         self._last_check_time = HydrusTime.GetNow()
         
@@ -841,12 +892,12 @@ class SubscriptionQueryHeader( HydrusSerialisable.SerialisableBase ):
         self._query_text = query_text
         
     
-    def SetTagImportOptions( self, tag_import_options: TagImportOptionsLegacy.TagImportOptionsLegacy ):
+    def SetTagImportOptions( self, tag_import_options: TagImportOptions.TagImportOptions ):
         
         self._tag_import_options = tag_import_options
         
     
-    def SyncToQueryLogContainer( self, checker_options: ClientImportOptions.CheckerOptions, query_log_container: SubscriptionQueryLogContainer ):
+    def SyncToQueryLogContainer( self, checker_options: CheckerImportOptions.CheckerOptions, query_log_container: SubscriptionQueryLogContainer ):
         
         gallery_seed_log = query_log_container.GetGallerySeedLog()
         

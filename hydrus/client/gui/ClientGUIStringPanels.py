@@ -751,7 +751,7 @@ class EditStringConverterPanel( ClientGUIScrolledPanels.EditPanel ):
             
             self._example_string = QW.QLineEdit( self._example_panel )
             
-            min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._example_string, 96 )
+            min_width = ClientGUIFunctions.ConvertTextToPixelWidth( self._example_string, 60 )
             
             self._example_string.setMinimumWidth( min_width )
             
@@ -2193,7 +2193,7 @@ class EditStringProcessorPanel( ClientGUIScrolledPanels.EditPanel ):
         
         #
         
-        ( w, h ) = ClientGUIFunctions.ConvertTextToPixels( self._example_panel, ( 64, 24 ) )
+        ( w, h ) = ClientGUIFunctions.ConvertTextToPixels( self._example_panel, ( 60, 24 ) )
         
         self._example_panel.setMinimumSize( w, h )
         

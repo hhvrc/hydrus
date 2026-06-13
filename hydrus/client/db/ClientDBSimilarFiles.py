@@ -858,7 +858,7 @@ class ClientDBSimilarFiles( ClientDBModule.ClientDBModule ):
                 
                 message = 'Discovered some bad nodes in your similar files search tree! The nodes have been deleted.'
                 message += '\n'
-                message += 'More details have been written to log, including the file list for affected hashes. You may wish to manually schedule a "similar files regen" job for all the affected file hashes. You should also check out "help my db is broke.txt" in your install_dir/db folder, since there are no clean ways these bad nodes got into your database.'
+                message += 'More details have been written to log, including the file list for affected hashes. You may wish to manually schedule a "similar files regen" job for all the affected file hashes. You should also check the \'Recovery->Help my db is broke\' document in the help, since there are no clean ways these bad nodes got into your database.'
                 
                 HydrusData.ShowText( message )
                 

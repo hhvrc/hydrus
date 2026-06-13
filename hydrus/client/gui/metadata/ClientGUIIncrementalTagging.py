@@ -41,7 +41,7 @@ class IncrementalTaggingPanel( ClientGUIScrolledPanels.EditPanel ):
         self._namespace.setText( initial_namespace )
         
         # let's make this dialog a reasonable landscape shape
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._namespace, 64 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._namespace, 60 )
         self._namespace.setFixedWidth( width )
         
         self._prefix = QW.QLineEdit( self )

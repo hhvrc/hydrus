@@ -1,8 +1,10 @@
+import collections.abc
 import typing
 
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
+from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusSerialisable
@@ -23,7 +25,13 @@ from hydrus.client.gui.lists import ClientGUIListBoxes
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIMenuButton
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import ImportOptionsContainer
+from hydrus.client.importing.options import ImportOptionsManager
+
+PASTE_REPLACE = 0
+PASTE_MERGE = 1
+PASTE_FILL_IN = 2
 
 def GetPasteObject( win: QW.QWidget ) -> ImportOptionsContainer.ImportOptionsContainer:
     
@@ -61,16 +69,14 @@ def GetPasteObject( win: QW.QWidget ) -> ImportOptionsContainer.ImportOptionsCon
 
 def DoCustomOverwrite( win: QW.QWidget, simple_mode: bool, import_options_caller_type: int, current_import_options_container: ImportOptionsContainer.ImportOptionsContainer, incoming_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
     
+    import_options_types_to_show = list( IOC.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ import_options_caller_type ] )
+    
     if simple_mode:
         
-        import_options_types_to_list_here = ImportOptionsContainer.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ import_options_caller_type ]
-        
-        incoming_import_options_container = incoming_import_options_container.GetDuplicateWithJustTheseOptionTypes( import_options_types_to_list_here )
+        incoming_import_options_container = incoming_import_options_container.GetDuplicateWithJustTheseOptionTypes( import_options_types_to_show )
         
     
-    import_options_types_to_show = ImportOptionsContainer.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ import_options_caller_type ]
-    
-    for import_options_type in ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER:
+    for import_options_type in IOC.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER:
         
         if current_import_options_container.HasImportOptions( import_options_type ) or incoming_import_options_container.HasImportOptions( import_options_type ):
             
@@ -100,17 +106,13 @@ def DoCustomOverwrite( win: QW.QWidget, simple_mode: bool, import_options_caller
         
     
 
-PASTE_REPLACE = 0
-PASTE_MERGE = 1
-PASTE_FILL_IN = 2
-
 class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
     
     def __init__( self, parent: QW.QWidget, import_options_caller_type: int, import_options_types_to_show: list[ int ], current_import_options_container: ImportOptionsContainer.ImportOptionsContainer, pasted_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
         self._import_options_caller_type = import_options_caller_type
-        self._current_import_options_container = current_import_options_container
-        self._pasted_import_options_container = pasted_import_options_container
+        self._current_import_options_container = current_import_options_container.Duplicate()
+        self._pasted_import_options_container = pasted_import_options_container.Duplicate()
         
         super().__init__( parent )
         
@@ -125,7 +127,7 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
         self._replace_button = ClientGUICommon.BetterButton( self, 'replace-paste', self._SetUpOverwrite, PASTE_REPLACE )
         self._replace_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Just paste everything, default or not.' ) )
         
-        if self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+        if self._import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
             
             self._fill_in_button.setVisible( False )
             self._replace_button.setVisible( False )
@@ -141,7 +143,7 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
         self._current_import_options_container_checklist_box = ClientGUICommon.BetterCheckBoxList( self._left_panel )
         self._pasted_import_options_container_checklist_box = ClientGUICommon.BetterCheckBoxList( self._middle_panel )
         
-        if self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+        if self._import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
             
             self._current_import_options_container_checklist_box.setEnabled( False )
             
@@ -180,7 +182,7 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
             
         elif any_pasted_were_default:
             
-            if self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+            if self._import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
                 
                 self._top_st.setText( 'You cannot make the Global set "default" anywhere, so those items in the paste/load have been disabled.' )
                 
@@ -251,15 +253,15 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
                 
             
         
-        label = ImportOptionsContainer.import_options_type_str_lookup[ import_options_type ]
+        label = IOC.import_options_type_str_lookup[ import_options_type ]
         
         if import_options_container.HasImportOptions( import_options_type ):
             
+            label = '> ' + label
+            
             import_options = import_options_container.GetImportOptions( import_options_type )
             
-            show_downloader_options = not self._import_options_caller_type in ImportOptionsContainer.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
-            
-            summary = import_options.GetSummary( show_downloader_options )
+            summary = import_options.GetSummary( self._import_options_caller_type )
             
             if len( summary ) > 0:
                 
@@ -279,7 +281,7 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
         current_import_options_types = self._current_import_options_container_checklist_box.GetValue()
         pasted_import_options_types = self._pasted_import_options_container_checklist_box.GetValue()
         
-        if self._import_options_caller_type != ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+        if self._import_options_caller_type != IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
             
             # need this so a default pasted value will overwrite something already existing in current
             current_import_options_types = [ import_options_type for import_options_type in current_import_options_types if import_options_type not in pasted_import_options_types ]
@@ -360,59 +362,81 @@ class EditImportOptionsOverwritePanel( ClientGUIScrolledPanels.EditPanel ):
 
 class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
     
-    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsContainer.ImportOptionsManager, import_options_container: ImportOptionsContainer.ImportOptionsContainer, import_options_caller_type: int, url_class_key: bytes | None = None, simple_mode: bool = True, favourites_name: str | None = None ):
+    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsManager.ImportOptionsManager, import_options_caller_type: int, import_options_container: ImportOptionsContainer.ImportOptionsContainer, url_class_keys: list[ bytes ] | None = None, simple_mode: bool = True, restrict_to_non_downloader_types = False, favourites_name: str | None = None ):
+        
+        if url_class_keys is None:
+            
+            url_class_keys = []
+            
         
         super().__init__( parent )
         
+        import_options_container = import_options_container.Duplicate()
+        
         self._import_options_container_manager = import_options_container_manager
         self._import_options_caller_type = import_options_caller_type
-        self._url_class_key = url_class_key
+        self._url_class_keys = url_class_keys
         self._simple_mode = simple_mode
+        
+        menu_template_items = []
+        
+        page_func = HydrusData.Call( ClientGUIDialogsQuick.OpenDocumentation, self, HC.DOCUMENTATION_IMPORT_OPTIONS )
+        
+        menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open the import options help', 'Open the HTML help that talks about this whole system.', page_func ) )
+        
+        help_button = ClientGUIMenuButton.MenuIconButton( self, CC.global_icons().help, menu_template_items )
+        
+        help_hbox = ClientGUICommon.WrapInText( help_button, self, 'help for this panel -->', object_name = 'HydrusIndeterminate' )
         
         if self._simple_mode:
             
-            import_options_types_to_list_here = ImportOptionsContainer.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ self._import_options_caller_type ]
-            
-            for import_options_type in ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER:
-                
-                if import_options_type not in import_options_types_to_list_here and import_options_container.HasImportOptions( import_options_type ):
-                    
-                    import_options_types_to_list_here.append( import_options_type )
-                    
-                
+            import_options_types_to_list_here = list( IOC.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ self._import_options_caller_type ] )
             
         else:
             
-            import_options_types_to_list_here = ImportOptionsContainer.IMPORT_OPTIONS_TYPES_CANONICAL_ORDER
+            import_options_types_to_list_here = IOC.IMPORT_OPTIONS_TYPES_CANONICAL_ORDER
             
         
-        if self._import_options_caller_type in ImportOptionsContainer.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES:
+        if restrict_to_non_downloader_types:
             
-            import_options_types_to_list_here = [ iot for iot in import_options_types_to_list_here if iot not in ImportOptionsContainer.IMPORT_OPTIONS_TYPES_DOWNLOADER_ONLY ]
+            import_options_types_to_list_here = [ iot for iot in import_options_types_to_list_here if iot not in IOC.IMPORT_OPTIONS_TYPES_DOWNLOADER_ONLY ]
+            
+        
+        for import_options_type in IOC.IMPORT_OPTIONS_CALLER_TYPES_CANONICAL_ORDER:
+            
+            if import_options_type not in import_options_types_to_list_here and import_options_container.HasImportOptions( import_options_type ):
+                
+                import_options_types_to_list_here.append( import_options_type )
+                
             
         
         #
         
-        if import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS and url_class_key is not None:
+        if import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_URL_CLASS and self._url_class_keys is not None and len( self._url_class_keys ) > 0:
             
-            try:
+            name = 'Unknown URL Class'
+            
+            for url_class_key in self._url_class_keys:
                 
-                name = CG.client_controller.network_engine.domain_manager.GetURLClassFromKey( url_class_key ).GetName()
-                
-            except Exception as e:
-                
-                name = 'Unknown URL Class'
+                try:
+                    
+                    name = CG.client_controller.network_engine.domain_manager.GetURLClassFromKey( url_class_key ).GetName()
+                    
+                except Exception as e:
+                    
+                    pass
+                    
                 
             
             label = f'You are editing URL Class "{name}".'
             
         else:
             
-            label = f'You are editing "{ImportOptionsContainer.import_options_caller_type_str_lookup[ import_options_caller_type ]}".'
+            label = f'You are editing "{IOC.import_options_caller_type_str_lookup[ import_options_caller_type ]}".'
             
         
         label += '\n\n'
-        label += ImportOptionsContainer.import_options_caller_type_desc_lookup[ import_options_caller_type ]
+        label += IOC.import_options_caller_type_desc_lookup[ import_options_caller_type ]
         
         self._description_label = ClientGUICommon.BetterStaticText( self, label = label )
         self._description_label.setWordWrap( True )
@@ -436,7 +460,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemSeparator() )
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'merge-paste', 'Replace what is selected with what you have in the clipboard that is non-default.', self._PasteMerge ) )
         
-        if self._import_options_caller_type != ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+        if self._import_options_caller_type != IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
             
             menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'fill-in-gaps-paste', 'Fill in what is currently default in the selected with what you have in the clipboard that is non-default.', self._PasteFillIn ) )
             menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'replace-paste', 'Replace what is selected with what you have in the clipboard.', self._Paste ) )
@@ -445,38 +469,13 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         self._paste_button = ClientGUIMenuButton.MenuIconButton( self, CC.global_icons().paste, menu_template_items )
         self._paste_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Paste an entire set of import options.' ) )
         
-        self._favourites_button = ImportOptionsContainerFavouritesButton( self, self._import_options_container_manager, edit_allowed = self._import_options_caller_type != ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES )
+        self._favourites_button = ImportOptionsContainerFavouritesButton( self, self._import_options_container_manager, edit_allowed = self._import_options_caller_type != IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES, current_value_callable = self.GetValue )
         
         self._listbook = ClientGUIListBook.ListBook( self, list_chars_height = len( import_options_types_to_list_here ), orientation = QC.Qt.Orientation.Vertical, no_vertical_scrollbar = True )
         
         #
         
-        if self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
-            
-            default_import_options_container = ImportOptionsContainer.ImportOptionsContainer()
-            
-        else:
-            
-            # let's make a full container for the parent, as if this guy was empty
-            # we can query that guy to get nice default labels 'uses subscription' and so on
-            
-            preference_stack = ImportOptionsContainer.GetImportOptionsCallerTypesPreferenceOrderFull( self._import_options_caller_type, url_class_key = self._url_class_key )
-            
-            caller_type_for_default = ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL
-            
-            try:
-                
-                index = preference_stack.index( self._import_options_caller_type )
-                
-                caller_type_for_default = preference_stack[ index + 1 ]
-                
-            except Exception as e:
-                
-                pass
-                
-            
-            default_import_options_container = import_options_container_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), caller_type_for_default )
-            
+        full_default_import_options_container = self._GetFullDefaultStackImportOptionsContainer()
         
         selectee_type = CG.client_controller.new_options.GetInteger( 'last_selected_import_options_container_panel_options_type' )
         selectee_page = None
@@ -488,9 +487,9 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
                 self._import_options_container_manager,
                 import_options_type,
                 import_options_container,
-                default_import_options_container,
+                full_default_import_options_container,
                 self._import_options_caller_type,
-                url_class_key = self._url_class_key
+                url_class_keys = self._url_class_keys
             )
             
             if import_options_type == selectee_type:
@@ -500,7 +499,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
             
             panel.valueChanged.connect( self._UpdateLabels )
             
-            self._listbook.addTab( panel, ImportOptionsContainer.import_options_type_str_lookup[ import_options_type ] )
+            self._listbook.addTab( panel, IOC.import_options_type_str_lookup[ import_options_type ] )
             
         
         if selectee_page is not None:
@@ -520,7 +519,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._name_edit_panel.setLayout( gridbox )
         
-        self._name_edit_panel.setVisible( self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES )
+        self._name_edit_panel.setVisible( self._import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES )
         
         button_hbox = QP.HBoxLayout()
         
@@ -530,6 +529,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         
         vbox = QP.VBoxLayout()
         
+        QP.AddToLayout( vbox, help_hbox, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._description_label, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._name_edit_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, button_hbox, CC.FLAGS_ON_RIGHT )
@@ -540,7 +540,8 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         #
         
         self._listbook.currentChanged.connect( self._UpdatePageChanged )
-        self._favourites_button.loadFavourite.connect( self._CustomOverwrite )
+        self._favourites_button.loadFavourite.connect( self.SetValue )
+        self._favourites_button.loadFavouriteCustom.connect( self._CustomOverwrite )
         
     
     def _Copy( self ):
@@ -572,6 +573,38 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         self.SetValue( final_import_options_container )
         
     
+    def _GetFullDefaultStackImportOptionsContainer( self ):
+        
+        if self._import_options_caller_type in ( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL, IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES ):
+            
+            full_default_import_options_container = self._import_options_container_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
+            
+        else:
+            
+            # let's make a full container for the parent, as if this guy was empty
+            # we can query that guy to get nice default labels 'uses subscription' and so on
+            
+            preference_stack = ImportOptionsManager.GetImportOptionsCallerTypesPreferenceOrderFull( self._import_options_caller_type, self._url_class_keys )
+            
+            caller_type_for_default = IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL
+            
+            try:
+                
+                index = preference_stack.index( self._import_options_caller_type )
+                
+                caller_type_for_default = preference_stack[ index + 1 ]
+                
+            except Exception as e:
+                
+                pass
+                
+            
+            full_default_import_options_container = self._import_options_container_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), caller_type_for_default )
+            
+        
+        return full_default_import_options_container
+        
+    
     def _Paste( self, paste_type = PASTE_REPLACE ):
         
         try:
@@ -585,7 +618,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         
         if self._simple_mode:
             
-            import_options_types_to_list_here = ImportOptionsContainer.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ self._import_options_caller_type ]
+            import_options_types_to_list_here = list( IOC.IMPORT_OPTIONS_TYPES_SIMPLE_MODE_LOOKUP[ self._import_options_caller_type ] )
             
             pasted_import_options_container = pasted_import_options_container.GetDuplicateWithJustTheseOptionTypes( import_options_types_to_list_here )
             
@@ -594,13 +627,9 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
             
             final_import_options_container = pasted_import_options_container
             
-            if self._import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
+            if self._import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL:
                 
-                try:
-                    
-                    final_import_options_container.SetAndCheckFull()
-                    
-                except:
+                if not final_import_options_container.IsFull():
                     
                     ClientGUIDialogsMessage.ShowInformation( self, 'Hey, you tried to paste a non-full import options container into the "global" entry. Did you mean to do a merge-paste instead?' )
                     
@@ -695,7 +724,7 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
             
             if not page.IsDefault():
                 
-                import_options_container.SetImportOptions( page.GetImportOptionsType(), page.GetValue() )
+                import_options_container.SetImportOptions( page.GetValue() )
                 
             
         
@@ -727,11 +756,44 @@ class EditImportOptionsContainerPanel( ClientGUIScrolledPanels.EditPanel ):
         
     
 
+class EditSpecificImportOptionsContainerPanel( EditImportOptionsContainerPanel ):
+    
+    def __init__(
+        self,
+        parent: QW.QWidget,
+        import_options_container_manager: ImportOptionsManager.ImportOptionsManager,
+        import_options_caller_type: int,
+        import_options_container: ImportOptionsContainer.ImportOptionsContainer
+    ):
+        
+        self._default_stack_import_options_caller_type = import_options_caller_type
+        
+        simple_mode = CG.client_controller.new_options.GetBoolean( 'import_options_simple_mode' )
+        
+        restrict_to_non_downloader_types = simple_mode and import_options_caller_type in IOC.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
+        
+        super().__init__(
+            parent,
+            import_options_container_manager,
+            IOC.IMPORT_OPTIONS_CALLER_TYPE_SPECIFIC_IMPORTER,
+            import_options_container,
+            simple_mode = simple_mode,
+            restrict_to_non_downloader_types = restrict_to_non_downloader_types
+        )
+        
+    
+    def _GetFullDefaultStackImportOptionsContainer( self ):
+        
+        return self._import_options_container_manager.GenerateFullImportOptionsContainer( ImportOptionsContainer.ImportOptionsContainer(), self._default_stack_import_options_caller_type )
+        
+    
+
 class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
     
+    loadFavouriteCustom = QC.Signal( ImportOptionsContainer.ImportOptionsContainer )
     loadFavourite = QC.Signal( ImportOptionsContainer.ImportOptionsContainer )
     
-    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsContainer.ImportOptionsManager, edit_allowed = True ):
+    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsManager.ImportOptionsManager, edit_allowed = True, current_value_callable: collections.abc.Callable[ [], ImportOptionsContainer.ImportOptionsContainer ] | None = None ):
         
         super().__init__( parent, CC.global_icons().star, self._ShowMenu )
         
@@ -739,6 +801,7 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
         
         self._import_options_container_manager = import_options_container_manager
         self._edit_allowed = edit_allowed
+        self._current_value_callable = current_value_callable
         
         if not self._edit_allowed and len( self._import_options_container_manager.GetFavouriteImportOptionContainers() ) == 0:
             
@@ -753,7 +816,13 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
         
         with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit favourite import options' ) as dlg:
             
-            panel = EditImportOptionsContainerPanel( dlg, self._import_options_container_manager, import_options_container, ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES, favourites_name = name )
+            panel = EditImportOptionsContainerPanel(
+                dlg,
+                self._import_options_container_manager,
+                IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES,
+                import_options_container,
+                favourites_name = name
+            )
             
             dlg.SetPanel( panel )
             
@@ -790,7 +859,13 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
         
         with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit favourite import options' ) as dlg:
             
-            panel = EditImportOptionsContainerPanel( dlg, self._import_options_container_manager, import_options_container, ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES, favourites_name = name )
+            panel = EditImportOptionsContainerPanel(
+                dlg,
+                self._import_options_container_manager,
+                IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES,
+                import_options_container,
+                favourites_name = name
+            )
             
             dlg.SetPanel( panel )
             
@@ -809,6 +884,41 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
         self.loadFavourite.emit( import_options_container )
         
     
+    def _LoadCustom( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        self.loadFavouriteCustom.emit( import_options_container )
+        
+    
+    def _SaveCurrentValueAsNew( self ):
+        
+        if self._current_value_callable is None:
+            
+            return
+            
+        
+        name = 'import options'
+        
+        try:
+            
+            import_options_container = self._current_value_callable()
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        try:
+            
+            name = ClientGUIDialogsQuick.EnterText( self, 'Please enter a name for the new favourite.', default = name, placeholder = 'Name for import options favourite entry.' )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        self._import_options_container_manager.AddFavourite( name, import_options_container )
+        
+    
     def _ShowMenu( self ):
         
         names_to_favourite_options_containers = self._import_options_container_manager.GetFavouriteImportOptionContainers()
@@ -819,30 +929,36 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
         
         #
         
+        import_options_caller_type_for_summaries = IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS
+        
         ClientGUIMenus.AppendMenuLabel( menu, 'favourites', make_it_bold = True )
         ClientGUIMenus.AppendSeparator( menu )
         
         if len( names_to_favourite_options_containers ) > 0:
             
-            copy_menu = ClientGUIMenus.GenerateMenu( menu )
             load_menu = ClientGUIMenus.GenerateMenu( menu )
+            load_custom_menu = ClientGUIMenus.GenerateMenu( menu )
+            copy_menu = ClientGUIMenus.GenerateMenu( menu )
             
             for name in names_in_order:
                 
                 import_options_container = names_to_favourite_options_containers[ name ]
                 
-                summary = import_options_container.GetSummary( show_downloader_options = True )
-                
-                ClientGUIMenus.AppendMenuItem( copy_menu, f'{name} - {summary}', 'copy this import options container to clipboard', self._Copy, import_options_container )
+                summary = import_options_container.GetSummary( import_options_caller_type_for_summaries )
                 
                 ClientGUIMenus.AppendMenuItem( load_menu, f'{name} - {summary}', 'load this import options container to the current selection', self._Load, import_options_container )
+                ClientGUIMenus.AppendMenuItem( load_custom_menu, f'{name} - {summary}', 'load some or all of this import options container to the current selection', self._LoadCustom, import_options_container )
+                ClientGUIMenus.AppendMenuItem( copy_menu, f'{name} - {summary}', 'copy this import options container to clipboard', self._Copy, import_options_container )
                 
             
-            ClientGUIMenus.AppendMenu( menu, copy_menu, 'copy' )
             ClientGUIMenus.AppendMenu( menu, load_menu, 'load' )
+            ClientGUIMenus.AppendMenu( menu, load_custom_menu, 'custom load' )
+            ClientGUIMenus.AppendMenu( menu, copy_menu, 'copy' )
             
         
         if self._edit_allowed:
+            
+            ClientGUIMenus.AppendSeparator( menu )
             
             edit_menu = ClientGUIMenus.GenerateMenu( self )
             
@@ -852,7 +968,12 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
                     
                     import_options_container = names_to_favourite_options_containers[ name ]
                     
-                    summary = import_options_container.GetSummary( show_downloader_options = True )
+                    summary = import_options_container.GetSummary( import_options_caller_type_for_summaries )
+                    
+                    if summary == '':
+                        
+                        summary = 'all default'
+                        
                     
                     ClientGUIMenus.AppendMenuItem( edit_menu, f'{name} - {summary}', 'copy this import options container to clipboard', self._Edit, name, import_options_container )
                     
@@ -861,6 +982,11 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
                 
             
             ClientGUIMenus.AppendMenuItem( edit_menu, 'add new favourite', 'Create an empty favourite', self._Add )
+            
+            if self._current_value_callable is not None:
+                
+                ClientGUIMenus.AppendMenuItem( edit_menu, 'save current value as new favourite', 'Create a new favourite', self._SaveCurrentValueAsNew )
+                
             
             ClientGUIMenus.AppendMenu( menu, edit_menu, 'edit/add' )
             
@@ -874,7 +1000,7 @@ class ImportOptionsContainerFavouritesButton( ClientGUICommon.IconButton ):
                     
                     import_options_container = names_to_favourite_options_containers[ name ]
                     
-                    summary = import_options_container.GetSummary( show_downloader_options = True )
+                    summary = import_options_container.GetSummary( import_options_caller_type_for_summaries )
                     
                     ClientGUIMenus.AppendMenuItem( delete_menu, f'{name} - {summary}', 'delete this import options container from the favourites store', self._Delete, name )
                     
@@ -893,15 +1019,20 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
     
     valueChanged = QC.Signal()
     
-    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsContainer.ImportOptionsManager, import_options_type: int, import_options_container: ImportOptionsContainer.ImportOptionsContainer, default_import_options_container: ImportOptionsContainer.ImportOptionsContainer, import_options_caller_type: int, url_class_key: bytes | None = None ):
+    def __init__( self, parent: QW.QWidget, import_options_container_manager: ImportOptionsManager.ImportOptionsManager, import_options_type: int, import_options_container: ImportOptionsContainer.ImportOptionsContainer, full_default_import_options_container: ImportOptionsContainer.ImportOptionsContainer, import_options_caller_type: int, url_class_keys: list[ bytes ] | None = None ):
         
-        super().__init__( parent, ImportOptionsContainer.import_options_type_str_lookup[ import_options_type ] )
+        if url_class_keys is None:
+            
+            url_class_keys = []
+            
+        
+        super().__init__( parent, IOC.import_options_type_str_lookup[ import_options_type ] )
         
         self._import_options_container_manager = import_options_container_manager
         self._import_options_type = import_options_type
-        self._default_import_options_container = default_import_options_container
+        self._full_default_import_options_container = full_default_import_options_container
         self._import_options_caller_type = import_options_caller_type
-        self._url_class_key = url_class_key
+        self._url_class_keys = url_class_keys
         
         if import_options_container.HasImportOptions( self._import_options_type ):
             
@@ -913,18 +1044,18 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
             
             is_default = True
             
-            import_options = self._default_import_options_container.GetImportOptions( self._import_options_type )
+            import_options = self._full_default_import_options_container.GetImportOptions( self._import_options_type )
             
         
         #
         
-        self._description_label = ClientGUICommon.BetterStaticText( self, label = ImportOptionsContainer.import_options_type_desc_lookup[ import_options_type ] )
+        self._description_label = ClientGUICommon.BetterStaticText( self, label = IOC.import_options_type_desc_lookup[ import_options_type ] )
         self._description_label.setWordWrap( True )
         self._description_label.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
         
         self._use_default_dropdown = ClientGUICommon.BetterChoice( self )
         
-        self._use_default_dropdown.addItem( f'use the default import options ({self._default_import_options_container.GetSourceLabel( self._import_options_type )})', True )
+        self._use_default_dropdown.addItem( f'use the default import options ({self._full_default_import_options_container.GetSourceLabel( self._import_options_type )})', True )
         self._use_default_dropdown.addItem( 'set custom import options', False )
         
         self._use_default_dropdown.SetValue( is_default )
@@ -935,38 +1066,36 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
         self._paste_button = ClientGUICommon.IconButton( self, CC.global_icons().paste, self._Paste )
         self._paste_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Paste in just this type of import options, if your clipboard holds a container with it.' ) )
         
-        if import_options_caller_type == ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL and not is_default:
+        if import_options_caller_type == IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL and not is_default:
             
             self._use_default_dropdown.setVisible( False )
             
         
-        show_downloader_options = not self._import_options_caller_type in ImportOptionsContainer.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
-        
-        if self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_PREFETCH:
+        if self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_PREFETCH:
             
             self._options_panel = ClientGUIImportOptionsPanels.EditPrefetchImportOptionsPanel( self, import_options )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_FILE_FILTERING:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_FILE_FILTERING:
             
             self._options_panel = ClientGUIImportOptionsPanels.EditFileFilteringImportOptionsPanel( self, import_options )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_TAG_FILTERING:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_TAG_FILTERING:
             
             self._options_panel = ClientGUIImportOptionsPanels.EditTagFilteringImportOptionsPanel( self, import_options )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_LOCATIONS:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_LOCATIONS:
             
-            self._options_panel = ClientGUIImportOptionsPanels.EditLocationImportOptionsPanel( self, import_options, show_downloader_options )
+            self._options_panel = ClientGUIImportOptionsPanels.EditLocationImportOptionsPanel( self, import_options, self._import_options_caller_type )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_TAGS:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_TAGS:
             
-            self._options_panel = ClientGUIImportOptionsPanels.EditTagImportOptionsPanel( self, import_options, show_downloader_options )
+            self._options_panel = ClientGUIImportOptionsPanels.EditTagImportOptionsPanel( self, import_options, self._import_options_caller_type )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_NOTES:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_NOTES:
             
             self._options_panel = ClientGUIImportOptionsPanels.EditNoteImportOptionsPanel( self, import_options )
             
-        elif self._import_options_type == ImportOptionsContainer.IMPORT_OPTIONS_TYPE_PRESENTATION:
+        elif self._import_options_type == IOC.IMPORT_OPTIONS_TYPE_PRESENTATION:
             
             self._options_panel = ClientGUIImportOptionsPanels.EditPresentationImportOptions( self, import_options )
             
@@ -1004,7 +1133,7 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
         
         import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        import_options_container.SetImportOptions( self._import_options_type, import_options )
+        import_options_container.SetImportOptions( import_options )
         
         payload = import_options_container.DumpToString()
         
@@ -1026,7 +1155,7 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
         
         if import_options is None:
             
-            message = f'Hey, I am afraid what you pasted does not have a defined (non-default) import options of type "{ImportOptionsContainer.import_options_type_str_lookup[ self._import_options_type ]}"! Make sure you copied the right thing and try again.'
+            message = f'Hey, I am afraid what you pasted does not have a defined (non-default) import options of type "{IOC.import_options_type_str_lookup[ self._import_options_type ]}"! Make sure you copied the right thing and try again.'
             
             ClientGUIDialogsMessage.ShowWarning( self, message )
             
@@ -1056,21 +1185,26 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
     
     def GetLabel( self ) -> str:
         
-        label = ImportOptionsContainer.import_options_type_str_lookup[ self._import_options_type ]
+        label = IOC.import_options_type_str_lookup[ self._import_options_type ]
         
         if self._use_default_dropdown.GetValue():
             
-            default_label = self._default_import_options_container.GetSourceLabel( self._import_options_type )
+            label = 'default ' + label
             
-            label += f': default ({default_label})'
+            if self._import_options_caller_type not in ( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL, IOC.IMPORT_OPTIONS_CALLER_TYPE_FAVOURITES ):
+                
+                default_label = self._full_default_import_options_container.GetSourceLabel( self._import_options_type )
+                
+                label += f' ({default_label})'
+                
             
         else:
             
+            label = '> ' + label
+            
             import_options = self.GetValue()
             
-            show_downloader_options = not self._import_options_caller_type in ImportOptionsContainer.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
-            
-            summary = import_options.GetSummary( show_downloader_options )
+            summary = import_options.GetSummary( self._import_options_caller_type )
             
             if len( summary ) > 0:
                 
@@ -1081,12 +1215,12 @@ class DefaultableImportOptionsPanel( ClientGUICommon.StaticBox ):
         return HydrusText.ElideText( label.splitlines()[0], 256 )
         
     
-    def GetValue( self ) -> ImportOptionsContainer.ImportOptionsMetatype:
+    def GetValue( self ) -> IOC.ImportOptionsMetatype:
         
         return self._options_panel.GetValue()
         
     
-    def SetValue( self, import_options: ImportOptionsContainer.ImportOptionsMetatype ):
+    def SetValue( self, import_options: IOC.ImportOptionsMetatype ):
         
         self._options_panel.SetValue( import_options )
         

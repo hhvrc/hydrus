@@ -56,8 +56,6 @@ class ShutdownException( HydrusException ): pass
 class SubprocessTimedOut( HydrusException ): pass
 class QtDeadWindowException( HydrusException ): pass
 
-class FileImportBlockException( HydrusException ): pass
-
 class UnsupportedFileException( HydrusException ): pass
 class ZeroSizeFileException( UnsupportedFileException ): pass
 class DamagedOrUnusualFileException( UnsupportedFileException ): pass
@@ -73,6 +71,7 @@ class VetoException( HydrusException ): pass
 
 class CancelledException( VetoException ): pass
 
+class FileImportBlockException( VetoException ): pass
 class FileImportRulesException( VetoException ): pass
 class DecompressionBombException( FileImportRulesException ): pass
 

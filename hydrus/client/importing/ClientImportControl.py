@@ -2,10 +2,11 @@ from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusTime
 
+from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing import ClientImportGallerySeeds
-from hydrus.client.importing.options import LocationImportOptions
+from hydrus.client.importing.options import ImportOptionsContainer
 
 def CheckImporterCanDoFileWorkBecausePaused( paused: bool, file_seed_cache: ClientImportFileSeeds.FileSeedCache, page_key: bytes ):
     
@@ -37,16 +38,22 @@ def CheckImporterCanDoFileWorkBecausePaused( paused: bool, file_seed_cache: Clie
         
     
 
-def CheckImporterCanDoFileWorkBecausePausifyingProblem( location_import_options: LocationImportOptions.LocationImportOptions ):
+def CheckImporterCanDoFileWorkBecauseLocationsProblem( file_seed_cache: ClientImportFileSeeds.FileSeedCache, import_options_container: ImportOptionsContainer.ImportOptionsContainer, import_options_caller_type: int ):
     
-    try:
+    file_seed = file_seed_cache.GetNextFileSeed( CC.STATUS_UNKNOWN )
+    
+    if file_seed is None:
         
-        location_import_options.CheckReadyToImport()
+        urls = []
         
-    except Exception as e:
+    else:
         
-        raise HydrusExceptions.VetoException( str( e ) )
+        urls = file_seed.GetURLsForOptionsLookup()
         
+    
+    full_import_options_container = CG.client_controller.import_options_manager.GenerateFullImportOptionsContainer( import_options_container, import_options_caller_type, urls = urls )
+    
+    full_import_options_container.GetLocationImportOptions().CheckReadyToImport()
     
 
 def CheckImporterCanDoGalleryWorkBecausePaused( paused: bool, gallery_seed_log: ClientImportGallerySeeds.GallerySeedLog | None ):

@@ -87,7 +87,7 @@ class MediaResultCache( object ):
         self._hash_ids_to_media_results = weakref.WeakValueDictionary()
         self._hashes_to_media_results = weakref.WeakValueDictionary()
         
-        self._fifo_timeout_cache = ClientCachesBase.DataCache( CG.client_controller, 'media result cache', 2048, 120 )
+        self._fifo_timeout_cache.Clear()
         
     
     def DropMediaResult( self, hash_id: int, hash: bytes ):
@@ -194,7 +194,10 @@ class MediaResultCache( object ):
                     
                     media_results.append( media_result )
                     
-                    self._fifo_timeout_cache.TouchKey( hash_id )
+                    if self._fifo_timeout_cache.HasData( hash_id ):
+                        
+                        self._fifo_timeout_cache.TouchKey( hash_id )
+                        
                     
                 
             

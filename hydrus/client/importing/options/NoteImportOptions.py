@@ -5,6 +5,7 @@ from hydrus.core import HydrusData
 from hydrus.core import HydrusSerialisable
 
 from hydrus.client import ClientConstants as CC
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.media import ClientMediaResult
 from hydrus.client.metadata import ClientContentUpdates
 
@@ -20,7 +21,9 @@ note_import_conflict_str_lookup = {
     NOTE_IMPORT_CONFLICT_RENAME : 'add the new note under a new name',
 }
 
-class NoteImportOptions( HydrusSerialisable.SerialisableBase ):
+class NoteImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_NOTES
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_NOTE_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Note Import Options'
@@ -109,7 +112,7 @@ class NoteImportOptions( HydrusSerialisable.SerialisableBase ):
         return content_update_package
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         statements = []
         

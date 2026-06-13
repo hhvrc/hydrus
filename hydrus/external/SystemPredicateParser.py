@@ -38,6 +38,8 @@ from hydrus.core import HydrusExceptions
 
 UNICODE_APPROX_EQUAL = '\u2248'
 UNICODE_NOT_EQUAL = '\u2260'
+UNICODE_LESS_THAN_OR_EQUAL_TO = '\u2264'
+UNICODE_GREATER_THAN_OR_EQUAL_TO = '\u2265'
 
 # sort according to longest thing first to rid ourselves of ambiguity
 operator_strings_and_results = sorted(
@@ -50,9 +52,19 @@ operator_strings_and_results = sorted(
         ( 'is not', UNICODE_NOT_EQUAL ),
         ( 'isn\'t', UNICODE_NOT_EQUAL ),
         ( '<', '<' ),
+        ( 'fewer than', '<' ),
         ( 'less than', '<' ),
         ( '>', '>' ),
         ( 'more than', '>' ),
+        ( 'greater than', '>' ),
+        ( UNICODE_LESS_THAN_OR_EQUAL_TO, UNICODE_LESS_THAN_OR_EQUAL_TO ),
+        ( '<=', UNICODE_LESS_THAN_OR_EQUAL_TO ),
+        ( 'fewer than or equal to', UNICODE_LESS_THAN_OR_EQUAL_TO ),
+        ( 'less than or equal to', UNICODE_LESS_THAN_OR_EQUAL_TO ),
+        ( UNICODE_GREATER_THAN_OR_EQUAL_TO, UNICODE_GREATER_THAN_OR_EQUAL_TO ),
+        ( '>=', UNICODE_GREATER_THAN_OR_EQUAL_TO ),
+        ( 'more than or equal to', UNICODE_GREATER_THAN_OR_EQUAL_TO ),
+        ( 'greater than or equal to', UNICODE_GREATER_THAN_OR_EQUAL_TO ),
         ( UNICODE_APPROX_EQUAL, UNICODE_APPROX_EQUAL ),
         ( '~=', UNICODE_APPROX_EQUAL ),
         ( 'about', UNICODE_APPROX_EQUAL ),
@@ -206,6 +218,7 @@ class Value( Enum ):
 # Possible operator formats
 # Implemented in parse_operator
 class Operators( Enum ):
+    RELATIONAL_NUMBERTEST = auto() # The new NumberTest for a general int/float. <, <=, ~=, =, !=, >=, > (with clever parsing, ideally for ~= vs ~=%) 
     RELATIONAL = auto()  # One of '=', '<', '>', UNICODE_APPROX_EQUAL ('≈') (takes '~=' too)
     VIEWS_RELATIONAL = auto() # media, preview, client api, and a RELATIONAL
     RELATIONAL_EXACT = auto() # Like RELATIONAL but without the approximately equal operator
@@ -274,9 +287,9 @@ SYSTEM_PREDICATES = {
     'num(ber)?( of)? tags': (Predicate.NUM_OF_TAGS, Operators.RELATIONAL, Value.NATURAL, None),
     r'num(ber)?( of)? (?=[^\s].* tags)': (Predicate.NUM_OF_TAGS_WITH_NAMESPACE, None, Value.NAMESPACE_AND_NUM_TAGS, None),
     'num(ber)?( of)? urls': (Predicate.NUM_OF_URLS, Operators.RELATIONAL, Value.NATURAL, None),
-    'num(ber)?( of)? words': (Predicate.NUM_OF_WORDS, Operators.RELATIONAL_EXACT, Value.NATURAL, None),
-    'height': (Predicate.HEIGHT, Operators.RELATIONAL, Value.NATURAL, Units.PIXELS_OR_NONE),
-    'width': (Predicate.WIDTH, Operators.RELATIONAL, Value.NATURAL, Units.PIXELS_OR_NONE),
+    'num(ber)?( of)? words': (Predicate.NUM_OF_WORDS, Operators.RELATIONAL_NUMBERTEST, Value.NATURAL, None),
+    'height': (Predicate.HEIGHT, Operators.RELATIONAL_NUMBERTEST, Value.NATURAL, Units.PIXELS_OR_NONE),
+    'width': (Predicate.WIDTH, Operators.RELATIONAL_NUMBERTEST, Value.NATURAL, Units.PIXELS_OR_NONE),
     'file ?size': (Predicate.FILESIZE, Operators.RELATIONAL, Value.NATURAL, Units.FILESIZE),
     'similar to(?! data)( files)?': (Predicate.SIMILAR_TO_FILES, None, Value.SHA256_HASHLIST_WITH_DISTANCE, None),
     'similar to data': (Predicate.SIMILAR_TO_DATA, None, Value.SIMILAR_TO_HASHLIST_WITH_DISTANCE, None),
@@ -287,9 +300,9 @@ SYSTEM_PREDICATES = {
     'modified (date|time)|(date|time) modified|modified': (Predicate.MOD_DATE, Operators.RELATIONAL_TIME, Value.DATE_OR_TIME_INTERVAL, None),
     'last view(ed)? (date|time)|(date|time) last viewed|last viewed': (Predicate.LAST_VIEWED_TIME, Operators.RELATIONAL_TIME, Value.DATE_OR_TIME_INTERVAL, None),
     'import(ed)? (date|time)|(date|time) imported|imported': (Predicate.TIME_IMPORTED, Operators.RELATIONAL_TIME, Value.DATE_OR_TIME_INTERVAL, None),
-    'duration': (Predicate.DURATION, Operators.RELATIONAL, Value.TIME_TO_MSEC, None),
+    'duration': (Predicate.DURATION, Operators.RELATIONAL_NUMBERTEST, Value.TIME_TO_MSEC, None),
     'framerate': (Predicate.FRAMERATE, Operators.RELATIONAL, Value.NATURAL, Units.FPS_OR_NONE),
-    'num(ber)?( of)? frames': (Predicate.NUM_OF_FRAMES, Operators.RELATIONAL, Value.NATURAL, None),
+    'num(ber)?( of)? frames': (Predicate.NUM_OF_FRAMES, Operators.RELATIONAL_NUMBERTEST, Value.NATURAL, None),
     'file service': (Predicate.FILE_SERVICE, Operators.FILESERVICE_STATUS, Value.ANY_STRING, None),
     'num(ber)?( of)? file relationships': (Predicate.NUM_FILE_RELS, Operators.RELATIONAL, Value.NATURAL, Units.FILE_RELATIONSHIP_TYPE),
     r'ratio(?=.*\d)': (Predicate.RATIO, Operators.RATIO_OPERATORS, Value.RATIO, None),
@@ -652,6 +665,11 @@ def parse_value( parse_result: SystemPredParseResult, spec ):
         if DATEPARSER_OK:
             
             dt = dateparser.parse( string )
+            
+            if dt is None:
+                
+                raise ValueError( 'Could not parse that date!' )
+                
             
             if not string_looks_like_date( string ):
                 
@@ -1179,6 +1197,35 @@ def parse_operator( parse_result: SystemPredParseResult, spec ):
         
         return
         
+    elif spec == Operators.RELATIONAL_NUMBERTEST:
+        
+        if string.startswith( 'has' ):
+            
+            parse_result.text_remainder = string
+            parse_result.operator = '>'
+            
+            return
+            
+        
+        if string.startswith( 'no' ):
+            
+            parse_result.text_remainder = string
+            parse_result.operator = '='
+            
+            return
+            
+        
+        for ( op_string, op_result ) in operator_strings_and_results:
+            
+            if string.startswith( op_string ):
+                
+                parse_result.text_remainder = string[ len( op_string ) : ]
+                parse_result.operator = op_result
+                
+                return
+                
+            
+        
     elif spec in ( Operators.RELATIONAL, Operators.RELATIONAL_EXACT, Operators.RELATIONAL_TIME ):
         
         ( parse_result.text_remainder, parse_result.operator ) = parse_operator_relational( string, spec )
@@ -1505,6 +1552,7 @@ def parse_operator_relational( string: str, spec ):
         if string.startswith( 'is not' ): return string[ 6: ], UNICODE_NOT_EQUAL
         if string.startswith( 'isn\'t' ): return string[ 5: ], UNICODE_NOT_EQUAL
         if string.startswith( '~=' ): return string[ 2: ], UNICODE_APPROX_EQUAL
+    
     for op in ops:
         if string.startswith( op ): return string[ len( op ): ], op
     if string.startswith( 'is' ): return string[ 2: ], '='

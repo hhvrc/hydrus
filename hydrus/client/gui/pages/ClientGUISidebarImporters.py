@@ -25,7 +25,7 @@ from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.importing import ClientGUIFileSeedCache
 from hydrus.client.gui.importing import ClientGUIGallerySeedLog
 from hydrus.client.gui.importing import ClientGUIImport
-from hydrus.client.gui.importing import ClientGUIImportOptionsLegacy
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainerButton
 from hydrus.client.gui.lists import ClientGUIListBoxes
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
@@ -44,15 +44,13 @@ from hydrus.client.importing import ClientImportGallery
 from hydrus.client.importing import ClientImportWatchers
 from hydrus.client.importing import ClientImportLocal
 from hydrus.client.importing import ClientImportSimpleURLs
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import PresentationImportOptions
 from hydrus.client.metadata import ClientTags
 from hydrus.client.networking import ClientNetworkingFunctions
 from hydrus.client.parsing import ClientParsing
 
-def AddPresentationSubmenu( menu: QW.QMenu, importer_name: str, single_selected_presentation_import_options: PresentationImportOptions.PresentationImportOptions | None, callable ):
-    
-    show_downloader_options = True
+def AddPresentationSubmenu( menu: QW.QMenu, importer_name: str, import_options_caller_type: int, single_selected_presentation_import_options: PresentationImportOptions.PresentationImportOptions | None, callable ):
     
     submenu = ClientGUIMenus.GenerateMenu( menu )
     
@@ -67,7 +65,7 @@ def AddPresentationSubmenu( menu: QW.QMenu, importer_name: str, single_selected_
         
     else:
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'default presented files ({})'.format( single_selected_presentation_import_options.GetSummary( show_downloader_options ) ), description, callable )
+        ClientGUIMenus.AppendMenuItem( submenu, 'default presented files ({})'.format( single_selected_presentation_import_options.GetSummary( import_options_caller_type ) ), description, callable )
         
     
     sets_of_options = []
@@ -101,7 +99,7 @@ def AddPresentationSubmenu( menu: QW.QMenu, importer_name: str, single_selected_
             continue
             
         
-        ClientGUIMenus.AppendMenuItem( submenu, presentation_import_options.GetSummary( show_downloader_options ), description, callable, presentation_import_options = presentation_import_options )
+        ClientGUIMenus.AppendMenuItem( submenu, presentation_import_options.GetSummary( import_options_caller_type ), description, callable, presentation_import_options = presentation_import_options )
         
     
     ClientGUIMenus.AppendMenu( menu, submenu, 'show files' )
@@ -154,14 +152,9 @@ class SidebarImporterHDD( SidebarImporter ):
         
         self._hdd_import: ClientImportLocal.HDDImport = self._page_manager.GetVariable( 'hdd_import' )
         
-        file_import_options = self._hdd_import.GetFileImportOptions()
+        import_options_container = self._hdd_import.GetImportOptionsContainer()
         
-        show_downloader_options = False
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT, import_options_container )
         
         #
         
@@ -177,7 +170,7 @@ class SidebarImporterHDD( SidebarImporter ):
         
         self._import_queue_panel.Add( hbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
         self._import_queue_panel.Add( self._file_seed_cache_control, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self._import_queue_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self._import_queue_panel.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         CGL.AddWidgetToLayout( vbox, self._import_queue_panel, CGL.FLAGS_EXPAND_PERPENDICULAR )
         
@@ -193,7 +186,7 @@ class SidebarImporterHDD( SidebarImporter ):
         
         self._UpdateImportStatus()
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._hdd_import.SetFileImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._hdd_import.SetImportOptionsContainer )
         
     
     def _UpdateImportStatus( self ):
@@ -309,19 +302,10 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
         self._file_limit.valueChanged.connect( self.EventFileLimit )
         self._file_limit.setToolTip( ClientGUIFunctions.WrapToolTip( 'per query, stop searching the gallery once this many files has been reached' ) )
         
-        file_import_options = self._multiple_gallery_import.GetFileImportOptions()
-        tag_import_options = self._multiple_gallery_import.GetTagImportOptions()
-        note_import_options = self._multiple_gallery_import.GetNoteImportOptions()
+        import_options_container = self._multiple_gallery_import.GetImportOptionsContainer()
         file_limit = self._multiple_gallery_import.GetFileLimit()
         
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, import_options_container )
         
         self._set_options_to_queries_button = ClientGUICommon.BetterButton( self, 'update selected with current options', self._SetOptionsToGalleryImports )
         self._set_options_to_queries_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Each query has its own file limit and import options (you can review them in the highlight panel below). These are not updated if the main page\'s options are updated. It seems some downloaders in your selection differ with what the page currently has. Clicking here will update the selected queries with whatever the page currently has.' ) )
@@ -340,7 +324,7 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
         self._gallery_downloader_panel.Add( input_hbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
         self._gallery_downloader_panel.Add( self._gug_key_and_name, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._gallery_downloader_panel.Add( self._file_limit, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self._gallery_downloader_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self._gallery_downloader_panel.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._gallery_downloader_panel.Add( self._set_options_to_queries_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
@@ -375,14 +359,12 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
         
         self._gallery_importers_listctrl.AddRowsMenuCallable( self._GetListCtrlMenu )
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._multiple_gallery_import.SetFileImportOptions )
-        self._import_options_button.noteImportOptionsChanged.connect( self._multiple_gallery_import.SetNoteImportOptions )
-        self._import_options_button.tagImportOptionsChanged.connect( self._multiple_gallery_import.SetTagImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._multiple_gallery_import.SetImportOptionsContainer )
         
-        self._file_limit.valueChanged.connect( self._UpdateImportOptionsSetButton )
-        self._import_options_button.importOptionsChanged.connect( self._UpdateImportOptionsSetButton )
-        self._highlighted_gallery_import_panel.importOptionsChanged.connect( self._UpdateImportOptionsSetButton )
-        self._gallery_importers_listctrl.selectionModel().selectionChanged.connect( self._UpdateImportOptionsSetButton )
+        self._file_limit.valueChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._import_options_container_button.importOptionsChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._highlighted_gallery_import_panel.importOptionsChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._gallery_importers_listctrl.selectionModel().selectionChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
         
         self._gug_key_and_name.valueChanged.connect( self._NotifyNewGUGKeyAndName )
         
@@ -635,12 +617,10 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
             
             ( importer, ) = selected_importers
             
-            fio = importer.GetFileImportOptions()
-            
-            single_selected_presentation_import_options = FileImportOptionsLegacy.GetRealPresentationImportOptions( fio, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
+            single_selected_presentation_import_options = importer.GetImportOptionsContainer().GetPresentationImportOptions()
             
         
-        AddPresentationSubmenu( menu, 'downloader', single_selected_presentation_import_options, self._ShowSelectedImportersFiles )
+        AddPresentationSubmenu( menu, 'downloader', IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, single_selected_presentation_import_options, self._ShowSelectedImportersFiles )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -995,19 +975,15 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
         if result == QW.QDialog.DialogCode.Accepted:
             
             file_limit = self._file_limit.GetValue()
-            file_import_options = self._import_options_button.GetFileImportOptions()
-            tag_import_options = self._import_options_button.GetTagImportOptions()
-            note_import_options = self._import_options_button.GetNoteImportOptions()
+            import_options_container = self._import_options_container_button.GetValue()
             
             for gallery_import in gallery_imports:
                 
                 gallery_import.SetFileLimit( file_limit )
-                gallery_import.SetFileImportOptions( file_import_options )
-                gallery_import.SetTagImportOptions( tag_import_options )
-                gallery_import.SetNoteImportOptions( note_import_options )
+                gallery_import.SetImportOptionsContainer( import_options_container )
                 
             
-            self._UpdateImportOptionsSetButton()
+            self._UpdateImportOptionsSetButtonVisibility()
             
         
     
@@ -1157,7 +1133,7 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
             
         
     
-    def _UpdateImportOptionsSetButton( self ):
+    def _UpdateImportOptionsSetButtonVisibility( self ):
         
         selected_gallery_imports = self._gallery_importers_listctrl.GetData( only_selected = True )
         
@@ -1168,13 +1144,10 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
             # ok the serialisable comparison sucks, but we can cut down the repeated work to just one per future run of this method by updating our children with exactly our object
             
             file_limit = self._file_limit.GetValue()
-            file_import_options = self._import_options_button.GetFileImportOptions()
-            note_import_options = self._import_options_button.GetNoteImportOptions()
-            tag_import_options = self._import_options_button.GetTagImportOptions()
             
-            file_import_options_string = None
-            note_import_options_string = None
-            tag_import_options_string = None
+            import_options_container = self._import_options_container_button.GetValue()
+            
+            import_options_container_string = None
             
             for gallery_import in selected_gallery_imports:
                 
@@ -1185,68 +1158,17 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
                     break
                     
                 
-                gallery_import_file_import_options = gallery_import.GetFileImportOptions()
+                gallery_import_import_options_container = gallery_import.GetImportOptionsContainer()
                 
-                if gallery_import_file_import_options != file_import_options:
+                if gallery_import_import_options_container is not import_options_container:
                     
-                    if file_import_options_string is None:
+                    if import_options_container_string is None:
                         
-                        file_import_options_string = file_import_options.DumpToString()
+                        import_options_container_string = import_options_container.DumpToString()
                         
                     
                     # not the same object, let's see if they have the same value
-                    if gallery_import_file_import_options.DumpToString() == file_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        gallery_import.SetFileImportOptions( file_import_options )
-                        
-                    else:
-                        
-                        show_it = True
-                        
-                        break
-                        
-                    
-                
-                gallery_import_note_import_options = gallery_import.GetNoteImportOptions()
-                
-                if gallery_import_note_import_options != note_import_options:
-                    
-                    if note_import_options_string is None:
-                        
-                        note_import_options_string = note_import_options.DumpToString()
-                        
-                    
-                    # not the same object, let's see if they have the same value
-                    if gallery_import_note_import_options.DumpToString() == note_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        gallery_import.SetNoteImportOptions( note_import_options )
-                        
-                    else:
-                        
-                        show_it = True
-                        
-                        break
-                        
-                    
-                
-                gallery_import_tag_import_options = gallery_import.GetTagImportOptions()
-                
-                if gallery_import_tag_import_options != tag_import_options:
-                    
-                    if tag_import_options_string is None:
-                        
-                        tag_import_options_string = tag_import_options.DumpToString()
-                        
-                    
-                    # not the same object, let's see if they have the same value
-                    if gallery_import_tag_import_options.DumpToString() == tag_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        gallery_import.SetTagImportOptions( tag_import_options )
-                        
-                    else:
+                    if gallery_import_import_options_container.DumpToString() != import_options_container_string:
                         
                         show_it = True
                         
@@ -1368,9 +1290,9 @@ class SidebarImporterMultipleGallery( SidebarImporter ):
         self._multiple_gallery_import.SetFileLimit( self._file_limit.GetValue() )
         
     
-    def PendSubscriptionGapDownloader( self, gug_key_and_name, query_text, file_import_options, tag_import_options, note_import_options, file_limit ):
+    def PendSubscriptionGapDownloader( self, gug_key_and_name, query_text, import_options_container, file_limit ):
         
-        new_query = self._multiple_gallery_import.PendSubscriptionGapDownloader( gug_key_and_name, query_text, file_import_options, tag_import_options, note_import_options, file_limit )
+        new_query = self._multiple_gallery_import.PendSubscriptionGapDownloader( gug_key_and_name, query_text, import_options_container, file_limit )
         
         if new_query is not None and self._highlighted_gallery_import is None and CG.client_controller.new_options.GetBoolean( 'highlight_new_query' ):
             
@@ -1407,9 +1329,7 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
         self._loading_highlight_job_status.Finish()
         
         checker_options = self._multiple_watcher_import.GetCheckerOptions()
-        file_import_options = self._multiple_watcher_import.GetFileImportOptions()
-        tag_import_options = self._multiple_watcher_import.GetTagImportOptions()
-        note_import_options = self._multiple_watcher_import.GetNoteImportOptions()
+        import_options_container = self._multiple_watcher_import.GetImportOptionsContainer()
         
         #
         
@@ -1456,14 +1376,7 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
         
         self._checker_options = ClientGUIImport.CheckerOptionsButton( self._watchers_panel, checker_options )
         
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS, import_options_container )
         
         self._set_options_to_watchers_button = ClientGUICommon.BetterButton( self, 'update selected with current options', self._SetOptionsToWatchers )
         self._set_options_to_watchers_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Each watcher has its own checker and import options (you can review them in the highlight panel below). These are not updated if the main page\'s options are updated. It seems some watchers in your selection differ with what the page currently has. Clicking here will update the selected watchers with whatever the page currently has.' ) )
@@ -1484,7 +1397,7 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
         self._watchers_panel.Add( self._watchers_listctrl_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
         self._watchers_panel.Add( self._watcher_url_input, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._watchers_panel.Add( self._checker_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self._watchers_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self._watchers_panel.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._watchers_panel.Add( self._set_options_to_watchers_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
@@ -1509,16 +1422,14 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
         
         CG.client_controller.sub( self, '_ClearExistingHighlightAndPanel', 'clear_multiwatcher_highlights' )
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._OptionsUpdated )
-        self._import_options_button.noteImportOptionsChanged.connect( self._OptionsUpdated )
-        self._import_options_button.tagImportOptionsChanged.connect( self._OptionsUpdated )
+        self._import_options_container_button.importOptionsChanged.connect( self._multiple_watcher_import.SetImportOptionsContainer )
         
         self._checker_options.valueChanged.connect( self._OptionsUpdated )
         
-        self._import_options_button.importOptionsChanged.connect( self._UpdateImportOptionsSetButton )
-        self._checker_options.valueChanged.connect( self._UpdateImportOptionsSetButton )
-        self._highlighted_watcher_panel.importOptionsChanged.connect( self._UpdateImportOptionsSetButton )
-        self._watchers_listctrl.selectionModel().selectionChanged.connect( self._UpdateImportOptionsSetButton )
+        self._import_options_container_button.importOptionsChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._checker_options.valueChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._highlighted_watcher_panel.importOptionsChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
+        self._watchers_listctrl.selectionModel().selectionChanged.connect( self._UpdateImportOptionsSetButtonVisibility )
         
     
     def _AddURLs( self, urls, filterable_tags = None, additional_service_keys_to_tags = None ):
@@ -1817,12 +1728,10 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
             
             ( watcher, ) = selected_watchers
             
-            fio = watcher.GetFileImportOptions()
-            
-            single_selected_presentation_import_options = FileImportOptionsLegacy.GetRealPresentationImportOptions( fio, FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
+            single_selected_presentation_import_options = watcher.GetImportOptionsContainer().GetPresentationImportOptions()
             
         
-        AddPresentationSubmenu( menu, 'watcher', single_selected_presentation_import_options, self._ShowSelectedImportersFiles )
+        AddPresentationSubmenu( menu, 'watcher', IOC.IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS, single_selected_presentation_import_options, self._ShowSelectedImportersFiles )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -2043,9 +1952,8 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
     def _OptionsUpdated( self, *args, **kwargs ):
         
         self._multiple_watcher_import.SetCheckerOptions( self._checker_options.GetValue() )
-        self._multiple_watcher_import.SetFileImportOptions( self._import_options_button.GetFileImportOptions() )
-        self._multiple_watcher_import.SetNoteImportOptions( self._import_options_button.GetNoteImportOptions() )
-        self._multiple_watcher_import.SetTagImportOptions( self._import_options_button.GetTagImportOptions() )
+        
+        self._multiple_watcher_import.SetImportOptionsContainer( self._import_options_container_button.GetValue() )
         
     
     def _PausePlayChecking( self ):
@@ -2183,19 +2091,17 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
         if result == QW.QDialog.DialogCode.Accepted:
             
             checker_options = self._checker_options.GetValue()
-            file_import_options = self._import_options_button.GetFileImportOptions()
-            note_import_options = self._import_options_button.GetNoteImportOptions()
-            tag_import_options = self._import_options_button.GetTagImportOptions()
+            
+            import_options_container = self._import_options_container_button.GetValue()
             
             for watcher in watchers:
                 
                 watcher.SetCheckerOptions( checker_options )
-                watcher.SetFileImportOptions( file_import_options )
-                watcher.SetNoteImportOptions( note_import_options )
-                watcher.SetTagImportOptions( tag_import_options )
+                
+                watcher.SetImportOptionsContainer( import_options_container )
                 
             
-            self._UpdateImportOptionsSetButton()
+            self._UpdateImportOptionsSetButtonVisibility()
             
         
     
@@ -2308,7 +2214,7 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
             
         
     
-    def _UpdateImportOptionsSetButton( self ):
+    def _UpdateImportOptionsSetButtonVisibility( self ):
         
         selected_watchers = self._watchers_listctrl.GetData( only_selected = True )
         
@@ -2319,20 +2225,17 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
             # ok the serialisable comparison sucks, but we can cut down the repeated work to just one per future run of this method by updating our children with exactly our object
             
             checker_options = self._checker_options.GetValue()
-            file_import_options = self._import_options_button.GetFileImportOptions()
-            note_import_options = self._import_options_button.GetNoteImportOptions()
-            tag_import_options = self._import_options_button.GetTagImportOptions()
+            
+            import_options_container = self._import_options_container_button.GetValue()
             
             checker_options_string = None
-            file_import_options_string = None
-            note_import_options_string = None
-            tag_import_options_string = None
+            import_options_container_string = None
             
             for watcher in selected_watchers:
                 
                 watcher_checker_options = watcher.GetCheckerOptions()
                 
-                if watcher_checker_options != checker_options:
+                if watcher_checker_options is not checker_options:
                     
                     if checker_options_string is None:
                         
@@ -2340,12 +2243,7 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
                         
                     
                     # not the same object, let's see if they have the same value
-                    if watcher_checker_options.DumpToString() == checker_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        watcher.SetCheckerOptions( checker_options )
-                        
-                    else:
+                    if watcher_checker_options.DumpToString() != checker_options_string:
                         
                         show_it = True
                         
@@ -2353,68 +2251,17 @@ class SidebarImporterMultipleWatcher( SidebarImporter ):
                         
                     
                 
-                watcher_file_import_options = watcher.GetFileImportOptions()
+                watcher_import_options_container = watcher.GetImportOptionsContainer()
                 
-                if watcher_file_import_options != file_import_options:
+                if watcher_import_options_container is not import_options_container:
                     
-                    if file_import_options_string is None:
+                    if import_options_container_string is None:
                         
-                        file_import_options_string = file_import_options.DumpToString()
+                        import_options_container_string = import_options_container.DumpToString()
                         
                     
                     # not the same object, let's see if they have the same value
-                    if watcher_file_import_options.DumpToString() == file_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        watcher.SetFileImportOptions( file_import_options )
-                        
-                    else:
-                        
-                        show_it = True
-                        
-                        break
-                        
-                    
-                
-                watcher_note_import_options = watcher.GetNoteImportOptions()
-                
-                if watcher_note_import_options != note_import_options:
-                    
-                    if note_import_options_string is None:
-                        
-                        note_import_options_string = note_import_options.DumpToString()
-                        
-                    
-                    # not the same object, let's see if they have the same value
-                    if watcher_note_import_options.DumpToString() == note_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        watcher.SetNoteImportOptions( note_import_options )
-                        
-                    else:
-                        
-                        show_it = True
-                        
-                        break
-                        
-                    
-                
-                watcher_tag_import_options = watcher.GetTagImportOptions()
-                
-                if watcher_tag_import_options != tag_import_options:
-                    
-                    if tag_import_options_string is None:
-                        
-                        tag_import_options_string = tag_import_options.DumpToString()
-                        
-                    
-                    # not the same object, let's see if they have the same value
-                    if watcher_tag_import_options.DumpToString() == tag_import_options_string:
-                        
-                        # we have the same value here, just not the same object. let's make the check faster next time
-                        watcher.SetTagImportOptions( tag_import_options )
-                        
-                    else:
+                    if watcher_import_options_container.DumpToString() != import_options_container_string:
                         
                         show_it = True
                         
@@ -2626,14 +2473,9 @@ class SidebarImporterSimpleDownloader( SidebarImporter ):
         
         self._RefreshFormulae()
         
-        file_import_options = self._simple_downloader_import.GetFileImportOptions()
+        import_options_container = self._simple_downloader_import.GetImportOptionsContainer()
         
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, import_options_container )
         
         #
         
@@ -2667,7 +2509,7 @@ class SidebarImporterSimpleDownloader( SidebarImporter ):
         
         self._simple_downloader_panel.Add( self._import_queue_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._simple_downloader_panel.Add( self._simple_parsing_jobs_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self._simple_downloader_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self._simple_downloader_panel.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
         
@@ -2696,7 +2538,7 @@ class SidebarImporterSimpleDownloader( SidebarImporter ):
         
         self._UpdateImportStatus()
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._simple_downloader_import.SetFileImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._simple_downloader_import.SetImportOptionsContainer )
         
         self._pending_jobs_queue_box.listBoxContentsDeleted.connect( self._QueueBoxContentsDeleted )
         self._pending_jobs_queue_box.listBoxOrderChanged.connect( self._QueueBoxOrderChanged )
@@ -3008,18 +2850,9 @@ class SidebarImporterURLs( SidebarImporter ):
         
         self._url_input.setPlaceholderText( 'any url hydrus recognises, or a raw file url' )
         
-        file_import_options = self._urls_import.GetFileImportOptions()
-        tag_import_options = self._urls_import.GetTagImportOptions()
-        note_import_options = self._urls_import.GetNoteImportOptions()
+        import_options_container = self._urls_import.GetImportOptionsContainer()
         
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, import_options_container )
         
         #
         hbox = QP.HBoxLayout()
@@ -3036,7 +2869,7 @@ class SidebarImporterURLs( SidebarImporter ):
         self._url_panel.Add( self._import_queue_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._url_panel.Add( self._gallery_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         self._url_panel.Add( self._url_input, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self._url_panel.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self._url_panel.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
         
@@ -3063,9 +2896,7 @@ class SidebarImporterURLs( SidebarImporter ):
         
         self._UpdateImportStatus()
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._urls_import.SetFileImportOptions )
-        self._import_options_button.noteImportOptionsChanged.connect( self._urls_import.SetNoteImportOptions )
-        self._import_options_button.tagImportOptionsChanged.connect( self._urls_import.SetTagImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._urls_import.SetImportOptionsContainer )
         
     
     def _PendURLs( self, unclean_urls, filterable_tags = None, additional_service_keys_to_tags = None ):

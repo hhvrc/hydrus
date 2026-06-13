@@ -4,7 +4,11 @@ from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusSerialisable
 from hydrus.core import HydrusTags
 
-class TagFilteringImportOptions( HydrusSerialisable.SerialisableBase ):
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+
+class TagFilteringImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_TAG_FILTERING
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_TAG_FILTERING_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Tag Filtering Import Options'
@@ -44,6 +48,11 @@ class TagFilteringImportOptions( HydrusSerialisable.SerialisableBase ):
         ( serialisable_tag_blacklist, self._tag_whitelist ) = serialisable_info
         
         self._tag_blacklist = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_tag_blacklist )
+        
+    
+    def AllowsEverything( self ):
+        
+        return self._tag_blacklist.AllowsEverything() and len( self._tag_whitelist ) == 0
         
     
     def CheckTagsVeto( self, tags: collections.abc.Collection[ str ], sibling_tags: collections.abc.Collection[ str ] ):
@@ -86,9 +95,11 @@ class TagFilteringImportOptions( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         statements = []
+        
+        show_downloader_options = import_options_caller_type not in IOC.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
         
         if show_downloader_options:
             

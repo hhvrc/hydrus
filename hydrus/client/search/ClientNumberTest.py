@@ -50,6 +50,17 @@ number_test_operator_to_pretty_str_lookup = {
 
 number_test_str_to_operator_lookup = { value : key for ( key, value ) in number_test_operator_to_str_lookup.items() if key != NUMBER_TEST_OPERATOR_APPROXIMATE_ABSOLUTE }
 
+number_test_operator_to_ratio_str_lookup = {
+    NUMBER_TEST_OPERATOR_LESS_THAN : 'taller than',
+    NUMBER_TEST_OPERATOR_GREATER_THAN : 'wider than',
+    NUMBER_TEST_OPERATOR_EQUAL : 'is',
+    NUMBER_TEST_OPERATOR_NOT_EQUAL : 'is not',
+    NUMBER_TEST_OPERATOR_APPROXIMATE_PERCENT : 'is about',
+    NUMBER_TEST_OPERATOR_APPROXIMATE_ABSOLUTE : 'you should not see this',
+    NUMBER_TEST_OPERATOR_LESS_THAN_OR_EQUAL_TO : 'taller than or exactly',
+    NUMBER_TEST_OPERATOR_GREATER_THAN_OR_EQUAL_TO : 'wider than or exactly',
+}
+
 number_test_operator_to_timestamp_str_lookup = {
     NUMBER_TEST_OPERATOR_LESS_THAN : 'earlier than',
     NUMBER_TEST_OPERATOR_GREATER_THAN : 'later than',
@@ -72,13 +83,20 @@ number_test_operator_to_timestamp_desc_lookup = {
     NUMBER_TEST_OPERATOR_GREATER_THAN_OR_EQUAL_TO : 'occurred after (or at exactly the same millisecond)',
 }
 
+# TODO: Ok rework this guy to hold a Value Serialisable
+# that guy might be an float, ( width, height (ratio) ), ( num_pixels, unit ), ( num_bytes, unit ), but will provide a single float value to test to the NumberTest
+# we are just preserving user-useful info for UI editing purposes
+# since this is pretty simple, let's just have one NumberTestValue class and have an enum to track different sub-values in there
+# also have some nice STATIC methods for just generating stuff
+# KISS for now, see where it goes
+
 class NumberTest( HydrusSerialisable.SerialisableBase ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_NUMBER_TEST
     SERIALISABLE_NAME = 'Number Test'
     SERIALISABLE_VERSION = 2
     
-    def __init__( self, operator = NUMBER_TEST_OPERATOR_EQUAL, value = 1, extra_value = None ):
+    def __init__( self, operator: int = NUMBER_TEST_OPERATOR_EQUAL, value: float = 1, extra_value = None ):
         
         super().__init__()
         
@@ -374,7 +392,19 @@ class NumberTest( HydrusSerialisable.SerialisableBase ):
         return actually_zero or less_than_one or less_than_or_equal_to_zero
         
     
-    def ToString( self, absolute_number_renderer: collections.abc.Callable | None = None, replacement_value_string: str | None = None, use_time_operators = False ) -> str:
+    def ToString( self, absolute_number_renderer: collections.abc.Callable | None = None, replacement_value_string: str | None = None, alternate_operator_lookup: dict[ int, str ] | None = None ) -> str:
+        
+        # TODO: instead of 'alternate operator lookup' and friends, when we move to the NumberTestValue we can just ask that guy to do ToString or whatever
+        # it can also inform operator strings to use
+        
+        if alternate_operator_lookup is None:
+            
+            operator_string = number_test_operator_to_str_lookup[ self.operator ]
+            
+        else:
+            
+            operator_string = alternate_operator_lookup[ self.operator ]
+            
         
         if absolute_number_renderer is None:
             
@@ -388,15 +418,6 @@ class NumberTest( HydrusSerialisable.SerialisableBase ):
         else:
             
             value_string = replacement_value_string
-            
-        
-        if use_time_operators:
-            
-            operator_string = number_test_operator_to_timestamp_str_lookup[ self.operator ]
-            
-        else:
-            
-            operator_string = number_test_operator_to_str_lookup[ self.operator ]
             
         
         result = f'{operator_string} {value_string}'
@@ -419,7 +440,7 @@ class NumberTest( HydrusSerialisable.SerialisableBase ):
         
     
     @staticmethod
-    def STATICCreateFromCharacters( operator_str: str, value: int ) -> "NumberTest":
+    def STATICCreateFromCharacters( operator_str: str, value: float ) -> "NumberTest":
         
         operator = number_test_str_to_operator_lookup[ operator_str ]
         

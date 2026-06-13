@@ -24,7 +24,7 @@ from hydrus.client.gui import ClientGUITopLevelWindowsPanels
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.importing import ClientGUIFileSeedCache
 from hydrus.client.gui.importing import ClientGUIGallerySeedLog
-from hydrus.client.gui.importing import ClientGUIImportOptionsLegacy
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainerButton
 from hydrus.client.gui.lists import ClientGUIListBoxes
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
@@ -37,11 +37,10 @@ from hydrus.client.gui.search import ClientGUIACDropdown
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIRegex
 from hydrus.client.importing import ClientImporting
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import CheckerImportOptions
 from hydrus.client.importing.options import FilenameTaggingOptions
-from hydrus.client.importing.options import FileImportOptionsLegacy
-from hydrus.client.importing.options import NoteImportOptionsLegacy
-from hydrus.client.importing.options import TagImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.metadata import ClientTags
 from hydrus.client.metadata import ClientTagSorting
 from hydrus.client.metadata import ClientMetadataMigrationExporters
@@ -49,9 +48,9 @@ from hydrus.client.metadata import ClientMetadataMigrationImporters
 
 class CheckerOptionsButton( ClientGUICommon.BetterButton ):
     
-    valueChanged = QC.Signal( ClientImportOptions.CheckerOptions )
+    valueChanged = QC.Signal( CheckerImportOptions.CheckerOptions )
     
-    def __init__( self, parent, checker_options: ClientImportOptions.CheckerOptions ):
+    def __init__( self, parent, checker_options: CheckerImportOptions.CheckerOptions ):
         
         super().__init__( parent, 'checker options', self._EditOptions )
         
@@ -1412,22 +1411,9 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
         self._file_limit.valueChanged.connect( self.EventFileLimit )
         self._file_limit.setToolTip( ClientGUIFunctions.WrapToolTip( 'stop searching the gallery once this many files has been reached' ) )
         
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        file_import_options.SetIsDefault( True )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
-        
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_POST_URLS, import_options_container )
         
         #
         
@@ -1455,43 +1441,25 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
         self.Add( self._import_queue_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         self.Add( self._gallery_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         self.Add( self._file_limit, CC.FLAGS_EXPAND_PERPENDICULAR )
-        self.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._SetFileImportOptions )
-        self._import_options_button.noteImportOptionsChanged.connect( self._SetNoteImportOptions )
-        self._import_options_button.tagImportOptionsChanged.connect( self._SetTagImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._NotifyImportOptionsChanged )
         
         self._file_limit.valueChanged.connect( self.importOptionsChanged )
-        self._import_options_button.importOptionsChanged.connect( self.importOptionsChanged )
+        self._import_options_container_button.importOptionsChanged.connect( self.importOptionsChanged )
         
         self._UpdateControlsForNewGalleryImport()
         
         CG.client_controller.gui.RegisterUIUpdateWindow( self )
         
     
-    def _SetFileImportOptions( self, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy ):
+    def _NotifyImportOptionsChanged( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
         if self._gallery_import is not None:
             
-            self._gallery_import.SetFileImportOptions( file_import_options )
-            
-        
-    
-    def _SetNoteImportOptions( self, note_import_options: NoteImportOptionsLegacy.NoteImportOptionsLegacy ):
-        
-        if self._gallery_import is not None:
-            
-            self._gallery_import.SetNoteImportOptions( note_import_options )
-            
-        
-    
-    def _SetTagImportOptions( self, tag_import_options: TagImportOptionsLegacy.TagImportOptionsLegacy ):
-        
-        if self._gallery_import is not None:
-            
-            self._gallery_import.SetTagImportOptions( tag_import_options )
+            self._gallery_import.SetImportOptionsContainer( import_options_container )
             
         
     
@@ -1503,7 +1471,7 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
             self._gallery_panel.setEnabled( False )
             
             self._file_limit.setEnabled( False )
-            self._import_options_button.setEnabled( False )
+            self._import_options_container_button.setEnabled( False )
             
             self._query_text.clear()
             
@@ -1524,7 +1492,7 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
             self._gallery_panel.setEnabled( True )
             
             self._file_limit.setEnabled( True )
-            self._import_options_button.setEnabled( True )
+            self._import_options_container_button.setEnabled( True )
             
             query = self._gallery_import.GetQueryText()
             
@@ -1534,13 +1502,13 @@ class GalleryImportPanel( ClientGUICommon.StaticBox ):
             
             self._file_limit.SetValue( file_limit )
             
-            file_import_options = self._gallery_import.GetFileImportOptions()
-            tag_import_options = self._gallery_import.GetTagImportOptions()
-            note_import_options = self._gallery_import.GetNoteImportOptions()
+            import_options_container = self._gallery_import.GetImportOptionsContainer()
             
-            self._import_options_button.SetFileImportOptions( file_import_options )
-            self._import_options_button.SetTagImportOptions( tag_import_options )
-            self._import_options_button.SetNoteImportOptions( note_import_options )
+            self._import_options_container_button.blockSignals( True )
+            
+            self._import_options_container_button.SetValue( import_options_container )
+            
+            self._import_options_container_button.blockSignals( False )
             
             file_seed_cache = self._gallery_import.GetFileSeedCache()
             
@@ -1879,28 +1847,15 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
         
         self._gallery_seed_log_control = ClientGUIGallerySeedLog.GallerySeedLogStatusControl( checker_panel, True, False, 'check', page_key = self._page_key )
         
-        checker_options = ClientImportOptions.CheckerOptions()
+        checker_options = CheckerImportOptions.CheckerOptions()
         
         self._checker_options_button = CheckerOptionsButton( checker_panel, checker_options )
         
         self._checker_download_control = ClientGUINetworkJobControl.NetworkJobControl( checker_panel )
         
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        file_import_options.SetIsDefault( True )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-        
-        note_import_options = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        note_import_options.SetIsDefault( True )
-        
-        show_downloader_options = True
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
-        self._import_options_button.SetTagImportOptions( tag_import_options )
-        self._import_options_button.SetNoteImportOptions( note_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_WATCHER_URLS, import_options_container )
         
         #
         
@@ -1941,18 +1896,16 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
         self.Add( self._watcher_subject, CC.FLAGS_EXPAND_PERPENDICULAR )
         self.Add( self._watcher_url, CC.FLAGS_EXPAND_PERPENDICULAR )
         self.Add( self._options_panel, CC.FLAGS_EXPAND_SIZER_BOTH_WAYS )
-        self.Add( self._import_options_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+        self.Add( self._import_options_container_button, CC.FLAGS_EXPAND_PERPENDICULAR )
         
         #
         
-        self._import_options_button.fileImportOptionsChanged.connect( self._SetFileImportOptions )
-        self._import_options_button.noteImportOptionsChanged.connect( self._SetNoteImportOptions )
-        self._import_options_button.tagImportOptionsChanged.connect( self._SetTagImportOptions )
+        self._import_options_container_button.importOptionsChanged.connect( self._NotifyImportOptionsChanged )
         
         self._checker_options_button.valueChanged.connect( self._SetCheckerOptions )
         
         self._checker_options_button.valueChanged.connect( self.importOptionsChanged )
-        self._import_options_button.importOptionsChanged.connect( self.importOptionsChanged )
+        self._import_options_container_button.importOptionsChanged.connect( self.importOptionsChanged )
         
         self._UpdateControlsForNewWatcher()
         
@@ -1967,27 +1920,11 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
             
         
     
-    def _SetFileImportOptions( self, file_import_options ):
+    def _NotifyImportOptionsChanged( self, import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
         
         if self._watcher is not None:
             
-            self._watcher.SetFileImportOptions( file_import_options )
-            
-        
-    
-    def _SetNoteImportOptions( self, note_import_options ):
-        
-        if self._watcher is not None:
-            
-            self._watcher.SetNoteImportOptions( note_import_options )
-            
-        
-    
-    def _SetTagImportOptions( self, tag_import_options ):
-        
-        if self._watcher is not None:
-            
-            self._watcher.SetTagImportOptions( tag_import_options )
+            self._watcher.SetImportOptionsContainer( import_options_container )
             
         
     
@@ -1997,7 +1934,7 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
             
             self._options_panel.setEnabled( False )
             
-            self._import_options_button.setEnabled( False )
+            self._import_options_container_button.setEnabled( False )
             
             self._watcher_subject.clear()
             
@@ -2020,7 +1957,7 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
             
             self._options_panel.setEnabled( True )
             
-            self._import_options_button.setEnabled( True )
+            self._import_options_container_button.setEnabled( True )
             
             if self._watcher.HasURL():
                 
@@ -2037,13 +1974,13 @@ class WatcherReviewPanel( ClientGUICommon.StaticBox ):
             
             self._checker_options_button.SetValue( checker_options )
             
-            file_import_options = self._watcher.GetFileImportOptions()
-            tag_import_options = self._watcher.GetTagImportOptions()
-            note_import_options = self._watcher.GetNoteImportOptions()
+            import_options_container = self._watcher.GetImportOptionsContainer()
             
-            self._import_options_button.SetFileImportOptions( file_import_options )
-            self._import_options_button.SetTagImportOptions( tag_import_options )
-            self._import_options_button.SetNoteImportOptions( note_import_options )
+            self._import_options_container_button.blockSignals( True )
+            
+            self._import_options_container_button.SetValue( import_options_container )
+            
+            self._import_options_container_button.blockSignals( False )
             
             file_seed_cache = self._watcher.GetFileSeedCache()
             

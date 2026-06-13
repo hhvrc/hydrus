@@ -997,6 +997,11 @@ class ServiceRemote( Service ):
     
     def _CheckCanCommunicateExternally( self, including_bandwidth = True ):
         
+        if CG.client_controller.new_options.GetBoolean( 'pause_all_new_network_traffic' ):
+            
+            raise HydrusExceptions.CancelledException( 'All network traffic is paused!' )
+            
+        
         if not HydrusTime.TimeHasPassed( self._no_requests_until ):
             
             raise HydrusExceptions.InsufficientCredentialsException( self._no_requests_reason + ' - next request ' + HydrusTime.TimestampToPrettyTimeDelta( self._no_requests_until ) )
@@ -1097,6 +1102,13 @@ class ServiceRemote( Service ):
     
 class ServiceRestricted( ServiceRemote ):
     
+    def __init__( self, *args, **kwargs ):
+        
+        super().__init__( *args, **kwargs )
+        
+        self._currently_syncing_account = False
+        
+    
     def _DealWithAccountError( self ):
         
         account_key = self._account.GetAccountKey()
@@ -1139,25 +1151,11 @@ class ServiceRestricted( ServiceRemote ):
             
         
     
-    def _CanSyncAccount( self, including_external_communication = True ):
-        
-        try:
-            
-            self._CheckFunctional( including_external_communication = including_external_communication, including_account = False )
-            
-            return True
-            
-        except Exception as e:
-            
-            return False
-            
-        
-    
     def _CheckFunctional( self, including_external_communication = True, including_bandwidth = True, including_account = True ):
         
         if self._network_sync_paused:
             
-            raise HydrusExceptions.ConflictException( 'Repository is paused!' )
+            raise HydrusExceptions.ConflictException( 'This repository is paused!' )
             
         
         if including_account:
@@ -1240,14 +1238,6 @@ class ServiceRestricted( ServiceRemote ):
     def _UpdateServiceOptions( self, service_options ):
         
         self._service_options.update( service_options )
-        
-    
-    def CanSyncAccount( self, including_external_communication = True ):
-        
-        with self._lock:
-            
-            return self._CanSyncAccount( including_external_communication = including_external_communication )
-            
         
     
     def CheckFunctional( self, including_external_communication = True, including_bandwidth = True, including_account = True ):
@@ -1530,36 +1520,60 @@ class ServiceRestricted( ServiceRemote ):
         
         with self._lock:
             
+            if self._currently_syncing_account:
+                
+                raise HydrusExceptions.CancelledException( 'An account sync is already happening!' )
+                
+            
             ( original_message, original_message_created ) = self._account.GetMessageAndTimestamp()
             
             name = self._name
+            service_type = self._service_type
+            
+            do_it = True
             
             if force:
                 
-                do_it = True
-                
                 self._no_requests_until = 0
                 
-                self._account = HydrusNetwork.Account.GenerateUnknownAccount()
+                try:
+                    
+                    self._CheckCanCommunicateExternally( including_bandwidth = False )
+                    
+                except Exception as e_check:
+                    
+                    raise HydrusExceptions.CancelledException( e_check )
+                    
                 
             else:
                 
-                if not self._CanSyncAccount():
+                try:
                     
-                    do_it = False
+                    self._CheckFunctional( including_external_communication = True, including_account = False )
+                    
+                except Exception as e_check:
                     
                     self._next_account_sync = HydrusTime.GetNow() + SHORT_DELAY_PERIOD
                     
                     self._SetDirty()
                     
-                else:
+                    raise HydrusExceptions.CancelledException( e_check )
                     
-                    do_it = HydrusTime.TimeHasPassed( self._next_account_sync )
-                    
+                
+                do_it = HydrusTime.TimeHasPassed( self._next_account_sync )
+                
+            
+            if do_it:
+                
+                self._currently_syncing_account = True
+                
+            else:
+                
+                return
                 
             
         
-        if do_it:
+        try:
             
             try:
                 
@@ -1586,59 +1600,62 @@ class ServiceRestricted( ServiceRemote ):
                         
                     
                 
-                try:
-                    
-                    options_response = self.Request( HC.GET, 'options' )
-                    
-                    with self._lock:
-                        
-                        service_options = options_response[ 'service_options' ]
-                        
-                        self._UpdateServiceOptions( service_options )
-                        
-                    
-                except HydrusExceptions.SerialisationException:
-                    
-                    pass
-                    
-                
-                if self._service_type == HC.TAG_REPOSITORY:
+                if self.IsFunctional():
                     
                     try:
                         
-                        tag_filter_response = self.Request( HC.GET, 'tag_filter' )
+                        options_response = self.Request( HC.GET, 'options' )
                         
                         with self._lock:
                             
-                            tag_filter = tag_filter_response[ 'tag_filter' ]
+                            service_options = options_response[ 'service_options' ]
                             
-                            if 'tag_filter' in self._service_options and CG.client_controller.new_options.GetBoolean( 'advanced_mode' ):
-                                
-                                old_tag_filter = self._service_options[ 'tag_filter' ]
-                                
-                                if old_tag_filter != tag_filter:
-                                    
-                                    try:
-                                        
-                                        summary = tag_filter.GetChangesSummaryText( old_tag_filter )
-                                        
-                                        message = 'The tag filter for "{}" just changed! Changes are:{}{}'.format( self._name, '\n' * 2, summary )
-                                        
-                                        HydrusData.ShowText( message )
-                                        
-                                    except Exception as e:
-                                        
-                                        pass
-                                        
-                                    
-                                
-                            
-                            self._SetNewTagFilter( tag_filter )
+                            self._UpdateServiceOptions( service_options )
                             
                         
-                    except Exception: # any exception, screw it
+                    except Exception as e:
                         
                         pass
+                        
+                    
+                    if service_type == HC.TAG_REPOSITORY:
+                        
+                        try:
+                            
+                            tag_filter_response = self.Request( HC.GET, 'tag_filter' )
+                            
+                            with self._lock:
+                                
+                                tag_filter = tag_filter_response[ 'tag_filter' ]
+                                
+                                if 'tag_filter' in self._service_options and CG.client_controller.new_options.GetBoolean( 'advanced_mode' ):
+                                    
+                                    old_tag_filter = self._service_options[ 'tag_filter' ]
+                                    
+                                    if old_tag_filter != tag_filter:
+                                        
+                                        try:
+                                            
+                                            summary = tag_filter.GetChangesSummaryText( old_tag_filter )
+                                            
+                                            message = 'The tag filter for "{}" just changed! Changes are:{}{}'.format( self._name, '\n' * 2, summary )
+                                            
+                                            HydrusData.ShowText( message )
+                                            
+                                        except Exception as e:
+                                            
+                                            pass
+                                            
+                                        
+                                    
+                                
+                                self._SetNewTagFilter( tag_filter )
+                                
+                            
+                        except Exception as e:
+                            
+                            pass
+                            
                         
                     
                 
@@ -1668,21 +1685,24 @@ class ServiceRestricted( ServiceRemote ):
                     raise
                     
                 
-            finally:
+            
+        finally:
+            
+            with self._lock:
                 
-                with self._lock:
-                    
-                    self._next_account_sync = HydrusTime.GetNow() + ACCOUNT_SYNC_PERIOD
-                    
-                    self._SetDirty()
-                    
+                self._currently_syncing_account = False
                 
-                CG.client_controller.pub( 'notify_new_permissions' )
-                CG.client_controller.pub( 'important_dirt_to_clean' )
+                self._next_account_sync = HydrusTime.GetNow() + ACCOUNT_SYNC_PERIOD
                 
+                self._SetDirty()
+                
+            
+            CG.client_controller.pub( 'notify_new_permissions' )
+            CG.client_controller.pub( 'important_dirt_to_clean' )
             
         
     
+
 class ServiceRepository( ServiceRestricted ):
     
     def __init__( self, service_key, service_type, name, dictionary = None ):

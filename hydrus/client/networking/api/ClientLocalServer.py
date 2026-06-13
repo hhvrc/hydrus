@@ -43,6 +43,7 @@ class HydrusServiceClientAPI( HydrusClientService ):
         root = HydrusClientService._InitRoot( self )
         
         root.putChild( b'api_version', ClientLocalServerResourcesAccess.HydrusResourceClientAPIVersion( self._service, self._client_requests_domain ) )
+        root.putChild( b'client_info', ClientLocalServerResourcesAccess.HydrusResourceClientAPIRestrictedAccountClientInfo( self._service, self._client_requests_domain ) )
         root.putChild( b'request_new_permissions', ClientLocalServerResourcesAccess.HydrusResourceClientAPIPermissionsRequest( self._service, self._client_requests_domain ) )
         root.putChild( b'session_key', ClientLocalServerResourcesAccess.HydrusResourceClientAPIRestrictedAccountSessionKey( self._service, self._client_requests_domain ) )
         root.putChild( b'verify_access_key', ClientLocalServerResourcesAccess.HydrusResourceClientAPIRestrictedAccountVerify( self._service, self._client_requests_domain ) )

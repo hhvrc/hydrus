@@ -397,9 +397,9 @@ class SidebarQuery( ClientGUISidebarCore.Sidebar ):
         self._query_job_status.Cancel()
         
     
-    def EnterPredicates( self, page_key, predicates ):
+    def EnterPredicates( self, predicates: list[ ClientSearchPredicate.Predicate ] ):
         
-        self._tag_autocomplete.EnterPredicates( page_key, predicates )
+        self._tag_autocomplete.EnterPredicates( predicates )
         
     
     def GetPredicates( self ):

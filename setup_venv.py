@@ -220,18 +220,18 @@ def process_advanced_options( requirements_dict: dict[ str, str | None ] ):
         requirements_dict[ 'opencv-python-headless' ] = '==4.13.0.92'
         requirements_dict[ 'numpy' ] = '==2.4.1'
         
-    '''
+    
     # Future libraries
     print()
     print( 'Future Libraries' )
-    print( 'There is a test for a new domain parsing library. Want to try it?' )
+    print( 'There is a test for curl_cffi. Want to try it?' )
     future = get_user_choice( 'Future libraries (y/n)', ( 'y', 'n' ), 'n' )
     
     if future == 'y':
         
-        requirements_dict[ 'tldextract' ] = '==5.3.1'
+        requirements_dict[ 'curl-cffi' ] = '==0.15.0'
         
-    '''
+    
     # Dev mode
     print()
     print( 'Development Tools' )
@@ -240,12 +240,12 @@ def process_advanced_options( requirements_dict: dict[ str, str | None ] ):
     
     if dev == 'y':
         
-        requirements_dict[ 'httmock' ] = '>=1.4.0'
+        requirements_dict[ 'httmock' ] = '<=1.4.0'
         requirements_dict[ 'mkdocs-material' ] = '==9.7.1'
         
     
 
-def create_venv(venv_path):
+def create_venv( venv_path ):
     
     print( '--------' )
     print( 'Creating new venv...' )
@@ -324,27 +324,27 @@ def main():
         # we are basically just being a requirements.txt in code; I care not
         
         requirements_dict = {
-            'beautifulsoup4' : '>=4.0.0',
-            'cbor2' : '>=5.6.5',
-            'chardet' : '>=3.0.4,<8',
-            'cryptography' : '>=44.0.0',
-            'html5lib' : '>=1.0.1',
-            'lxml' : '>=4.5.0',
-            'lz4' : '>=3.0.0',
-            'olefile' : '>=0.47',
-            'pillow' : '>=10.0.1',
-            'pillow-heif' : '>=0.12.0',
-            'pillow-jxl-plugin' : '>=1.3.0',
-            'psutil' : '>=5.0.0',
-            'pympler' : '>=1.1',
-            'pyopenssl' : '>=19.1.0',
-            'pysocks' : '>=1.7.0',
-            'python-dateutil' : '>=2.9.0.post0',
-            'pyyaml' : '>=5.0.0',
-            'send2trash' : '>=1.5.0',
-            'service-identity' : '>=18.1.0',
-            'show-in-file-manager' : '>=1.1.5',
-            'twisted[http2,tls]' : '>=20.3.0',
+            'beautifulsoup4' : '<=4.14.3',
+            'cbor2' : '<=6.1.1',
+            'chardet' : '<=7.4.3',
+            'cryptography' : '<=48.0.0',
+            'html5lib' : '<=1.1',
+            'lxml' : '<=6.1.1',
+            'lz4' : '<=4.4.5',
+            'olefile' : '<=0.47',
+            'pillow' : '<=12.2.0',
+            'pillow-heif' : '<=1.3.0',
+            'pillow-jxl-plugin' : '<=1.3.7',
+            'psutil' : '<=7.2.2',
+            'pympler' : '<=1.1',
+            'pyopenssl' : '<=26.2.0',
+            'pysocks' : '<=1.7.1',
+            'python-dateutil' : '<=2.9.0.post0',
+            'pyyaml' : '<=6.0.3',
+            'send2trash' : '<=2.1.0',
+            'service-identity' : '<=24.2.0',
+            'show-in-file-manager' : '<=1.1.6',
+            'twisted[http2,tls]' : '<=26.4.0',
             'mpv' : '==1.0.8',
             'opencv-python-headless' : '==4.12.0.88',
             'numpy' : '<=2.3.1',
@@ -359,7 +359,7 @@ def main():
             
             requirements_dict.update(
                 {
-                    'pywin32' : None,
+                    'pywin32' : '<=311',
                 }
             )
             
@@ -367,9 +367,9 @@ def main():
             
             requirements_dict.update(
                 {
-                    'pyobjc-core' : '>=10.1',
-                    'pyobjc-framework-cocoa' : '>=10.1',
-                    'pyobjc-framework-quartz' : '>=10.1',
+                    'pyobjc-core' : '<=12.1',
+                    'pyobjc-framework-cocoa' : '<=12.1',
+                    'pyobjc-framework-quartz' : '<=12.1',
                 }
             )
             

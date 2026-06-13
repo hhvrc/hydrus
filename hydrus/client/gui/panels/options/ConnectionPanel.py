@@ -1,7 +1,12 @@
 from qtpy import QtWidgets as QW
+import re
+
+from hydrus.core import HydrusExceptions
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
+from hydrus.client.gui import ClientGUIDialogsMessage
+from hydrus.client.gui import ClientGUIDialogsQuick
 from hydrus.client.gui import ClientGUIFunctions
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.metadata import ClientGUITime
@@ -70,6 +75,11 @@ class ConnectionPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._do_not_verify_regular_https = QW.QCheckBox( general )
         self._do_not_verify_regular_https.setToolTip( ClientGUIFunctions.WrapToolTip( 'This will not verify any HTTPS traffic. This tech is important for security, so only enable this mode temporarily, to test out unusual situations.' ) )
         
+        self._curl_cffi_definition = ClientGUICommon.NoneableTextCtrl( general, default_text = '', placeholder_text = 'browser name', none_phrase = 'do not run the test' )
+        self._curl_cffi_definition.setToolTip( ClientGUIFunctions.WrapToolTip( 'This will engage the curl_cffi test globally. Make sure you have the module installed and that the text here is a valid browser definition for curl_cffi.' ) )
+        
+        self._fetch_curl_cffi_names_button = ClientGUICommon.BetterButton( general, 'fetch browser names', self._FetchCURLCFFIBrowserNames )
+        
         #
         
         proxy_panel = ClientGUICommon.StaticBox( self, 'proxy settings' )
@@ -91,6 +101,8 @@ class ConnectionPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         self._set_requests_ca_bundle_env.setChecked( self._new_options.GetBoolean( 'set_requests_ca_bundle_env' ) )
         self._do_not_verify_regular_https.setChecked( not self._new_options.GetBoolean( 'verify_regular_https' ) )
+        
+        self._curl_cffi_definition.SetValue( self._new_options.GetNoneableString( 'curl_cffi_definition' ) )
         
         self._http_proxy.SetValue( self._new_options.GetNoneableString( 'http_proxy' ) )
         self._https_proxy.SetValue( self._new_options.GetNoneableString( 'https_proxy' ) )
@@ -136,6 +148,8 @@ class ConnectionPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         rows.append( ( 'max number of simultaneous active network jobs per domain: ', self._max_network_jobs_per_domain ) )
         rows.append( ( 'DEBUG: set the REQUESTS_CA_BUNDLE env to certifi cacert.pem on program start:', self._set_requests_ca_bundle_env ) )
         rows.append( ( 'DEBUG: do not verify regular https traffic:', self._do_not_verify_regular_https ) )
+        rows.append( ( 'TEST: run the curl_cffi test with this browser definition:', self._curl_cffi_definition ) )
+        rows.append( ( '', self._fetch_curl_cffi_names_button ) )
         
         gridbox = ClientGUICommon.WrapInGrid( general, rows )
         
@@ -186,10 +200,60 @@ class ConnectionPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self.setLayout( vbox )
         
     
+    def _FetchCURLCFFIBrowserNames( self ):
+        
+        from hydrus.client.networking import ClientNetworkingCurlCFFI
+        
+        if not ClientNetworkingCurlCFFI.CURL_CFFI_OK:
+            
+            ClientGUIDialogsMessage.ShowWarning( self, 'Sorry, it looks like you do not have curl_cffi!' )
+            
+            return
+            
+        
+        browser_names = ClientNetworkingCurlCFFI.GetBrowserNames()
+        
+        message = 'Want the simple definitions, or all the individual versions?'
+        
+        yes_tuples = []
+        
+        yes_tuples.append( ( 'simple', True ) )
+        yes_tuples.append( ( 'everything', False ) )
+        
+        try:
+            
+            go_simple = ClientGUIDialogsQuick.GetYesYesNo( self, message, yes_tuples = yes_tuples, no_label = 'forget it' )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        if go_simple:
+            
+            browser_names = [ name for name in browser_names if re.search( r'\d', name ) is None ]
+            
+        
+        choice_tuples = [ ( name, name, f'Use curl_cffi with the {name} definition.' ) for name in browser_names ]
+        
+        try:
+            
+            browser_name = ClientGUIDialogsQuick.SelectFromListButtons( self, 'select name', choice_tuples, message = 'Official curl_cffi docs recommend "chrome" or "safari", or "chrome_android" or "safari_ios", if you are not sure.' )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return
+            
+        
+        self._curl_cffi_definition.SetValue( browser_name )
+        
+    
     def UpdateOptions( self ):
         
         self._new_options.SetBoolean( 'set_requests_ca_bundle_env', self._set_requests_ca_bundle_env.isChecked() )
         self._new_options.SetBoolean( 'verify_regular_https', not self._do_not_verify_regular_https.isChecked() )
+        
+        self._new_options.SetNoneableString( 'curl_cffi_definition', self._curl_cffi_definition.GetValue() )
         
         self._new_options.SetNoneableString( 'http_proxy', self._http_proxy.GetValue() )
         self._new_options.SetNoneableString( 'https_proxy', self._https_proxy.GetValue() )

@@ -1,10 +1,14 @@
 from hydrus.core import HydrusSerialisable
 
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+
 DO_NOT_CHECK = 0
 DO_CHECK = 1
 DO_CHECK_AND_MATCHES_ARE_DISPOSITIVE = 2
 
-class PrefetchImportOptions( HydrusSerialisable.SerialisableBase ):
+class PrefetchImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_PREFETCH
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_PREFETCH_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Prefetch Import Options'
@@ -99,9 +103,11 @@ class PrefetchImportOptions( HydrusSerialisable.SerialisableBase ):
         return self._preimport_url_check_type
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         statements = []
+        
+        show_downloader_options = import_options_caller_type not in IOC.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
         
         if not show_downloader_options:
             

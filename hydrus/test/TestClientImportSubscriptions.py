@@ -12,7 +12,7 @@ from hydrus.client import ClientDefaults
 from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing import ClientImportGallerySeeds
 from hydrus.client.importing import ClientImportSubscriptionQuery
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import CheckerImportOptions
 from hydrus.client.networking import ClientNetworking
 from hydrus.client.networking import ClientNetworkingBandwidth
 from hydrus.client.networking import ClientNetworkingDomain
@@ -113,7 +113,7 @@ PRETEND_NOW = 150000000
 
 def flesh_out_with_stuff(
     query_header: ClientImportSubscriptionQuery.SubscriptionQueryHeader,
-    checker_options: ClientImportOptions.CheckerOptions,
+    checker_options: CheckerImportOptions.CheckerOptions,
     query_log_container: ClientImportSubscriptionQuery.SubscriptionQueryLogContainer,
     with_outstanding_files: bool,
     is_dead: bool
@@ -173,7 +173,7 @@ def flesh_out_with_stuff(
         
     
 
-def generate_query_header( query_text: str, checker_options: ClientImportOptions.CheckerOptions, query_log_container: ClientImportSubscriptionQuery.SubscriptionQueryLogContainer ) -> ClientImportSubscriptionQuery.SubscriptionQueryHeader:
+def generate_query_header( query_text: str, checker_options: CheckerImportOptions.CheckerOptions, query_log_container: ClientImportSubscriptionQuery.SubscriptionQueryLogContainer ) -> ClientImportSubscriptionQuery.SubscriptionQueryHeader:
     
     query_header = ClientImportSubscriptionQuery.SubscriptionQueryHeader()
     
@@ -194,9 +194,9 @@ def generate_query_log_container() -> ClientImportSubscriptionQuery.Subscription
     return query_log_container
     
 
-def generate_typical_checker_options() -> ClientImportOptions.CheckerOptions:
+def generate_typical_checker_options() -> CheckerImportOptions.CheckerOptions:
     
-    return ClientImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 86400, never_slower_than = 90 * 86400, death_file_velocity = ( 1, 180 * 86400 ) )
+    return CheckerImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 86400, never_slower_than = 90 * 86400, death_file_velocity = (1, 180 * 86400) )
     
 
 def generate_empty_query_header( query_text: str ) -> ClientImportSubscriptionQuery.SubscriptionQueryHeader:

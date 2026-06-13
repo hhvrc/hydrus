@@ -7,13 +7,10 @@ import threading
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
-from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusNumbers
-from hydrus.core import HydrusPaths
 from hydrus.core import HydrusTime
-from hydrus.core.files import HydrusFileHandling
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
@@ -27,77 +24,15 @@ from hydrus.client.gui import ClientGUIFunctions
 from hydrus.client.gui import ClientGUITopLevelWindowsPanels
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.importing import ClientGUIImport
-from hydrus.client.gui.importing import ClientGUIImportOptionsLegacy
+from hydrus.client.gui.importing import ClientGUIImportOptionsContainerButton
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.widgets import ClientGUICommon
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing import ClientImportLocalFileParse
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.metadata import ClientTags
-
-RESULT_NOT_PARSED = 0
-RESULT_GOOD = 1
-RESULT_EMPTY = 2
-RESULT_MISSING = 3
-RESULT_UNIMPORTABLE = 4
-RESULT_OCCUPIED = 5
-RESULT_SIDECAR = 6
-RESULT_DIRECTORY = 7
-
-result_str_lookup = {    
-    RESULT_NOT_PARSED : 'not yet parsed',
-    RESULT_GOOD : 'good (you should not see this)',
-    RESULT_EMPTY : 'PROBLEM: file empty',
-    RESULT_MISSING : 'PROBLEM: file missing',
-    RESULT_UNIMPORTABLE : 'PROBLEM: filetype unsupported',
-    RESULT_OCCUPIED : 'PROBLEM: file in use by other program',
-    RESULT_SIDECAR : 'sidecar',
-    RESULT_DIRECTORY : 'directory (you should not see this)'
-}
-
-class LocalFileParse( object ):
-    
-    def __init__( self, path: str ):
-        
-        self.path = path
-        self.result = RESULT_NOT_PARSED
-        self.index = 0
-        self.mime = HC.APPLICATION_UNKNOWN
-        self.size = 0
-        
-    
-    def __eq__( self, other ):
-        
-        if isinstance( other, LocalFileParse ):
-            
-            return self.__hash__() == other.__hash__()
-            
-        
-        return NotImplemented
-        
-    
-    def __hash__( self ):
-        
-        return self.path.__hash__()
-        
-    
-    def GetPrettyMime( self ):
-        
-        if self.result == RESULT_GOOD:
-            
-            return HC.mime_string_lookup[ self.mime ]
-            
-        else:
-            
-            return result_str_lookup[ self.result ]
-            
-        
-    
-    def IsDir( self ):
-        
-        return os.path.isdir( self.path )
-        
-    
 
 class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
     
@@ -146,15 +81,9 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         self._progress_cancel = ClientGUICommon.IconButton( self, CC.global_icons().stop, self.Cancel )
         self._progress_cancel.setEnabled( False )
         
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        file_import_options.SetIsDefault( True )
+        import_options_container = ImportOptionsContainer.ImportOptionsContainer()
         
-        show_downloader_options = False
-        allow_default_selection = True
-        
-        self._import_options_button = ClientGUIImportOptionsLegacy.ImportOptionsButton( self, show_downloader_options, allow_default_selection )
-        
-        self._import_options_button.SetFileImportOptions( file_import_options )
+        self._import_options_container_button = ClientGUIImportOptionsContainerButton.SpecificImportOptionsContainerButton( self, IOC.IMPORT_OPTIONS_CALLER_TYPE_LOCAL_IMPORT, import_options_container )
         
         self._delete_after_success_st = ClientGUICommon.BetterStaticText( self )
         self._delete_after_success_st.setAlignment( QC.Qt.AlignmentFlag.AlignRight | QC.Qt.AlignmentFlag.AlignVCenter )
@@ -184,7 +113,7 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         
         import_options_buttons = QP.HBoxLayout()
         
-        QP.AddToLayout( import_options_buttons, self._import_options_button, CC.FLAGS_CENTER )
+        QP.AddToLayout( import_options_buttons, self._import_options_container_button, CC.FLAGS_CENTER )
         
         buttons = QP.HBoxLayout()
         
@@ -226,7 +155,7 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         
         for path in paths:
             
-            local_file_parse = LocalFileParse( path )
+            local_file_parse = ClientImportLocalFileParse.LocalFileParse( path )
             
             # don't do a 'if not path_list.has( path )' here. user appreciates the flicker of feedback to see the dupe checked and discounted
             # subfolders don't fit this test anyway, so we are only talking about clumps of files. no worries about wasted time
@@ -247,7 +176,7 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         
         if len( good_paths ) > 0:
             
-            file_import_options = self._import_options_button.GetFileImportOptions()
+            import_options_container = self._import_options_container_button.GetValue()
             
             with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'filename tagging', frame_key = 'local_import_filename_tagging' ) as dlg:
                 
@@ -261,7 +190,7 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                     
                     delete_after_success = self._delete_after_success.isChecked()
                     
-                    CG.client_controller.pub( 'new_hdd_import', good_paths, file_import_options, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
+                    CG.client_controller.pub( 'new_hdd_import', good_paths, import_options_container, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
                     
                     self._OKParent()
                     
@@ -269,13 +198,13 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
             
         
     
-    def _ConvertPathToDisplayTuple( self, local_file_parse: LocalFileParse ):
+    def _ConvertPathToDisplayTuple( self, local_file_parse: ClientImportLocalFileParse.LocalFileParse ):
         
         pretty_index = HydrusNumbers.ToHumanInt( local_file_parse.index )
         
         path = local_file_parse.path
         
-        if local_file_parse.result in ( RESULT_MISSING, RESULT_OCCUPIED ):
+        if local_file_parse.result in ( ClientImportLocalFileParse.RESULT_MISSING, ClientImportLocalFileParse.RESULT_OCCUPIED ):
             
             pretty_size = '-'
             
@@ -291,12 +220,12 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         return display_tuple
         
     
-    def _ConvertPathToSortTuple( self, local_file_parse: LocalFileParse ):
+    def _ConvertPathToSortTuple( self, local_file_parse: ClientImportLocalFileParse.LocalFileParse ):
         
         sort_tuple = (
             local_file_parse.index,
             local_file_parse.path,
-            ( local_file_parse.result != RESULT_GOOD, local_file_parse.GetPrettyMime() ),
+            ( local_file_parse.result != ClientImportLocalFileParse.RESULT_GOOD, local_file_parse.GetPrettyMime() ),
             local_file_parse.size
         )
         
@@ -305,18 +234,20 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
     
     def _DoImport( self ):
         
+        # TODO: Here and in _AddTags, rework the pipeline so we don't pass 'good_paths', but 'good_local_file_parses' and then our fileseeds can intelligently inherit the parsed size and mime
+        # fileseeds will need to navigate that capability too obviously
         good_paths = self._GetGoodPaths()
         
         if len( good_paths ) > 0:
             
-            file_import_options = self._import_options_button.GetFileImportOptions()
+            import_options_container = self._import_options_container_button.GetValue()
             
             metadata_routers = []
             paths_to_additional_service_keys_to_tags = collections.defaultdict( ClientTags.ServiceKeysToTags )
             
             delete_after_success = self._delete_after_success.isChecked()
             
-            CG.client_controller.pub( 'new_hdd_import', good_paths, file_import_options, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
+            CG.client_controller.pub( 'new_hdd_import', good_paths, import_options_container, metadata_routers, paths_to_additional_service_keys_to_tags, delete_after_success )
             
         
         self._OKParent()
@@ -329,9 +260,9 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
     
     def _GetGoodPaths( self ):
         
-        local_file_parses: list[ LocalFileParse ] = sorted( self._paths_list.GetData(), key = lambda lfp: lfp.index )
+        local_file_parses: list[ ClientImportLocalFileParse.LocalFileParse ] = sorted( self._paths_list.GetData(), key = lambda lfp: lfp.index )
         
-        good_paths = [ local_file_parse.path for local_file_parse in local_file_parses if local_file_parse.result == RESULT_GOOD ]
+        good_paths = [ local_file_parse.path for local_file_parse in local_file_parses if local_file_parse.result == ClientImportLocalFileParse.RESULT_GOOD ]
         
         return good_paths
         
@@ -380,7 +311,7 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                 
                 try:
                     
-                    local_file_parse: LocalFileParse = unparsed_paths_queue.get( block = False )
+                    local_file_parse: ClientImportLocalFileParse.LocalFileParse = unparsed_paths_queue.get( block = False )
                     
                 except queue.Empty:
                     
@@ -389,10 +320,10 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                 
                 path = local_file_parse.path
                 
-                # do dir/file here I guess
-                
                 if local_file_parse.IsDir():
                     
+                    # TODO: rework this guy and Import Folders relatedly to use LocalFileParse
+                    # probably make a LocalDirParse or something too
                     ( new_file_paths, sidecar_paths ) = ClientFiles.GetAllFilePaths(
                         path,
                         search_subdirectories = search_subdirectories,
@@ -401,16 +332,16 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                     
                     for new_file_path in new_file_paths:
                         
-                        new_local_file_parse = LocalFileParse( new_file_path )
+                        new_local_file_parse = ClientImportLocalFileParse.LocalFileParse( new_file_path )
                         
                         unparsed_paths_queue.put( new_local_file_parse )
                         
                     
                     for sidecar_path in sidecar_paths:
                         
-                        sidecar_local_file_parse = LocalFileParse( sidecar_path )
+                        sidecar_local_file_parse = ClientImportLocalFileParse.LocalFileParse( sidecar_path )
                         
-                        sidecar_local_file_parse.result = RESULT_SIDECAR
+                        sidecar_local_file_parse.result = ClientImportLocalFileParse.RESULT_SIDECAR
                         
                         try:
                             
@@ -424,83 +355,11 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                         parsed_paths_queue.put( sidecar_local_file_parse )
                         
                     
-                    local_file_parse.result = RESULT_DIRECTORY
+                    local_file_parse.result = ClientImportLocalFileParse.RESULT_DIRECTORY
                     
                 else:
                     
-                    ClientFiles.PopulateComparableSidecarPrefixes( [ path ], comparable_sidecar_prefixes )
-                    
-                    if not os.path.exists( path ):
-                        
-                        HydrusData.Print( 'Missing file: ' + path )
-                        
-                        local_file_parse.result = RESULT_MISSING
-                        
-                    elif not HydrusPaths.PathIsFree( path ):
-                        
-                        HydrusData.Print( 'File currently in use: ' + path )
-                        
-                        local_file_parse.result = RESULT_OCCUPIED
-                        
-                    elif ClientFiles.LooksLikeSidecarPath( path, comparable_sidecar_prefixes ):
-                        
-                        local_file_parse.result = RESULT_SIDECAR
-                        
-                    else:
-                        
-                        try:
-                            
-                            size = os.path.getsize( path )
-                            
-                        except Exception as e:
-                            
-                            size = 0
-                            
-                        
-                        local_file_parse.size = size
-                        
-                        if size == 0:
-                            
-                            HydrusData.Print( 'Empty file: ' + path )
-                            
-                            local_file_parse.result = RESULT_EMPTY
-                            
-                        elif path.endswith( os.path.sep + 'Thumbs.db' ) or path.endswith( os.path.sep + 'thumbs.db' ):
-                            
-                            HydrusData.Print( 'In import parse, skipping Thumbs.db: ' + path )
-                            
-                            local_file_parse.result = RESULT_UNIMPORTABLE
-                            
-                        else:
-                            
-                            # looks good, let's burn some CPU
-                            
-                            try:
-                                
-                                mime = HydrusFileHandling.GetMime( path )
-                                
-                            except Exception as e:
-                                
-                                HydrusData.Print( 'Problem parsing mime for: ' + path )
-                                HydrusData.PrintException( e )
-                                
-                                mime = HC.APPLICATION_UNKNOWN
-                                
-                            
-                            local_file_parse.mime = mime
-                            
-                            if mime in HC.ALLOWED_MIMES:
-                                
-                                local_file_parse.result = RESULT_GOOD
-                                
-                            else:
-                                
-                                HydrusData.Print( 'During file import scan, unparsable file: ' + path )
-                                
-                                local_file_parse.result = RESULT_UNIMPORTABLE
-                                
-                            
-                        
+                    local_file_parse.DoFileParse( comparable_sidecar_prefixes )
                     
                 
                 parsed_paths_queue.put( local_file_parse )
@@ -528,14 +387,14 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
                 
                 try:
                     
-                    local_file_parse: LocalFileParse = self._parsed_paths_queue.get( block = False )
+                    local_file_parse: ClientImportLocalFileParse.LocalFileParse = self._parsed_paths_queue.get( block = False )
                     
                 except queue.Empty:
                     
                     raise Exception( 'File parse queue was somehow empty!' )
                     
                 
-                if local_file_parse.result != RESULT_DIRECTORY:
+                if local_file_parse.result != ClientImportLocalFileParse.RESULT_DIRECTORY:
                     
                     if not self._paths_list.HasData( local_file_parse ) and local_file_parse not in stuff_to_add:
                         
@@ -569,11 +428,11 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
     def _UpdateWidgets( self ):
         
         # this guy is tricky to keep updated, so we'll just bruteforce it here mate
-        self._result_types_to_count[ RESULT_NOT_PARSED ] = self._unparsed_paths_queue.qsize()
+        self._result_types_to_count[ ClientImportLocalFileParse.RESULT_NOT_PARSED ] = self._unparsed_paths_queue.qsize()
         
-        good_files_in_list = self._result_types_to_count[ RESULT_GOOD ] > 0
+        good_files_in_list = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_GOOD ] > 0
         
-        no_work_in_queue = self._result_types_to_count[ RESULT_NOT_PARSED ] == 0
+        no_work_in_queue = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_NOT_PARSED ] == 0
         paused = self._pause_event.is_set()
         
         can_import = good_files_in_list and ( no_work_in_queue or paused )
@@ -612,18 +471,18 @@ class ReviewLocalFileImports( ClientGUIScrolledPanels.ReviewPanel ):
         #
         
         num_total_paths = sum( self._result_types_to_count.values() )
-        num_unparsed_paths = self._result_types_to_count[ RESULT_NOT_PARSED ]
+        num_unparsed_paths = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_NOT_PARSED ]
         num_files_done = num_total_paths - num_unparsed_paths
-        num_good_files = self._result_types_to_count[ RESULT_GOOD ]
+        num_good_files = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_GOOD ]
         
-        num_empty_files = self._result_types_to_count[ RESULT_EMPTY ]
-        num_unimportable = self._result_types_to_count[ RESULT_UNIMPORTABLE ]
-        num_occupied = self._result_types_to_count[ RESULT_OCCUPIED ]
-        num_missing = self._result_types_to_count[ RESULT_MISSING ]
+        num_empty_files = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_EMPTY ]
+        num_unimportable = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_UNIMPORTABLE ]
+        num_occupied = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_OCCUPIED ]
+        num_missing = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_MISSING ]
         
         num_bad_files = num_empty_files + num_unimportable + num_occupied + num_missing
         
-        num_sidecars = self._result_types_to_count[ RESULT_SIDECAR ]
+        num_sidecars = self._result_types_to_count[ ClientImportLocalFileParse.RESULT_SIDECAR ]
         
         if num_total_paths == 0:
             

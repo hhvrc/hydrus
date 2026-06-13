@@ -23,15 +23,13 @@ from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIBytes
 from hydrus.client.gui.widgets import ClientGUIMenuButton
 from hydrus.client.importing.options import FileFilteringImportOptions
-from hydrus.client.importing.options import FileImportOptionsLegacy
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import LocationImportOptions
 from hydrus.client.importing.options import NoteImportOptions
-from hydrus.client.importing.options import NoteImportOptionsLegacy
 from hydrus.client.importing.options import PrefetchImportOptions
 from hydrus.client.importing.options import PresentationImportOptions
 from hydrus.client.importing.options import TagFilteringImportOptions
 from hydrus.client.importing.options import TagImportOptions
-from hydrus.client.importing.options import TagImportOptionsLegacy
 from hydrus.client.metadata import ClientTags
 
 class EditFileFilteringImportOptionsPanel( QW.QWidget ):
@@ -162,270 +160,15 @@ class EditFileFilteringImportOptionsPanel( QW.QWidget ):
         
     
 
-class EditFileImportOptionsLegacyPanel( ClientGUIScrolledPanels.EditPanel ):
-    
-    isDefaultChanged = QC.Signal( bool )
-    
-    def __init__( self, parent: QW.QWidget, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy, show_downloader_options: bool, allow_default_selection: bool ):
-        
-        super().__init__( parent )
-        
-        help_button = ClientGUICommon.IconButton( self, CC.global_icons().help, self._ShowHelp )
-        
-        help_hbox = ClientGUICommon.WrapInText( help_button, self, 'help for this panel -->', object_name = 'HydrusIndeterminate' )
-        
-        #
-        
-        if file_import_options.IsDefault():
-            
-            file_import_options = CG.client_controller.new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_LOUD ).Duplicate()
-            
-            file_import_options.SetIsDefault( True )
-            
-        
-        #
-        
-        default_panel = ClientGUICommon.StaticBox( self, 'default options' )
-        
-        self._use_default_dropdown = ClientGUICommon.BetterChoice( default_panel )
-        
-        self._use_default_dropdown.addItem( 'use the default file import options at the time of import', True )
-        self._use_default_dropdown.addItem( 'set custom file import options just for this importer', False )
-        
-        tt = 'Normally, the client will refer to the defaults (as set under "options->importing") at the time of import.'
-        tt += '\n' * 2
-        tt += 'It is easier to work this way, since you can change a single default setting and update all current and future downloaders that refer to those defaults, whereas having specific options for every subscription or downloader means you have to update every single one just to make a little change somewhere.'
-        tt += '\n' * 2
-        tt += 'But if you are doing a one-time import that has some unusual file rules, set them here.'
-        
-        self._use_default_dropdown.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
-        
-        #
-        
-        self._load_default_options = ClientGUICommon.BetterButton( self, 'load one of the default options', self._LoadDefaultOptions )
-        
-        #
-        
-        self._specific_options_panel = QW.QWidget( self )
-        
-        #
-        
-        prefetch_import_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'prefetch', can_expand = True, start_expanded = False )
-        
-        self._prefetch_import_options_panel = EditPrefetchImportOptionsPanel( prefetch_import_panel, file_import_options.GetPrefetchImportOptions() )
-        
-        #
-        
-        file_filtering_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'file filtering' )
-        
-        self._file_filtering_import_options_panel = EditFileFilteringImportOptionsPanel( file_filtering_panel, file_import_options.GetFileFilteringImportOptions() )
-        
-        #
-        
-        self._use_default_dropdown.SetValue( file_import_options.IsDefault() )
-        
-        #
-        
-        locations_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'locations' )
-        
-        self._location_import_options_panel = EditLocationImportOptionsPanel( locations_panel, file_import_options.GetLocationImportOptions(), show_downloader_options )
-        
-        #
-        
-        presentation_static_box = ClientGUICommon.StaticBox( self._specific_options_panel, 'presentation options' )
-        
-        presentation_import_options = file_import_options.GetPresentationImportOptions()
-        
-        self._presentation_import_options_panel = EditPresentationImportOptions( presentation_static_box, presentation_import_options )
-        
-        #
-        
-        self._SetValue( file_import_options )
-        
-        #
-        
-        default_panel.Add( self._use_default_dropdown, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        if not allow_default_selection:
-            
-            default_panel.hide()
-            
-        
-        #
-        
-        prefetch_import_panel.Add( self._prefetch_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        prefetch_import_panel.setVisible( show_downloader_options )
-        
-        #
-        
-        file_filtering_panel.Add( self._file_filtering_import_options_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
-        
-        #
-        
-        locations_panel.Add( self._location_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        #
-        
-        presentation_static_box.Add( self._presentation_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        #
-        
-        specific_vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( specific_vbox, prefetch_import_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( specific_vbox, file_filtering_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
-        QP.AddToLayout( specific_vbox, locations_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( specific_vbox, presentation_static_box, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        self._specific_options_panel.setLayout( specific_vbox )
-        
-        #
-        
-        vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( vbox, help_hbox, CC.FLAGS_ON_RIGHT )
-        QP.AddToLayout( vbox, default_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._load_default_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._specific_options_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
-        vbox.addStretch( 0 )
-        
-        self.widget().setLayout( vbox )
-        
-        self._use_default_dropdown.currentIndexChanged.connect( self._UpdateIsDefault )
-        
-        self._UpdateIsDefault()
-        
-    
-    def _LoadDefaultOptions( self ):
-        
-        loud_file_import_options = CG.client_controller.new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_LOUD )
-        quiet_file_import_options = CG.client_controller.new_options.GetDefaultFileImportOptions( FileImportOptionsLegacy.IMPORT_TYPE_QUIET )
-        
-        choice_tuples = []
-        
-        choice_tuples.append( ( 'loud default', loud_file_import_options ) )
-        choice_tuples.append( ( 'quiet default', quiet_file_import_options ) )
-        
-        try:
-            
-            default_file_import_options = ClientGUIDialogsQuick.SelectFromList( self, 'Select which default', choice_tuples, sort_tuples = False )
-            
-        except HydrusExceptions.CancelledException:
-            
-            return
-            
-        
-        if default_file_import_options is None:
-            
-            return
-            
-        
-        self._SetValue( default_file_import_options )
-        
-    
-    def _SetValue( self, file_import_options: FileImportOptionsLegacy.FileImportOptionsLegacy ):
-        
-        self._use_default_dropdown.SetValue( file_import_options.IsDefault() )
-        
-        self._prefetch_import_options_panel.SetValue( file_import_options.GetPrefetchImportOptions() )
-        self._file_filtering_import_options_panel.SetValue( file_import_options.GetFileFilteringImportOptions() )
-        self._location_import_options_panel.SetValue( file_import_options.GetLocationImportOptions() )
-        self._presentation_import_options_panel.SetValue( file_import_options.GetPresentationImportOptions() )
-        
-        #
-        
-        self._UpdateIsDefault()
-        
-    
-    def _ShowHelp( self ):
-        
-        help_message = '''-exclude previously deleted files-
-
-If this is set and an incoming file has already been seen and deleted before by this client, the import will be abandoned. This is useful to make sure you do not keep importing and deleting the same bad files over and over. Files currently in the trash count as deleted.
-
--allow decompression bombs-
-
-Some images, called Decompression Bombs, consume huge amounts of memory and CPU time (typically multiple GB and 30s+) to render. These can be malicious attacks or accidentally inelegant compressions of very large images (typically 100MegaPixel+ pngs). Keep this unchecked to catch and disallow them before they blat your computer.
-
--max gif size-
-
-Some artists and over-enthusiastic fans re-encode popular webms into gif, typically so they can be viewed on simpler platforms like older phones. These people do not know what they are doing and generate 20MB, 100MB, even 220MB(!) gif files that they then upload to the boorus. Most hydrus users do not want these duplicate, bloated, bad-paletted, and CPU-laggy files on their clients, so this can probit them.
-
--archive all imports-
-
-If this is set, all successful imports will be archived rather than sent to the inbox. This applies to files 'already in db' as well (these would otherwise retain their existing inbox status unaltered).
-
--presentation options-
-
-For regular import pages, 'presentation' means if the imported file's thumbnail will be added. For quieter queues like subscriptions, it determines if the file will be in any popup message button.
-
-If you have a very large (10k+ files) file import page, consider hiding some or all of its thumbs to reduce ui lag and increase overall import speed.'''
-        
-        ClientGUIDialogsMessage.ShowInformation( self, help_message )
-        
-    
-    def _UpdateIsDefault( self ):
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        show_specific_options = not is_default
-        
-        self._load_default_options.setVisible( show_specific_options )
-        
-        self._specific_options_panel.setVisible( show_specific_options )
-        
-        if not show_specific_options:
-            
-            self.window().adjustSize()
-            
-        
-        self.isDefaultChanged.emit( is_default )
-        
-    
-    def CheckValid( self ):
-        
-        file_import_options = self.GetValue()
-        
-        try:
-            
-            file_import_options.GetLocationImportOptions().CheckReadyToImport()
-            
-        except Exception as e:
-            
-            raise HydrusExceptions.VetoException( e )
-            
-        
-    
-    def GetValue( self ) -> FileImportOptionsLegacy.FileImportOptionsLegacy:
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        file_import_options = FileImportOptionsLegacy.FileImportOptionsLegacy()
-        
-        if is_default:
-            
-            file_import_options.SetIsDefault( True )
-            
-        else:
-            
-            file_import_options.SetPrefetchImportOptions( self._prefetch_import_options_panel.GetValue() )
-            file_import_options.SetFileFilteringImportOptions( self._file_filtering_import_options_panel.GetValue() )
-            file_import_options.SetLocationImportOptions( self._location_import_options_panel.GetValue() )
-            file_import_options.SetPresentationImportOptions( self._presentation_import_options_panel.GetValue() )
-            
-        
-        return file_import_options
-        
-    
-
 class EditLocationImportOptionsPanel( QW.QWidget ):
     
     valueChanged = QC.Signal()
     
-    def __init__( self, parent: QW.QWidget, location_import_options: LocationImportOptions.LocationImportOptions, show_downloader_options: bool ):
+    def __init__( self, parent: QW.QWidget, location_import_options: LocationImportOptions.LocationImportOptions, import_options_caller_type: int ):
         
         super().__init__( parent )
+        
+        show_downloader_options = import_options_caller_type not in IOC.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
         
         #
         
@@ -769,195 +512,6 @@ Beyond that, you can filter and rename notes. Check the tooltips for more info.'
         
     
 
-class EditNoteImportOptionsLegacyPanel( QW.QWidget ):
-    
-    isDefaultChanged = QC.Signal( bool )
-    
-    def __init__( self, parent: QW.QWidget, note_import_options: NoteImportOptionsLegacy.NoteImportOptionsLegacy, allow_default_selection: bool, simple_mode = False ):
-        
-        super().__init__( parent )
-        
-        self._allow_default_selection = allow_default_selection
-        self._simple_mode = simple_mode
-        
-        #
-        
-        default_panel = ClientGUICommon.StaticBox( self, 'default options' )
-        
-        self._use_default_dropdown = ClientGUICommon.BetterChoice( default_panel )
-        
-        self._use_default_dropdown.addItem( 'use the default note import options at the time of import', True )
-        self._use_default_dropdown.addItem( 'set custom note import options just for this importer', False )
-        
-        tt = 'Normally, the client will refer to the defaults (as set under "network->downloaders->manage default import options") at the time of import.'
-        tt += '\n' * 2
-        tt += 'It is easier to work this way, since you can change a single default setting and update all current and future downloaders that refer to those defaults, whereas having specific options for every subscription or downloader means you have to update every single one just to make a little change somewhere.'
-        tt += '\n' * 2
-        tt += 'But if you are doing a one-time import that has some unusual note merge rules, set them here.'
-        
-        self._use_default_dropdown.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
-        
-        #
-        
-        self._load_default_options = ClientGUICommon.BetterButton( self, 'load one of the default options', self._LoadDefaultOptions )
-        
-        #
-        
-        self._specific_options_panel = QW.QWidget( self )
-        
-        #
-        
-        note_import_options_static_box = ClientGUICommon.StaticBox( self._specific_options_panel, 'note import options' )
-        
-        self._note_import_options = EditNoteImportOptionsPanel( note_import_options_static_box, note_import_options.GetNoteImportOptions() )
-        
-        #
-        
-        self._use_default_dropdown.SetValue( note_import_options.IsDefault() )
-        
-        #
-        
-        self._SetValue( note_import_options )
-        
-        #
-        
-        default_panel.Add( self._use_default_dropdown, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        if not self._allow_default_selection:
-            
-            default_panel.setVisible( False )
-            
-        
-        #
-        
-        note_import_options_static_box.Add( self._note_import_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        #
-        
-        vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( vbox, note_import_options_static_box, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        self._specific_options_panel.setLayout( vbox )
-        
-        
-        #
-        
-        vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( vbox, default_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._load_default_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._specific_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        vbox.addStretch( 0 )
-        
-        self.setLayout( vbox )
-        
-        self._use_default_dropdown.currentIndexChanged.connect( self._UpdateIsDefault )
-        
-        self._UpdateIsDefault()
-        
-    
-    def _LoadDefaultOptions( self ):
-        
-        domain_manager = CG.client_controller.network_engine.domain_manager
-        
-        ( file_post_default_note_import_options, watchable_default_note_import_options, url_class_keys_to_default_note_import_options ) = domain_manager.GetDefaultNoteImportOptions()
-        
-        choice_tuples = []
-        
-        choice_tuples.append( ( 'file post default', file_post_default_note_import_options ) )
-        choice_tuples.append( ( 'watchable default', watchable_default_note_import_options ) )
-        
-        if len( url_class_keys_to_default_note_import_options ) > 0:
-            
-            choice_tuples.append( ( '----', None ) )
-            
-            url_classes = domain_manager.GetURLClasses()
-            
-            url_class_keys_to_url_classes = { url_class.GetClassKey() : url_class for url_class in url_classes }
-            
-            url_class_names_and_default_note_import_options = sorted( ( ( url_class_keys_to_url_classes[ url_class_key ].GetName(), url_class_keys_to_default_note_import_options[ url_class_key ] ) for url_class_key in list( url_class_keys_to_default_note_import_options.keys() ) if url_class_key in url_class_keys_to_url_classes ) )
-            
-            choice_tuples.extend( url_class_names_and_default_note_import_options )
-            
-        
-        try:
-            
-            default_note_import_options = ClientGUIDialogsQuick.SelectFromList( self, 'Select which default', choice_tuples, sort_tuples = False )
-            
-        except HydrusExceptions.CancelledException:
-            
-            return
-            
-        
-        if default_note_import_options is None:
-            
-            return
-            
-        
-        self._SetValue( default_note_import_options )
-        
-    
-    def _SetValue( self, note_import_options: NoteImportOptionsLegacy.NoteImportOptionsLegacy ):
-        
-        self._use_default_dropdown.SetValue( note_import_options.IsDefault() )
-        
-        self._note_import_options.SetValue( note_import_options.GetNoteImportOptions() )
-        
-        #
-        
-        self._UpdateIsDefault()
-        
-    
-    def _UpdateIsDefault( self ):
-        
-        if self._simple_mode or not self._allow_default_selection:
-            
-            return
-            
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        show_specific_options = not is_default
-        
-        self._load_default_options.setVisible( show_specific_options )
-        
-        self._specific_options_panel.setVisible( show_specific_options )
-        
-        if not show_specific_options:
-            
-            self.window().adjustSize()
-            
-        
-        self.isDefaultChanged.emit( is_default )
-        
-    
-    def GetValue( self ) -> NoteImportOptionsLegacy.NoteImportOptionsLegacy:
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        note_import_options_legacy = NoteImportOptionsLegacy.NoteImportOptionsLegacy()
-        
-        if is_default:
-            
-            note_import_options_legacy.SetIsDefault( True )
-            
-        else:
-            
-            note_import_options = self._note_import_options.GetValue()
-            
-            note_import_options_legacy.SetNoteImportOptions( note_import_options )
-            
-        
-        return note_import_options_legacy
-        
-    
-    def SetValue( self, note_import_options: NoteImportOptionsLegacy.NoteImportOptionsLegacy ):
-        
-        self._SetValue( note_import_options)
-        
-    
-
 class EditPrefetchImportOptionsPanel( QW.QWidget ):
     
     valueChanged = QC.Signal()
@@ -1036,13 +590,10 @@ class EditPrefetchImportOptionsPanel( QW.QWidget ):
         
         rows = []
         
-        self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.setVisible( False )
-        self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.setVisible( False )
-        
         rows.append( ( 'check hashes to determine "already in db/previously deleted" outcome?: ', self._preimport_hash_check_type ) )
         rows.append( ( 'check URLs to determine "already in db/previously deleted" outcome?: ', self._preimport_url_check_type ) )
-        #rows.append( ( 'force metadata/page fetch even if hash recognised and file appears "already in db"?: ', self._preimport_hash_check_type ) )
-        #rows.append( ( 'force metadata/page fetch even if url recognised and file appears "already in db"?: ', self._preimport_url_check_type ) )
+        rows.append( ( 'force metadata/page fetch even if hash recognised and file appears "already in db"?: ', self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db ) )
+        rows.append( ( 'force metadata/page fetch even if url recognised and file appears "already in db"?: ', self._fetch_metadata_even_if_url_recognised_and_file_already_in_db ) )
         rows.append( ( 'during URL check, check for neighbour-spam?: ', self._preimport_url_check_looks_for_neighbour_spam ) )
         
         gridbox = ClientGUICommon.WrapInGrid( self, rows )
@@ -1097,6 +648,9 @@ class EditPrefetchImportOptionsPanel( QW.QWidget ):
     def GetValue( self ) -> PrefetchImportOptions.PrefetchImportOptions:
         
         prefetch_import_options = PrefetchImportOptions.PrefetchImportOptions()
+        
+        prefetch_import_options.SetShouldFetchMetadataEvenIfHashKnownAndFileAlreadyInDB( self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.isChecked())
+        prefetch_import_options.SetShouldFetchMetadataEvenIfURLKnownAndFileAlreadyInDB( self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.isChecked())
         
         prefetch_import_options.SetPreImportHashCheckType( self._preimport_hash_check_type.GetValue() )
         prefetch_import_options.SetPreImportURLCheckType( self._preimport_url_check_type.GetValue() )
@@ -1173,12 +727,6 @@ class EditPresentationImportOptions( QW.QWidget ):
         
         vbox = QP.VBoxLayout()
         
-        label = 'An importer will try to import everything in its queue, but it does not have to _show_ all the successful results in the import page or subscription button/page. Many advanced users will set this to only show _new_ results to skip seeing \'already in db\' files.'
-        
-        st = ClientGUICommon.BetterStaticText( self, label = label )
-        
-        st.setWordWrap( True )
-        
         hbox = QP.HBoxLayout()
         
         QP.AddToLayout( hbox, self._presentation_status, CC.FLAGS_CENTER_PERPENDICULAR )
@@ -1187,7 +735,6 @@ class EditPresentationImportOptions( QW.QWidget ):
         
         #
         
-        QP.AddToLayout( vbox, st, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, hbox, CC.FLAGS_EXPAND_PERPENDICULAR )
         vbox.addStretch( 0 )
         
@@ -1353,7 +900,7 @@ class EditServiceTagImportOptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         
         if not self._show_downloader_options:
             
-            tag_parsing_panel.hide()
+            tag_parsing_panel.setVisible( False )
             
         
         main_box.Add( cog_button, CC.FLAGS_ON_RIGHT )
@@ -1616,11 +1163,11 @@ class EditTagImportOptionsPanel( QW.QWidget ):
     
     valueChanged = QC.Signal()
     
-    def __init__( self, parent: QW.QWidget, tag_import_options: TagImportOptions.TagImportOptions, show_downloader_options: bool ):
+    def __init__( self, parent: QW.QWidget, tag_import_options: TagImportOptions.TagImportOptions, import_options_caller_type: int ):
         
         super().__init__( parent )
         
-        self._show_downloader_options = show_downloader_options
+        self._show_downloader_options = import_options_caller_type not in IOC.NON_DOWNLOADER_IMPORT_OPTION_CALLER_TYPES
         
         self._service_keys_to_service_tag_import_options_panels = {}
         
@@ -1686,13 +1233,11 @@ class EditTagImportOptionsPanel( QW.QWidget ):
 
 If this import context can fetch and parse tags from a remote location (such as a gallery downloader, which may provide 'creator' or 'series' tags, amongst others), then the namespaces it provides will be listed here with checkboxes--simply check which ones you are interested in for the tag services you want them to be applied to and it will all occur as the importer processes its files.
 
-In these cases, if the URL has been previously downloaded and the client knows its file is already in the database, the client will usually not make a new network request to fetch the file's tags. This allows for quick reprocessing/skipping of previously seen items in large download queues and saves bandwidth. If you however wish to purposely fetch tags for files you have previously downloaded, you can also force tag fetching for these 'already in db' files.
-
-You can also set some fixed 'explicit' tags (like, say, 'read later' or 'from my unsorted folder' or 'subscription x') to be applied to all imported files.
+You can also set some fixed 'additional' tags (like, say, 'read later' or 'from my unsorted folder') to be applied to all imported files.
 
 ---
 
-Please note that once you know what tags you like, you can (and should) set up the 'default' values for these tag import options under _network->downloaders->manage default import options_, both globally and on a per-parser basis. If you always want all the tags going to 'my tags', this is easy to set up there, and you won't have to put it in every time.'''
+Please note that once you know what tags you like, you can (and should) set up the 'default' values for these tag import options under _options->import options_. If you always want all the tags going to 'my tags', this is easy to set up there, and you won't have to put it in every time.'''
         
         ClientGUIDialogsMessage.ShowInformation( self, message )
         
@@ -1723,275 +1268,5 @@ Please note that once you know what tags you like, you can (and should) set up t
             
             panel.SetValue( service_tag_import_options )
             
-        
-    
-
-class EditTagImportOptionsLegacyPanel( ClientGUIScrolledPanels.EditPanel ):
-    
-    isDefaultChanged = QC.Signal( bool )
-    
-    def __init__( self, parent: QW.QWidget, tag_import_options_legacy: TagImportOptionsLegacy.TagImportOptionsLegacy, show_downloader_options: bool, allow_default_selection: bool ):
-        
-        super().__init__( parent )
-        
-        self._show_downloader_options = show_downloader_options
-        
-        self._service_keys_to_service_tag_import_options_panels = {}
-        
-        #
-        
-        help_button = ClientGUICommon.IconButton( self, CC.global_icons().help, self._ShowHelp )
-        help_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Show help regarding these tag options.' ) )
-        
-        #
-        
-        tag_filtering_import_options = tag_import_options_legacy.GetTagFilteringImportOptions()
-        tag_import_options = tag_import_options_legacy.GetTagImportOptions()
-        
-        default_panel = ClientGUICommon.StaticBox( self, 'default options' )
-        
-        self._use_default_dropdown = ClientGUICommon.BetterChoice( default_panel )
-        
-        self._use_default_dropdown.addItem( 'use the default tag import options at the time of import', True )
-        self._use_default_dropdown.addItem( 'set custom tag import options just for this importer', False )
-        
-        tt = 'Normally, the client will refer to the defaults (as set under "network->downloaders->manage default import options") for the appropriate tag import options at the time of import.'
-        tt += '\n' * 2
-        tt += 'It is easier to work this way, since you can change a single default setting and update all current and future downloaders that refer to those defaults, whereas having specific options for every subscription or downloader means you have to update every single one just to make a little change somewhere.'
-        tt += '\n' * 2
-        tt += 'But if you are doing a one-time import that has some unusual tag rules, set them here.'
-        
-        self._use_default_dropdown.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
-        
-        #
-        
-        self._load_default_options = ClientGUICommon.BetterButton( self, 'load one of the default options', self._LoadDefaultOptions )
-        
-        #
-        
-        self._specific_options_panel = QW.QWidget( self )
-        
-        #
-        
-        prefetch_import_options_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'prefetch options' )
-        
-        self._fetch_metadata_even_if_url_recognised_and_file_already_in_db = QW.QCheckBox( prefetch_import_options_panel )
-        self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db = QW.QCheckBox( prefetch_import_options_panel )
-        
-        tt = 'I strongly recommend you uncheck this for normal use. When it is on, downloaders are inefficent!'
-        tt += '\n' * 2
-        tt += 'This will force the client to download the metadata for a file even if it thinks it has visited its page before. Normally, hydrus will skip an URL in this case. It is useful to turn this on if you want to force a recheck of the tags in that page.'
-        
-        self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
-        
-        tt = 'I strongly recommend you uncheck this for normal use.  When it is on, downloaders could be inefficent!'
-        tt += '\n' * 2
-        tt += 'This will force the client to download the metadata for a file even if the gallery step has given a hash that the client thinks it recognises. Normally, hydrus will skip an URL in this case (although the hash-from-gallery case is rare, so this option rarely matters). This is mostly a debug complement to the url check option.'
-        
-        self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
-        
-        #
-        
-        tag_filtering_import_options_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'tag filtering options' )
-        
-        self._tag_filtering_import_options = EditTagFilteringImportOptionsPanel( tag_filtering_import_options_panel, tag_filtering_import_options )
-        
-        #
-        
-        tag_import_options_panel = ClientGUICommon.StaticBox( self._specific_options_panel, 'tag import options' )
-        
-        self._tag_import_options = EditTagImportOptionsPanel( tag_import_options_panel, tag_import_options, show_downloader_options )
-        
-        #
-        
-        self._use_default_dropdown.SetValue( tag_import_options_legacy.IsDefault() )
-        
-        self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.setChecked( tag_import_options_legacy.ShouldFetchTagsEvenIfURLKnownAndFileAlreadyInDB() )
-        self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.setChecked( tag_import_options_legacy.ShouldFetchTagsEvenIfHashKnownAndFileAlreadyInDB() )
-        
-        self._SetValue( tag_import_options_legacy )
-        
-        #
-        
-        if not CG.client_controller.new_options.GetBoolean( 'advanced_mode' ):
-            
-            st = ClientGUICommon.BetterStaticText( default_panel, label = 'Most of the time, you want to rely on the default tag import options!' )
-            
-            st.setObjectName( 'HydrusWarning' )
-            
-            default_panel.Add( st, CC.FLAGS_EXPAND_PERPENDICULAR )
-            
-        
-        default_panel.Add( self._use_default_dropdown, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        if not allow_default_selection:
-            
-            default_panel.hide()
-            
-        
-        #
-        
-        rows = []
-        
-        rows.append( ( 'force metadata/page fetch even if url recognised and file already in db: ', self._fetch_metadata_even_if_url_recognised_and_file_already_in_db ) )
-        rows.append( ( 'force metadata/page fetch even if hash recognised and file already in db: ', self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db ) )
-        
-        gridbox = ClientGUICommon.WrapInGrid( prefetch_import_options_panel, rows )
-        
-        prefetch_import_options_panel.Add( gridbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
-        
-        #
-        
-        tag_filtering_import_options_panel.Add( self._tag_filtering_import_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        #
-        
-        tag_import_options_panel.Add( self._tag_import_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        #
-        
-        if not self._show_downloader_options:
-            
-            prefetch_import_options_panel.setVisible( False )
-            tag_filtering_import_options_panel.setVisible( False )
-            
-        
-        #
-        
-        vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( vbox, prefetch_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, tag_filtering_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, tag_import_options_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        self._specific_options_panel.setLayout( vbox )
-        
-        #
-        
-        vbox = QP.VBoxLayout()
-        
-        QP.AddToLayout( vbox, help_button, CC.FLAGS_ON_RIGHT )
-        QP.AddToLayout( vbox, default_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._load_default_options, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, self._specific_options_panel, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
-        vbox.addStretch( 0 )
-        
-        self.widget().setLayout( vbox )
-        
-        #
-        
-        self._use_default_dropdown.currentIndexChanged.connect( self._UpdateIsDefault )
-        
-        self._UpdateIsDefault()
-        
-    
-    def _LoadDefaultOptions( self ):
-        
-        domain_manager = CG.client_controller.network_engine.domain_manager
-        
-        ( file_post_default_tag_import_options, watchable_default_tag_import_options, url_class_keys_to_default_tag_import_options ) = domain_manager.GetDefaultTagImportOptions()
-        
-        choice_tuples = []
-        
-        choice_tuples.append( ( 'file post default', file_post_default_tag_import_options ) )
-        choice_tuples.append( ( 'watchable default', watchable_default_tag_import_options ) )
-        
-        if len( url_class_keys_to_default_tag_import_options ) > 0:
-            
-            choice_tuples.append( ( '----', None ) )
-            
-            url_classes = domain_manager.GetURLClasses()
-            
-            url_class_keys_to_url_classes = { url_class.GetClassKey() : url_class for url_class in url_classes }
-            
-            url_class_names_and_default_tag_import_options = sorted( ( ( url_class_keys_to_url_classes[ url_class_key ].GetName(), url_class_keys_to_default_tag_import_options[ url_class_key ] ) for url_class_key in list( url_class_keys_to_default_tag_import_options.keys() ) if url_class_key in url_class_keys_to_url_classes ) )
-            
-            choice_tuples.extend( url_class_names_and_default_tag_import_options )
-            
-        
-        try:
-            
-            default_tag_import_options = ClientGUIDialogsQuick.SelectFromList( self, 'Select which default', choice_tuples, sort_tuples = False )
-            
-        except HydrusExceptions.CancelledException:
-            
-            return
-            
-        
-        if default_tag_import_options is None:
-            
-            return
-            
-        
-        self._SetValue( default_tag_import_options )
-        
-    
-    def _SetValue( self, tag_import_options_legacy: TagImportOptionsLegacy.TagImportOptionsLegacy ):
-        
-        tag_import_options = tag_import_options_legacy.GetTagImportOptions()
-        tag_filtering_import_options = tag_import_options_legacy.GetTagFilteringImportOptions()
-        
-        self._use_default_dropdown.SetValue( tag_import_options_legacy.IsDefault() )
-        
-        self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.setChecked( tag_import_options_legacy.ShouldFetchTagsEvenIfURLKnownAndFileAlreadyInDB() )
-        self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.setChecked( tag_import_options_legacy.ShouldFetchTagsEvenIfHashKnownAndFileAlreadyInDB() )
-        
-        self._tag_filtering_import_options.SetValue( tag_filtering_import_options )
-        
-        self._tag_import_options.SetValue( tag_import_options )
-        
-        self._UpdateIsDefault()
-        
-    
-    def _ShowHelp( self ):
-        
-        message = '''I strongly recommend that you only ever turn the 'force page fetch...' options for one-time jobs. It is typically only useful if you download some files and realised you forgot to set tag parsing up--you can set the "force fetch" options on and 'try again' the files to force the downloader to fetch the tags.'''
-        
-        ClientGUIDialogsMessage.ShowInformation( self, message )
-        
-    
-    def _UpdateIsDefault( self ):
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        show_specific_options = not is_default
-        
-        self._load_default_options.setVisible( show_specific_options )
-        
-        self._specific_options_panel.setVisible( show_specific_options )
-        
-        if not show_specific_options:
-            
-            self.window().adjustSize()
-            
-        
-        self.isDefaultChanged.emit( is_default )
-        
-    
-    def GetValue( self ) -> TagImportOptionsLegacy.TagImportOptionsLegacy:
-        
-        is_default = self._use_default_dropdown.GetValue()
-        
-        if is_default:
-            
-            tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy( is_default = True )
-            
-        else:
-            
-            fetch_tags_even_if_url_recognised_and_file_already_in_db = self._fetch_metadata_even_if_url_recognised_and_file_already_in_db.isChecked()
-            fetch_tags_even_if_hash_recognised_and_file_already_in_db = self._fetch_metadata_even_if_hash_recognised_and_file_already_in_db.isChecked()
-            
-            tag_filtering_import_options = self._tag_filtering_import_options.GetValue()
-            tag_import_options = self._tag_import_options.GetValue()
-            
-            tag_import_options = TagImportOptionsLegacy.TagImportOptionsLegacy(
-                fetch_tags_even_if_url_recognised_and_file_already_in_db = fetch_tags_even_if_url_recognised_and_file_already_in_db,
-                fetch_tags_even_if_hash_recognised_and_file_already_in_db = fetch_tags_even_if_hash_recognised_and_file_already_in_db,
-                tag_filtering_import_options = tag_filtering_import_options,
-                tag_import_options = tag_import_options
-            )
-            
-        
-        return tag_import_options
         
     

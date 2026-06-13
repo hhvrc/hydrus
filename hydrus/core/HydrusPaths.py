@@ -1,4 +1,5 @@
 import collections.abc
+import errno
 import functools
 import os
 import re
@@ -18,6 +19,23 @@ from hydrus.core import HydrusPSUtil
 from hydrus.core import HydrusTime
 from hydrus.core.processes import HydrusSubprocess
 from hydrus.core.processes import HydrusThreading
+
+def oserror_is_device_access_trouble( e: OSError ):
+    """
+    Is this "OSError [Errno 112] Host is down" or one of its friends.
+    This stuff is _not_ FileNotFoundError, for good reason, but some logic for 'can we see this directory?' may want to lump it in.
+    """
+    
+    return e.errno in (
+        errno.EHOSTDOWN,
+        errno.EHOSTUNREACH,
+        errno.ECONNRESET,
+        errno.ETIMEDOUT,
+        errno.ESTALE,
+        errno.ENOTCONN,
+        errno.ENODEV,
+    )
+    
 
 def stat_is_file( path_stat: os.stat_result ):
     
@@ -981,7 +999,21 @@ def MakeSureDirectoryExists( path ):
         
     except FileNotFoundError as e:
         
-        raise FileNotFoundError( f'While trying to ensure the directory "{path}" exists, none of the possible parent folders seem to exist either! Is the device not plugged in?' ) from e
+        raise FileNotFoundError( f'While trying to ensure the directory "{path}" exists, none of the possible parent folders seem to exist either! Is this device having trouble?' ) from e
+        
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            new_e = OSError( f'While trying to ensure the directory "{path}" exists, there appeared to be a device access issue. Is something not plugged in?' )
+            new_e.errno = e.errno
+            
+            raise new_e from e
+            
+        else:
+            
+            raise
+            
         
     
 
@@ -1119,6 +1151,20 @@ def MergeFile( source, dest ) -> bool:
         
         raise Exception( f'Cannot file-merge "{source}" to "{dest}"--the source does not exist!' )
         
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            new_e = OSError( f'Cannot file-merge "{source}" to "{dest}"--the source device is having trouble!' )
+            new_e.errno = e.errno
+            
+            raise new_e from e
+            
+        else:
+            
+            raise
+            
+        
     
     if stat_is_dir( source_stat ):
         
@@ -1181,6 +1227,20 @@ def MergeTree( source: str, dest: str, text_update_hook = None ):
     except FileNotFoundError:
         
         raise Exception( f'Cannot directory-merge "{source}" to "{dest}"--the source does not exist!' )
+        
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            new_e = OSError( f'Cannot directory-merge "{source}" to "{dest}"--the source device is having trouble!' )
+            new_e.errno = e.errno
+            
+            raise new_e from e
+            
+        else:
+            
+            raise
+            
         
     
     if stat_is_file( source_stat ):
@@ -1297,6 +1357,20 @@ def MirrorFile( source, dest ) -> bool:
         
         raise Exception( f'Cannot file-mirror "{source}" to "{dest}"--the source does not exist!' )
         
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            new_e = OSError( f'Cannot file-mirror "{source}" to "{dest}"--the source device is having trouble!' )
+            new_e.errno = e.errno
+            
+            raise new_e from e
+            
+        else:
+            
+            raise
+            
+        
     
     if stat_is_dir( source_stat ):
         
@@ -1381,6 +1455,20 @@ def MirrorTree( source: str, dest: str, text_update_hook = None, is_cancelled_ho
     except FileNotFoundError:
         
         raise Exception( f'Cannot directory-mirror "{source}" to "{dest}"--the source does not exist!' )
+        
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            new_e = OSError( f'Cannot directory-mirror "{source}" to "{dest}"--the source device is having trouble!' )
+            new_e.errno = e.errno
+            
+            raise new_e from e
+            
+        else:
+            
+            raise
+            
         
     
     if stat_is_file( source_stat ):
@@ -1517,16 +1605,43 @@ def OpenFileLocation( path ):
     thread.start()
     
 
-def PathIsFree( path ):
-    
-    if not os.path.exists( path ):
-        
-        return False
-        
+def PathExistsAndIsDir( path: str ):
     
     try:
         
-        stat_result = os.stat( path )
+        path_stat = os.stat( path )
+        
+    except FileNotFoundError:
+        
+        return False
+        
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            return False
+            
+        else:
+            
+            raise
+            
+        
+    
+    return stat_is_dir( path_stat )
+    
+
+def PathIsFree( path ):
+    
+    try:
+        
+        try:
+            
+            stat_result = os.stat( path )
+            
+        except FileNotFoundError:
+            
+            return False
+            
         
         current_bits = stat_result.st_mode
         
@@ -1561,18 +1676,25 @@ def PathIsFree( path ):
 
 def PotentialPathDeviceIsConnected( path: str ):
     
-    # this is a little hacky, but it works at catching "H:\ is not plugged in"
-    # does not work for Linux, oh well
     try:
         
-        os.path.ismount( path )
-        
-        return True
+        os.stat( path )
         
     except FileNotFoundError:
         
-        return False
+        # this is ok
+        pass
         
+    except OSError as e:
+        
+        if oserror_is_device_access_trouble( e ):
+            
+            return False
+            
+        
+    
+    # we tried hitting the potential path and nothing went crazy, so mite b cool
+    return True
     
 
 def ReadFileLikeAsBlocks( f ) -> collections.abc.Iterator[ bytes ]:

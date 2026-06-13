@@ -138,7 +138,7 @@ class MediaResult( object ):
         return ( self._file_info_manager.width, self._file_info_manager.height )
         
     
-    def GetSimulatedDurationMSAndSource( self ):
+    def GetSimulatedDurationMSAndSource( self ) -> tuple[ int, str ]:
         
         if self._file_info_manager.mime == HC.ANIMATION_UGOIRA:
             

@@ -3,14 +3,36 @@ import collections.abc
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusSerialisable
 from hydrus.core import HydrusTags
-from hydrus.core import HydrusText
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
-from hydrus.client.importing.options import ClientImportOptions
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.media import ClientMediaResult
 from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.metadata import ClientTags
+
+def FilterCurrentTagHashes( service_key: bytes, media_results: collections.abc.Collection[ ClientMediaResult.MediaResult ], tag: str ):
+    
+    hashes = { media_result.GetHash() for media_result in media_results if tag in media_result.GetTagsManager().GetCurrent( service_key, ClientTags.TAG_DISPLAY_STORAGE ) }
+    
+    return hashes
+    
+
+def FilterNotPreviouslyDeletedTags( service_key: bytes, media_result: ClientMediaResult.MediaResult, tags: collections.abc.Iterable[ str ] ):
+    
+    deleted_tags = set( media_result.GetTagsManager().GetDeleted( service_key, ClientTags.TAG_DISPLAY_STORAGE ) )
+    
+    tags = set( tags ).difference( deleted_tags )
+    
+    return tags
+    
+
+def FilterNotPreviouslyDeletedTagHashes( service_key: bytes, media_results: collections.abc.Collection[ ClientMediaResult.MediaResult ], tag: str ):
+    
+    hashes = { media_result.GetHash() for media_result in media_results if tag not in set( media_result.GetTagsManager().GetDeleted( service_key, ClientTags.TAG_DISPLAY_STORAGE ) ) }
+    
+    return hashes
+    
 
 def NewInboxArchiveMatch( new_files, inbox_files, archive_files, status, inbox ):
     
@@ -164,7 +186,7 @@ class ServiceTagImportOptions( HydrusSerialisable.SerialisableBase ):
             
             pretty_additional_tags = sorted( self._additional_tags )
             
-            statements.append( 'additional tags: ' + ', '.join( pretty_additional_tags ) )
+            statements.append( 'adding "' + ', '.join( pretty_additional_tags ) + '"' )
             
         
         return statements
@@ -189,7 +211,7 @@ class ServiceTagImportOptions( HydrusSerialisable.SerialisableBase ):
                 
                 if not self._get_tags_overwrite_deleted:
                     
-                    filtered_tags = ClientImportOptions.FilterNotPreviouslyDeletedTags( service_key, media_result, filtered_tags )
+                    filtered_tags = FilterNotPreviouslyDeletedTags( service_key, media_result, filtered_tags )
                     
                 
                 tags.update( filtered_tags )
@@ -202,7 +224,7 @@ class ServiceTagImportOptions( HydrusSerialisable.SerialisableBase ):
             
             if not self._additional_tags_overwrite_deleted:
                 
-                additional_tags = ClientImportOptions.FilterNotPreviouslyDeletedTags( service_key, media_result, additional_tags )
+                additional_tags = FilterNotPreviouslyDeletedTags( service_key, media_result, additional_tags )
                 
             
             tags.update( additional_tags )
@@ -240,7 +262,9 @@ class ServiceTagImportOptions( HydrusSerialisable.SerialisableBase ):
 
 HydrusSerialisable.SERIALISABLE_TYPES_TO_OBJECT_TYPES[ HydrusSerialisable.SERIALISABLE_TYPE_SERVICE_TAG_IMPORT_OPTIONS ] = ServiceTagImportOptions
 
-class TagImportOptions( HydrusSerialisable.SerialisableBase ):
+class TagImportOptions( IOC.ImportOptionsMetatype ):
+    
+    IMPORT_OPTIONS_TYPE = IOC.IMPORT_OPTIONS_TYPE_TAGS
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_TAG_IMPORT_OPTIONS
     SERIALISABLE_NAME = 'Tag Import Options'
@@ -357,11 +381,11 @@ class TagImportOptions( HydrusSerialisable.SerialisableBase ):
         return self._service_keys_to_service_tag_import_options[ service_key ]
         
     
-    def GetSummary( self, show_downloader_options: bool = True ):
+    def GetSummary( self, import_options_caller_type: int ):
         
         statements = []
         
-        for ( service_key, service_tag_import_options ) in list(self._service_keys_to_service_tag_import_options.items()):
+        for ( service_key, service_tag_import_options ) in self._service_keys_to_service_tag_import_options.items():
             
             sub_statements = service_tag_import_options.GetSummaryStatements()
             
@@ -369,7 +393,7 @@ class TagImportOptions( HydrusSerialisable.SerialisableBase ):
                 
                 name = CG.client_controller.services_manager.GetNameSafe( service_key )
                 
-                service_statement = f'{name}:{HydrusText.ConvertManyStringsToNiceInsertableHumanSummary( sub_statements, no_trailing_whitespace = True )}'
+                service_statement = f'{name}[' + ', '.join( sub_statements ) + ']'
                 
                 statements.append( service_statement )
                 
@@ -377,7 +401,7 @@ class TagImportOptions( HydrusSerialisable.SerialisableBase ):
         
         if len( statements ) > 0:
             
-            summary = ', '.join( statements )
+            summary = ' | '.join( statements )
             
         else:
             

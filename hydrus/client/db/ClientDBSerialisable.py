@@ -70,7 +70,7 @@ def DealWithBrokenJSONDump( db_dir, dump, dump_object_descriptor, dump_descripto
     message += '\n' * 2
     message += 'The database has attempted to delete the broken object, and the object\'s dump written to {}. Depending on the object, your client may no longer be able to boot, or it may have lost something like a session or a subscription.'.format( path )
     message += '\n' * 2
-    message += 'Please review the \'help my db is broke.txt\' file in your install_dir/db directory as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
+    message += 'Please check the \'Recovery->Help my db is broke\' document in the help as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
     
     HydrusData.ShowText( message )
     
@@ -232,7 +232,7 @@ class ClientDBSerialisable( ClientDBModule.ClientDBModule ):
                     message += '\n' * 2
                     message += 'Your client may have lost one or more session pages.'
                     message += '\n' * 2
-                    message += 'Please review the \'help my db is broke.txt\' file in your install_dir/db directory as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
+                    message += 'Please check the \'Recovery->Help my db is broke\' document in the help as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
                     
                     HydrusData.ShowText( message )
                     
@@ -271,7 +271,7 @@ class ClientDBSerialisable( ClientDBModule.ClientDBModule ):
                     message += '\n' * 2
                     message += 'The database has attempted to delete the broken object, and the object\'s dump written to your database directory. Your client may have lost one or more session pages.'
                     message += '\n' * 2
-                    message += 'Please review the \'help my db is broke.txt\' file in your install_dir/db directory as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
+                    message += 'Please check the \'Recovery->Help my db is broke\' document in the help as background reading, and if the situation or fix here is not obvious, please contact hydrus dev.'
                     
                     HydrusData.ShowText( message )
                     
@@ -301,7 +301,7 @@ class ClientDBSerialisable( ClientDBModule.ClientDBModule ):
         
         if not session_container.HasAllPageData():
             
-            HydrusData.ShowText( 'The session "{}" had missing page data on load! It will still try to load what it can into GUI, but every missing page will print its information! It may have been a logical error that failed to save or keep the correct page, or you may have had a database failure. If you have had any other database or hard drive issues recently, please check out "help my db is broke.txt" in your install_dir/db directory. Hydev would also like to know the details here!'.format( name ) )
+            HydrusData.ShowText( 'The session "{}" had missing page data on load! It will still try to load what it can into GUI, but every missing page will print its information! It may have been a logical error that failed to save or keep the correct page, or you may have had a database failure. If you have had any other database or hard drive issues recently, please check the \'Recovery->Help my db is broke\' document in the help. Hydev would also like to know the details here!'.format( name ) )
             
         
         return session_container

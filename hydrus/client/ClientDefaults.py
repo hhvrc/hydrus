@@ -66,27 +66,27 @@ def GetClientDefaultOptions():
     
 def GetDefaultCheckerOptions( name ):
     
-    from hydrus.client.importing.options import ClientImportOptions
+    from hydrus.client.importing.options import CheckerImportOptions
     
     if name == 'thread':
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 300, never_slower_than = 86400, death_file_velocity = ( 1, 3 * 86400 ) )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 300, never_slower_than = 86400, death_file_velocity = (1, 3 * 86400) )
         
     elif name == 'slow thread':
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check = 1, never_faster_than = 4 * 3600, never_slower_than = 7 * 86400, death_file_velocity = ( 1, 30 * 86400 ) )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check = 1, never_faster_than = 4 * 3600, never_slower_than = 7 * 86400, death_file_velocity = ( 1, 30 * 86400 ) )
         
     elif name == 'artist subscription':
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 86400, never_slower_than = 90 * 86400, death_file_velocity = ( 1, 180 * 86400 ) )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check = 4, never_faster_than = 86400, never_slower_than = 90 * 86400, death_file_velocity = ( 1, 180 * 86400 ) )
         
     elif name == 'fast tag subscription':
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check = 10, never_faster_than = 43200, never_slower_than = 30 * 86400, death_file_velocity = ( 1, 90 * 86400 ) )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check = 10, never_faster_than = 43200, never_slower_than = 30 * 86400, death_file_velocity = ( 1, 90 * 86400 ) )
         
     elif name == 'slow tag subscription':
         
-        return ClientImportOptions.CheckerOptions( intended_files_per_check = 1, never_faster_than = 7 * 86400, never_slower_than = 180 * 86400, death_file_velocity = ( 1, 365 * 86400 ) )
+        return CheckerImportOptions.CheckerOptions( intended_files_per_check = 1, never_faster_than = 7 * 86400, never_slower_than = 180 * 86400, death_file_velocity = (1, 365 * 86400) )
         
     
 

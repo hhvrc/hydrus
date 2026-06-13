@@ -5,6 +5,7 @@ import sqlite3
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusDBBase
+from hydrus.core import HydrusDBPopulateCache
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusTags
 
@@ -18,7 +19,7 @@ class ClientDBMasterHashes( ClientDBModule.ClientDBModule ):
         
         super().__init__( 'client hashes master', cursor )
         
-        self._hash_ids_to_hashes_cache = {}
+        self._hash_ids_to_hashes_cache = HydrusDBPopulateCache.IdToPrimitiveCache( 'master hash', 80000 )
         
     
     def _GetCriticalTableNames( self ) -> collections.abc.Collection[ str ]:
@@ -51,15 +52,7 @@ class ClientDBMasterHashes( ClientDBModule.ClientDBModule ):
     
     def _PopulateHashIdsToHashesCache( self, hash_ids, error_on_missing_hash_ids = False ):
         
-        if len( self._hash_ids_to_hashes_cache ) > 100000:
-            
-            if not isinstance( hash_ids, set ):
-                
-                hash_ids = set( hash_ids )
-                
-            
-            self._hash_ids_to_hashes_cache = { hash_id : hash for ( hash_id, hash ) in self._hash_ids_to_hashes_cache.items() if hash_id in hash_ids }
-            
+        self._hash_ids_to_hashes_cache.maintain_touch_record()
         
         uncached_hash_ids = { hash_id for hash_id in hash_ids if hash_id not in self._hash_ids_to_hashes_cache }
         
@@ -119,7 +112,7 @@ class ClientDBMasterHashes( ClientDBModule.ClientDBModule ):
                             
                             if not pubbed_error:
                                 
-                                HydrusData.ShowText( 'A file identifier was missing! This is a serious error that means your client database had an orphan file id! You have very likely encountered database corruption, perhaps recently, or perhaps years ago, please check the "help I had a file identifier missing error.txt" document under install_dir/db folder. Additional info has been written to the log.' )
+                                HydrusData.ShowText( 'A file identifier was missing! This is a serious error that means your client database had an orphan file id! You have very likely encountered database corruption, perhaps recently, or perhaps years ago, please check the "Recovery->Help I had a file identifier missing error" document in the help. Additional info has been written to the log.' )
                                 
                                 pubbed_error = True
                                 
@@ -132,7 +125,7 @@ class ClientDBMasterHashes( ClientDBModule.ClientDBModule ):
                             
                             if not pubbed_error:
                                 
-                                HydrusData.ShowText( 'A file identifier was missing! This is a serious error that means your client database had an orphan file id! Luckily, I was able to find a duplicate record in another location and fill in the missing record. You have, however, very likely encountered database corruption, perhaps recently, or perhaps years ago, please check the "help my db is broke.txt" document under install_dir/db folder as background reading. Additional info has been written to the log.' )
+                                HydrusData.ShowText( 'A file identifier was missing! This is a serious error that means your client database had an orphan file id! Luckily, I was able to find a duplicate record in another location and fill in the missing record. You have, however, very likely encountered database corruption, perhaps recently, or perhaps years ago, please check the \'Recovery->Help my db is broke\' document in the help as background reading. Additional info has been written to the log.' )
                                 
                                 pubbed_error = True
                                 
@@ -486,7 +479,7 @@ class ClientDBMasterTags( ClientDBModule.ClientDBModule ):
         
         self.null_namespace_id = None
         
-        self._tag_ids_to_tags_cache = {}
+        self._tag_ids_to_tags_cache = HydrusDBPopulateCache.IdToPrimitiveCache( 'master tag', 160000 )
         
     
     def _GetCriticalTableNames( self ) -> collections.abc.Collection[ str ]:
@@ -521,15 +514,7 @@ class ClientDBMasterTags( ClientDBModule.ClientDBModule ):
     
     def _PopulateTagIdsToTagsCache( self, tag_ids ):
         
-        if len( self._tag_ids_to_tags_cache ) > 100000:
-            
-            if not isinstance( tag_ids, set ):
-                
-                tag_ids = set( tag_ids )
-                
-            
-            self._tag_ids_to_tags_cache = { tag_id : tag for ( tag_id, tag ) in self._tag_ids_to_tags_cache.items() if tag_id in tag_ids }
-            
+        self._tag_ids_to_tags_cache.maintain_touch_record()
         
         uncached_tag_ids = { tag_id for tag_id in tag_ids if tag_id not in self._tag_ids_to_tags_cache }
         
@@ -791,9 +776,9 @@ class ClientDBMasterTags( ClientDBModule.ClientDBModule ):
     def UpdateTagId( self, tag_id, namespace_id, subtag_id ):
         
         self._Execute( 'UPDATE tags SET namespace_id = ?, subtag_id = ? WHERE tag_id = ?;', ( namespace_id, subtag_id, tag_id ) )
-    
+        
         if tag_id in self._tag_ids_to_tags_cache:
-    
+            
             del self._tag_ids_to_tags_cache[ tag_id ]
             
         

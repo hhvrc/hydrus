@@ -8,7 +8,7 @@ try:
     
     # For Russian and Polish and some other 24-hour-only systems, it is highly important this happens before Qt and mpv get their teeth into things
     # it establishes some timezone cache that requires the locale to be clean
-    # I don't know if it needs to be before locale.setlocale, but I know that it works if it does
+    # I don't know if it needs to be before locale.setlocale too, but I know that it works if it does
     import dateparser
     
 except Exception as e:
@@ -28,10 +28,10 @@ except Exception as e:
     
 
 import sys
+import os
 
 try:
     
-    import os
     import argparse
     
     from hydrus.core import HydrusBoot

@@ -690,7 +690,7 @@ class EditPairComparatorOneFileMetadataConditionalPanel( ClientGUIScrolledPanels
         
         self._metadata_conditional = ClientGUIMetadataConditional.EditMetadataConditionalPanel( self, pair_comparator.GetMetadataConditional() )
         
-        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._metadata_conditional, 64 )
+        width = ClientGUIFunctions.ConvertTextToPixelWidth( self._metadata_conditional, 60 )
         
         self._metadata_conditional.setMinimumWidth( width )
         
@@ -821,7 +821,7 @@ class EditComparatorList( ClientGUIListBoxes.AddEditDeleteListBox ):
                 
             elif isinstance( comparator, ClientDuplicatesAutoResolutionComparators.PairComparatorRelativeFileInfo ):
                 
-                panel = EditPairComparatorRelativeFileinfoPanel( dlg, comparator )
+                panel = EditPairComparatorRelativeFileInfoPanel( dlg, comparator )
                 
             elif isinstance( comparator, ClientDuplicatesAutoResolutionComparators.PairComparatorRelativeVisualDuplicates ):
                 
@@ -919,7 +919,7 @@ class EditPairComparatorOR( ClientGUIScrolledPanels.EditPanel ):
         
     
 
-class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel ):
+class EditPairComparatorRelativeFileInfoPanel( ClientGUIScrolledPanels.EditPanel ):
     
     def __init__( self, parent, pair_comparator: ClientDuplicatesAutoResolutionComparators.PairComparatorRelativeFileInfo ):
         
@@ -1000,6 +1000,36 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         self._duration_delta = ClientGUITime.TimeDeltaWidget( self, min = - 86400 * 10000, minutes = True, seconds = True, milliseconds = True, negative_allowed = True )
         
         self._duration_delta.SetValue( 0 )
+        
+        #
+        
+        self._ratio_panel = QW.QWidget( self )
+        
+        allowed_operators = [
+            ClientNumberTest.NUMBER_TEST_OPERATOR_LESS_THAN,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_LESS_THAN_OR_EQUAL_TO,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_EQUAL,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_NOT_EQUAL,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_GREATER_THAN,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_GREATER_THAN_OR_EQUAL_TO,
+            ClientNumberTest.NUMBER_TEST_OPERATOR_APPROXIMATE_PERCENT
+        ]
+        
+        self._ratio_number_test = ClientGUINumberTest.NumberTestWidget(
+            self._ratio_panel,
+            allowed_operators = allowed_operators,
+            swap_in_string_for_value = 'B'
+        )
+        
+        self._ratio_multiplier = QW.QDoubleSpinBox( self._ratio_panel )
+        self._ratio_multiplier.setDecimals( 2 )
+        self._ratio_multiplier.setSingleStep( 0.01 )
+        self._ratio_multiplier.setMinimum( -10000 )
+        self._ratio_multiplier.setMaximum( 10000 )
+        
+        self._ratio_multiplier.setMinimumWidth( ClientGUIFunctions.ConvertTextToPixelWidth( self._ratio_multiplier, 11 ) )
+        
+        self._ratio_multiplier.setValue( 1.00 )
         
         #
         
@@ -1106,6 +1136,17 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         
         rows = []
         
+        rows.append( ( 'operator: ', self._ratio_number_test ) )
+        rows.append( ( 'multiplier (optional): ', self._ratio_multiplier ) )
+        
+        gridbox = ClientGUICommon.WrapInGrid( self._ratio_panel, rows )
+        
+        self._ratio_panel.setLayout( gridbox )
+        
+        #
+        
+        rows = []
+        
         rows.append( ( 'operator: ', self._normal_number_test ) )
         rows.append( ( 'multiplier (optional): ', self._normal_multiplier ) )
         rows.append( ( 'delta (optional)', self._normal_delta ) )
@@ -1135,6 +1176,7 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         QP.AddToLayout( vbox, self._time_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._duration_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._normal_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._ratio_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._fuzzy_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, self._live_value_st, CC.FLAGS_EXPAND_PERPENDICULAR )
         
@@ -1154,6 +1196,9 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         self._fuzzy_number_test.valueChanged.connect( self._UpdateLabel )
         self._fuzzy_multiplier.valueChanged.connect( self._UpdateLabel )
         self._fuzzy_delta.valueChanged.connect( self._UpdateLabel )
+        
+        self._ratio_number_test.valueChanged.connect( self._UpdateLabel )
+        self._ratio_multiplier.valueChanged.connect( self._UpdateLabel )
         
         self._normal_number_test.valueChanged.connect( self._UpdateLabel )
         self._normal_multiplier.valueChanged.connect( self._UpdateLabel )
@@ -1235,15 +1280,19 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         
         we_duration_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DURATION
         
+        we_ratio_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO
+        
         we_fuzzy_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_FRAMERATE
         
         self._time_panel.setVisible( we_time_pred )
         
         self._duration_panel.setVisible( we_duration_pred )
         
+        self._ratio_panel.setVisible( we_ratio_pred )
+        
         self._fuzzy_panel.setVisible( we_fuzzy_pred )
         
-        self._normal_panel.setVisible( not ( we_time_pred or we_duration_pred or we_fuzzy_pred ) )
+        self._normal_panel.setVisible( not ( we_time_pred or we_duration_pred or we_fuzzy_pred or we_ratio_pred ) )
         
         warning_label = self._system_pred_types_to_warning_label_texts.get( system_predicate.GetType(), '' )
         
@@ -1255,7 +1304,7 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
     
     def GetValue( self ):
         
-        system_predicate = self._system_predicate.GetValue()
+        system_predicate: ClientSearchPredicate.Predicate = self._system_predicate.GetValue()
         
         we_time_pred = system_predicate.GetType() in (
             ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_IMPORT_TIME,
@@ -1266,13 +1315,17 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
         
         we_duration_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_DURATION
         
+        we_ratio_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_RATIO
+        
         we_fuzzy_pred = system_predicate.GetType() == ClientSearchPredicate.PREDICATE_TYPE_SYSTEM_FRAMERATE
+        
+        delta = 0
+        multiplier = 1.00
         
         if we_time_pred:
             
             number_test = self._time_number_test.GetValue()
             
-            multiplier = 1.00
             delta = HydrusTime.MillisecondiseS( self._time_delta.GetValue() )
             
         elif we_duration_pred:
@@ -1289,12 +1342,23 @@ class EditPairComparatorRelativeFileinfoPanel( ClientGUIScrolledPanels.EditPanel
             multiplier = self._fuzzy_multiplier.value()
             delta = self._fuzzy_delta.value()
             
+        elif we_ratio_pred:
+            
+            number_test = self._ratio_number_test.GetValue()
+            
+            multiplier = self._ratio_multiplier.value()
+            
         else:
             
             number_test = self._normal_number_test.GetValue()
             
             multiplier = self._normal_multiplier.value()
             delta = self._normal_delta.value()
+            
+        
+        if delta is None:
+            
+            delta = 0
             
         
         number_test.value = 1

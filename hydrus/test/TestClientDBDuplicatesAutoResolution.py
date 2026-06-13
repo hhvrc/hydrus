@@ -17,7 +17,8 @@ from hydrus.client.duplicates import ClientPotentialDuplicatesSearchContext
 from hydrus.client.duplicates import ClientDuplicatesAutoResolution
 from hydrus.client.duplicates import ClientDuplicatesAutoResolutionComparators
 from hydrus.client.importing import ClientImportFiles
-from hydrus.client.importing.options import ImportOptionsContainer
+from hydrus.client.importing.options import ImportOptionsConstants as IOC
+from hydrus.client.importing.options import ImportOptionsManager
 from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.metadata import ClientMetadataConditional
 from hydrus.client.search import ClientSearchFileSearchContext
@@ -147,7 +148,7 @@ class TestClientDBDuplicatesAutoResolution( unittest.TestCase ):
         test_files.append( ( 'muh_apng.png', '9e7b8b5abc7cb11da32db05671ce926a2a2b701415d1b2cb77a28deea51010c3' ) )
         test_files.append( ( 'muh_gif.gif', '00dd9e9611ebc929bfc78fde99a0c92800bbb09b9d18e0946cea94c099b211c2' ) )
         
-        import_options_container = ImportOptionsContainer.ImportOptionsManager.STATICGetDefaultInitialisedManager().GetDefaultImportOptionsContainerForCallerType( ImportOptionsContainer.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
+        full_import_options_container = ImportOptionsManager.ImportOptionsManager.STATICGetDefaultInitialisedManager().GetDefaultImportOptionsContainerForCallerType( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
         
         for ( filename, hex_hash ) in test_files:
             
@@ -159,7 +160,7 @@ class TestClientDBDuplicatesAutoResolution( unittest.TestCase ):
             
             hashes.append( hash )
             
-            file_import_job = ClientImportFiles.FileImportJob( path, import_options_container )
+            file_import_job = ClientImportFiles.FileImportJob( path, full_import_options_container )
             
             file_import_job.GeneratePreImportHashAndStatus()
             

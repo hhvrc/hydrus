@@ -523,6 +523,8 @@ _If you have never used python before, do not try this. If the easy setup script
 
 You can also set up the environment yourself. Inside the extract should be hydrus_client.py and hydrus_server.py. You will be treating these basically the same as the 'client' and 'server' executables--with the right environment, you should be able to launch them the same way and they take the same launch parameters as the exes.
 
+### Environment setup
+
 Hydrus needs a whole bunch of libraries, so let's now set your python up. I **strongly** recommend you create a virtual environment. It is easy and doesn't mess up your system python.
 
 **You have to do this in the correct order! Do not switch things up. If you make a mistake, delete your venv folder and start over from the beginning.**
@@ -558,27 +560,22 @@ Then, to create a new venv:
 
 **After you have activated the venv**, you can use pip to install everything you need to it from the `pyproject.toml` in the install_dir:
 
-_This is going to be simpler in future!_
-
 ```
-python -m pip install . --group qt6-normal --group opencv-normal --group mpv-normal --group other-normal
+python -m pip install .
 ```
 
-If you need different versions of libraries, check the `pyproject.toml` file itself. For instance, for the newer OpenCV and Qt, you'd do this:
-
-```
-python -m pip install . --group qt6-test --group opencv-test --group mpv-normal --group other-normal
-```
+If you know what you are doing, you may also manually pip in different library versions as you desire, or you can use `uv` instead, if you know what that is.
 
 ### Qt { id="qt" }
 
-Qt is the UI library. I used to support Qt5, but no longer. You can run PySide6 or PyQt6--a wrapper library called `qtpy` allows this. The default is PySide6, but if it is missing, qtpy will fall back to an available alternative. You can choose PyQt6 like this:
+Qt is the UI library. I used to support Qt5, but no longer. You can run PySide6 or PyQt6--a wrapper library called `qtpy` allows this. The default is PySide6, but if it is missing, qtpy will fall back to an available alternative. You can install PyQt6 like this:
 
 ```
-python -m pip install . --group qt6-new-pyqt6 --group opencv-normal --group mpv-normal --group other-normal
+(with activated venv)
+python -m pip install pyqt6 pyqt6-charts
 ```
 
-If you have multiple Qts installed, then select which one you want to use by setting the `QT_API` environment variable to 'pyside6' or 'pyqt6'. Check _help->about_ to make sure it loaded the right one.
+You will then have both PySide6 and PyQt6 in your venv. You can uninstall PySide6 if you like, or, with multiple Qts installed, you can select which one you want to use by setting the `QT_API` environment variable to 'pyside6' or 'pyqt6'. Check _help->about_ to make sure it loaded the right one.
 
 !!! note "Qt compatibility"
     
@@ -603,16 +600,16 @@ If you have multiple Qts installed, then select which one you want to use by set
 
 ### mpv { id="mpv" }
 
-MPV is optional and complicated, but it is great, so it is worth the time to figure out!
+MPV is optional and sometimes annoying to get working, but it is great, so it is worth the time to figure out!
 
-As well as the python wrapper that we installed in the venv, you also need the underlying dev library, which means a .dll or .so file. This is _not_ mpv the program, but `libmpv`, often called `libmpv1` or `libmpv2`.
+As well as the python wrapper that we installed in the venv, you also need the underlying dev library, which means a .dll or .so file. This is _generally not_ mpv the program, but `libmpv`, often called `libmpv1` or `libmpv2`. Sometimes, installing mpv also installs libmpv, so you might already have it without realising it.
 
-For Windows, the dll builds are [here](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/), although selecting a stable version can be difficult on older machines. Just put it in your hydrus base install directory. Check the links in the easy-setup guide above for good versions. You can also just grab the 'mpv-1.dll'/'mpv-2.dll' I bundle in my extractable Windows release.
+For Windows, the dll builds are [here](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/), although selecting a stable version can be difficult on older machines. If you need help selecting a good version, check the links in the easy-setup guide above. Just put the dll in your hydrus base install directory, next to hydrus_client.py. You can also just grab the 'libmpv-2.dll' I bundle in my extractable Windows release.
 
 If you are on Linux, you can usually get `libmpv` like so:
 
 `sudo apt install libmpv1`  
--or-  
+-or, these days-  
 `sudo apt install libmpv2`
 
 On macOS, you should be able to get it with `brew install mpv`, but you are likely to find mpv crashes the program when it tries to load. Hydev is working on this, but it will probably need a completely different render API.
@@ -621,9 +618,9 @@ Hit _help->about_ to see your mpv status. If you don't have it, it will present 
 
 ### SQLite { id="sqlite" }
 
-If you can, update python's SQLite--it'll improve performance. The SQLite that comes with stock python is usually quite old, so you'll get a significant boost in speed. In some python deployments, the built-in SQLite not compiled with neat features like Fast Text Search (FTS) that hydrus needs.
+You might like to consider updating python's SQLite--it'll improve performance. The SQLite that comes with stock python is sometimes quite old, so you'll get a boost in speed.
 
-On Windows, get the 64-bit sqlite3.dll [here](https://www.sqlite.org/download.html), and just drop it in your ~~base install directory~~ python install location's DLLs folder, likely something like `C:\Program Files\Python311\DLLs` or `C:\Python311\DLLs`. There should be a sqlite3.dll there. Rename it to sqlite3.dll.old and add your newer one in.
+On Windows, get the 64-bit sqlite3.dll [here](https://www.sqlite.org/download.html), and drop it in your python install location's DLLs folder, likely something like `C:\Program Files\Python313\DLLs` or `C:\Python313\DLLs`. There should be a sqlite3.dll there. Rename it to sqlite3.dll.old and add your newer one in.
 
 You _may_ be able to update your SQLite on Linux or macOS with:
 
@@ -633,6 +630,8 @@ You _may_ be able to update your SQLite on Linux or macOS with:
 
 But as long as the program launches, it usually isn't a big deal.
 
+You can see your SQLite version under `help->about`.
+
 !!! note "Anaconda"
     A user who made a Windows venv with Anaconda reported they had to replace the sqlite3.dll in their conda env at `~/.conda/envs/<envname>/Library/bin/sqlite3.dll`.
 
@@ -640,9 +639,11 @@ But as long as the program launches, it usually isn't a big deal.
 
 If you don't have FFMPEG in your PATH and you want to import anything more fun than jpegs, you will need to put a static [FFMPEG](https://ffmpeg.org/) executable in your PATH or the `install_dir/bin` directory. [This](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z) should always point to a new build for Windows. Alternately, you can just copy the exe from one of my extractable Windows releases.
 
+If you are on a 'LTS'-style Linux flavour, your system ffmpeg may be pinned to an older version to guarantee stability. There's a couple guys who make regular new Linux builds, such as [here](https://github.com/BtbN/FFmpeg-Builds/releases). If you like, you can download that and extract the internal `ffmpeg` executable into `install_dir/bin`, and hydrus will use that instead. Unless you know better, you probably want the `linux64 gpl non-shared`.
+
 ### Running It { id="running_it" }
 
-Once you have everything set up, hydrus_client.py and hydrus_server.py should look for and run off client.db and server.db just like the executables. You can use the 'hydrus_client.bat/sh/command' scripts in the install dir or use them as inspiration for your own. In any case, you are looking at entering something like this into the terminal:
+Once you have everything set up, then you can launch the program as long as the venv is activated. hydrus_client.py and hydrus_server.py should look for and run off client.db and server.db just like the executables. You can use the 'hydrus_client.bat/sh/command' scripts in the install dir or use them as inspiration for your own. In any case, you are looking at entering something like this into the terminal:
 
 ```
 source venv/bin/activate
@@ -658,16 +659,24 @@ source venv/bin/activate
 python hydrus_client.py -d="/path/to/database"
 ```
 
+Alternately, rather than activating the venv, you can call the python executable directly; something like this:
+
+```
+/home/me/hydrus/venv/bin/python /home/me/hydrus/hydrus_client.py
+-or-
+C:\Users\Me\Hydrus\venv\Source\python.exe C:\Users\Me\Hydrus\hydrus_client.py
+```
+
 ### Building these Docs
 
 When running from source you may want to [build the hydrus help docs](about_docs.md) yourself. You can also check the `setup_help` scripts in the install directory. 
 
 ## My Code { id="my_code" }
 
-I use Windows and Linux, but I have more experience with Windows, and the program is generally most stable and clean there. I have very little experience with macOS, but I appreciate bug reports for any platform.
+I used to be a Windows guy with a little Linux experience, and now I am becoming the reverse. The program is stable and clean in most normal situations in either OS these days, although mpv and Wayland Linux can cause some headaches. I have very little experience with macOS, but I appreciate bug reports.
 
 My coding style is unusual and unprofessional. Everything is pretty much hacked together. I'm constantly throwing new code together and then cleaning and overhauling it down the line. If you are interested in how things work, look through the source and please do ask me if you don't understand something.
 
 I work strictly alone, however. While I am very interested in bug reports or suggestions for good libraries to use, I am not looking for pull requests or suggestions on refactoring. I know a lot of things are a mess. Everything I do is [WTFPL](https://github.com/sirkris/WTFPL/blob/master/WTFPL.md), so you can fork and play around with things on your end as much as you like.
 
-[This DeepWiki AI Crawl](https://deepwiki.com/hydrusnetwork/hydrus) of the Hydrus Github repository is not totally comprehensive, but I was impressed with how generally accurate it is. It attributes more thought on my part than actually happened, hahaha, but you might like to check it if you want to poke around.
+AI seems to understand my code well enough, and several users have vibe coded features without too much trouble. Feel free to point an AI at the code itself or the API Documentation if you want to code something up or figure out a bug. This [DeepWiki AI Crawl](https://deepwiki.com/hydrusnetwork/hydrus) is also surprisingly good, if not totally comprehensive.

@@ -6,22 +6,22 @@
 
 action = 'start'
 
-import sys
+import locale
 
 try:
     
-    import locale
+    locale.setlocale( locale.LC_ALL, '' )
     
-    try:
-        
-        locale.setlocale( locale.LC_ALL, '' )
-        
-    except Exception as e:
-        
-        pass
-        
+except Exception as e:
     
-    import os
+    pass
+    
+
+import sys
+import os
+
+try:
+    
     import threading
     
     from hydrus.core import HydrusBoot
@@ -173,6 +173,7 @@ except Exception as e:
     
     sys.exit( 1 )
     
+
 def boot():
     
     try:
