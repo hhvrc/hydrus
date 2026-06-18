@@ -825,11 +825,42 @@ def GetPartitionInfo( path ) -> FakeDiskPart | None:
     
 
 def GetDeviceId( path: str ):
-    
+
     result = os.stat( path )
-    
+
     return result.st_dev
-    
+
+
+def PathsAreOnSameDevice( path_a: str, path_b: str ) -> bool:
+    """
+    Tests whether two paths live on the same logical device/volume.
+
+    We resolve symlinks/junctions/mount points to their real targets first, so a folder link that points at another drive is correctly reported as a different device. os.stat then derives the device from the real file's volume (on Windows, the volume serial number), not from the literal path prefix.
+
+    Returns False if either path cannot be examined, so callers fall back to the safe behaviour when we can't be sure.
+    """
+
+    try:
+
+        real_a = os.path.realpath( path_a )
+        real_b = os.path.realpath( path_b )
+
+        device_a = os.stat( real_a ).st_dev
+        device_b = os.stat( real_b ).st_dev
+
+    except OSError:
+
+        return False
+
+
+    if device_a == 0 or device_b == 0:
+
+        # a zero device id means we can't actually identify the volume, so don't risk a false match
+        return False
+
+
+    return device_a == device_b
+
 
 def GetFileSystemType( path: str ) -> str | None:
     
