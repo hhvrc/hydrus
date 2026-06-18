@@ -54,6 +54,7 @@ Once the API is running, go to its entry in _services->review services_. Each ex
 
 ### Misc
 
+* [Hydrus Slideshow Frame](https://github.com/apampurin/hydrus-slideshow) ([opendesktop](https://www.opendesktop.org/p/2362439/)): KDE Plasma Widget slideshow photo frame
 * [Hydrus Video Deduplicator](https://github.com/hydrusvideodeduplicator/hydrus-video-deduplicator): Discovers duplicate videos in your client and queues them for the duplicate filter. 
 * [HydrusTools](https://github.com/GiovanH/HydrusTools): Toolkit for multiple kinds of metadata management and organisation.
 * [tagrank](https://github.com/matjojo/tagrank): Shows you comparison images and cleverly ranks your favourite tag.

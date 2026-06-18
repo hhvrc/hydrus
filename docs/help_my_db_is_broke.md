@@ -135,6 +135,8 @@ There are three known repair operations. Try one and see if you can pass an inte
 
 ##### clone
 
+_In our experience, this is generally the best thing to try._
+
 This instructs the database to copy itself to a new file. When it comes across damaged data, it will attempt to cleanly correct or nullify the broken links. The new file should be clean, but missing some data. It typically loses anywhere from 15-75%, which you can see by filesize. Losing 1-5% is normal because a clone includes an implicit vacuum.
 
 ```
@@ -179,9 +181,11 @@ You do not have to do an integrity_check after you clone. If you know your curre
 
 ##### repair
 
-This command tries to fix a database file in place. I do not recommend it as it works very very slowly--I have heard of users running .recover on a client.mappings.db and it not being finished a whole week later! While it may be able to recover some rows a clones would lose, it cannot fix everything and may leave you with a database that is still malformed, so you'll want to run integrity_check again and do a clone if needed.
+This command tries to fix a database file in place. **I do not recommend it** as it works very very slowly--in one case, a 92GB client.mappings.db took _13 days_ to finish and, after a vacuum, truncated to 300MB. While it may be able to recover some rows a clones would lose, it cannot fix everything and may leave you with a database that is still malformed, so you'll want to run integrity_check again and do a clone if needed.
 
-It is very important you have a backup copy of the broken file(s) here, as this edits the file in place.
+It may be reasonable to run a 'repair' if an attempt to clone simply errors out.
+
+**It is very important you make a backup copy of the broken file(s) before starting the command, as this edits the file in place.**
 
 ```
 .open client.db

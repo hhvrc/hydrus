@@ -9,7 +9,7 @@ Categories=Application;FileTools;Graphics;Network;
 # This needs to point to your executable, which is probably /path/to/install_dir/hydrus_client.sh. "Wrap in quotes" if the path has spaces.
 Exec=/usr/lib/hydrus/hydrus_client.sh
 
-# This can be whatever, but /path/to/install_dir/static/hydrus_non-transparent.png works well. "Wrap in quotes" if the path has spaces.
+# This can be whatever, but /path/to/install_dir/static/hydrus_non-transparent.png works well. Do not "wrap in quotes" if the path has spaces!
 Icon=/usr/lib/hydrus/static/hydrus_non-transparent.png
 
 # no ugly terminal when you boot up

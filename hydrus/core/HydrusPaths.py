@@ -34,6 +34,7 @@ def oserror_is_device_access_trouble( e: OSError ):
         errno.ESTALE,
         errno.ENOTCONN,
         errno.ENODEV,
+        -2144272384, # locked bitlocker drive
     )
     
 
@@ -1724,7 +1725,7 @@ def PotentialPathDeviceIsConnected( path: str ):
             
         
     
-    # we tried hitting the potential path and nothing went crazy, so mite b cool
+    # we tried hitting the potential path and nothing _about access_ went crazy, so mite b cool
     return True
     
 

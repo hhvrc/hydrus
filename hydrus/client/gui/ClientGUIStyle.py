@@ -1,9 +1,12 @@
+from pathlib import Path
 import os
+import re
 import typing
 
 from qtpy import QtWidgets as QW
 
 from hydrus.core import HydrusData
+from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusStaticDir
 from hydrus.core import HydrusText
@@ -18,6 +21,47 @@ CURRENT_STYLESHEET_FILENAME = None
 def ClearStyleSheet():
     
     SetStyleSheet( ORIGINAL_STYLESHEET, None )
+    
+
+def ConvertRelativeQSSPathsToAbsolute( qss_text: str, path: str ) -> str:
+    
+    # ok, so Qt doesn't know where a relative path is relative to. we can't tell it
+    # it uses the CWD by default, so wew
+    # for a while we vacillated on different solutions, but now I say, "Just state url("static/qss/blah... and I'll fix it on load"
+    # And here we are.
+    
+    MAGIC_PATH_PARTS = ( 'static', 'qss' )
+    
+    pathlib_path = Path( path )
+    
+    parts = pathlib_path.parts
+    
+    base_pathlib_path = None
+    
+    for i in range( len( parts ) - 1 ):
+        
+        if tuple( parts[ i : i + 2 ] ) == MAGIC_PATH_PARTS:
+            
+            base_pathlib_path = Path( * parts[:i] )
+            
+            break
+            
+        
+    
+    if base_pathlib_path is None:
+        
+        return qss_text
+        
+    
+    base_pathlib_path_forward_slashes = base_pathlib_path.as_posix()
+    # this is now something like "/home/me/hydrus" or "C:/hydrus network"
+    
+    STRING_TO_REPLACE = '"static/qss'
+    STRING_TO_REPLACE_WITH = f'"{base_pathlib_path_forward_slashes}/static/qss'
+    
+    qss_text_clean = re.sub( STRING_TO_REPLACE, STRING_TO_REPLACE_WITH, qss_text )
+    
+    return qss_text_clean
     
 
 def GetAvailableStyles():
@@ -173,6 +217,11 @@ def SetStyleSheetFromPath( filename ):
     with open( path, 'r', encoding = 'utf-8' ) as f:
         
         qss = f.read()
+        
+    
+    if HG.qss_absolute_test_mode:
+        
+        qss = ConvertRelativeQSSPathsToAbsolute( qss, path )
         
     
     SetStyleSheet( qss, filename )

@@ -22,6 +22,7 @@ from qtpy import QtGui as QG
 import random
 import math
 import re
+import time
 
 def elideRichText(richText: str, maxWidth: int, widget, elideFromLeft: bool):
     
@@ -204,7 +205,9 @@ class QLocatorResultWidget(QW.QWidget):
         self.currentIcon = QG.QIcon()
         self.currentToggledIcon = QG.QIcon()
         self.toggled = False
-
+        
+        self._last_show_event_time = 0.0
+        
         self.activateEnterShortcut.activated.connect(self.activate)
         self.activateReturnShortcut.activated.connect(self.activate)
 
@@ -221,8 +224,17 @@ class QLocatorResultWidget(QW.QWidget):
         p = QG.QPainter(self)
         self.style().drawPrimitive(QW.QStyle.PE_Widget, opt, p, self)
 
-    def enterEvent(self, event):
-        self.entered.emit()
+    def enterEvent( self, event: QG.QEnterEvent ):
+        
+        if time.monotonic() - self._last_show_event_time < 0.100: # if <100ms since we showed
+            
+            event.ignore()
+            
+        else:
+            
+            self.entered.emit()
+            
+        
 
     def mousePressEvent(self, event):
         self.entered.emit()
@@ -276,7 +288,14 @@ class QLocatorResultWidget(QW.QWidget):
             self.style().polish(self)
         iconToUse = self.currentIcon if not self.toggled else self.currentToggledIcon
         self.iconLabel.setPixmap(iconToUse.pixmap(self.iconHeight, self.iconHeight, QG.QIcon.Mode.Selected if self.selected else QG.QIcon.Mode.Normal))
-
+    
+    def showEvent( self, event):
+        
+        self._last_show_event_time = time.monotonic()
+        
+        return super().showEvent( event )
+        
+    
     def keyPressEvent(self, ev: QG.QKeyEvent):
         if ev.key() != QC.Qt.Key.Key_Up and ev.key() != QC.Qt.Key.Key_Down and ev.key() != QC.Qt.Key.Key_Enter and ev.key() != QC.Qt.Key.Key_Return:
             QW.QApplication.postEvent(self.keyEventTarget, QG.QKeyEvent(ev.type(), ev.key(), ev.modifiers(), ev.text(), ev.isAutoRepeat()))

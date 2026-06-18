@@ -19,6 +19,12 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         self._new_options = new_options
         
+        graphics_view_test_box = ClientGUICommon.StaticBox( self, 'New Rendering Tech Test' )
+        
+        self._test_thumbnails_graphics_view = QW.QCheckBox( graphics_view_test_box )
+        tt = 'Test out a new rendering method that uses more advanced, Qt-native drawing tech. Will only apply to new thumbnail pages, so do a client restart if you do not like it.'
+        self._test_thumbnails_graphics_view.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
+        
         thumbnail_appearance_box = ClientGUICommon.StaticBox( self, 'appearance' )
         
         self._thumbnail_width = ClientGUICommon.BetterSpinBox( thumbnail_appearance_box, min=20, max=2048 )
@@ -77,6 +83,8 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         #
         
+        self._test_thumbnails_graphics_view.setChecked( self._new_options.GetBoolean( 'test_thumbnails_graphics_view' ) )
+        
         ( thumbnail_width, thumbnail_height ) = HC.options[ 'thumbnail_dimensions' ]
         
         self._thumbnail_width.setValue( thumbnail_width )
@@ -111,6 +119,16 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
             
         
         self._show_extended_single_file_info_in_status_bar.setChecked( self._new_options.GetBoolean( 'show_extended_single_file_info_in_status_bar' ) )
+        
+        #
+        
+        rows = []
+        
+        rows.append( ( 'EXPERIMENTAL TEST, DO NOT CLICK: Try out the new thumbnail rendering tech (only applies to new pages): ', self._test_thumbnails_graphics_view ) )
+        
+        gridbox = ClientGUICommon.WrapInGrid( graphics_view_test_box, rows )
+        
+        graphics_view_test_box.Add( gridbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
         
         #
         
@@ -163,6 +181,7 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         QP.AddToLayout( vbox, thumbnail_appearance_box, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, thumbnail_interaction_box, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, thumbnail_misc_box, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, graphics_view_test_box, CC.FLAGS_EXPAND_PERPENDICULAR )
         vbox.addStretch( 0 )
         
         self.setLayout( vbox )
@@ -177,6 +196,8 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
     
     def UpdateOptions( self ):
+        
+        self._new_options.SetBoolean( 'test_thumbnails_graphics_view', self._test_thumbnails_graphics_view.isChecked() )
         
         new_thumbnail_dimensions = [self._thumbnail_width.value(), self._thumbnail_height.value()]
         

@@ -3614,6 +3614,8 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuItem( debug_modes, 'simulate a wake from sleep', 'Tell the controller to pretend that it just woke up from sleep.', self._controller.SimulateWakeFromSleepEvent )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'thumbnail debug mode', 'Show some thumbnail debug info.', HG.thumbnail_debug_mode, self._SwitchBoolean, 'thumbnail_debug_mode' )
         ClientGUIMenus.AppendSeparator( debug_modes )
+        ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'qss absolute path test mode', 'Test out that QSS thing for hydev.', HG.qss_absolute_test_mode, self._SwitchBoolean, 'qss_absolute_test_mode' )
+        ClientGUIMenus.AppendSeparator( debug_modes )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'allow crashy files in mpv', 'Disable the crash handling that unloads files from mpv when they raise certain fatal errors.', HG.mpv_allow_crashy_files, self._FlipMPVCrashHandling )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'allow crashy files in mpv (and silence errors)', 'Disable the crash handling that unloads files from mpv when they raise certain fatal errors and do not notify the user when it happens.', HG.mpv_allow_crashy_files_silently, self._FlipMPVSilentCrashHandling )
         ClientGUIMenus.AppendSeparator( debug_modes )
@@ -7022,6 +7024,10 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         elif name == 'pubsub_report_mode':
             
             HG.pubsub_report_mode = not HG.pubsub_report_mode
+            
+        elif name == 'qss_absolute_test_mode':
+            
+            HG.qss_absolute_test_mode = not HG.qss_absolute_test_mode
             
         elif name == 'shortcut_report_mode':
             

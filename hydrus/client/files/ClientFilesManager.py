@@ -348,7 +348,7 @@ class ClientFilesManager( object ):
                     HydrusData.DebugPrint( 'Missing locations follow:' )
                     HydrusData.DebugPrint( missing_string )
                     
-                    text = 'When initialising the client files manager, some file locations did not exist! They have all been written to the log!'
+                    text = 'When initialising the client files manager, some file locations either did not exist or were not available! They have all been written to the log!'
                     text += '\n' * 2
                     text += 'If this is happening on client boot, you should now be presented with a dialog to correct this manually!'
                     
@@ -356,7 +356,7 @@ class ClientFilesManager( object ):
                     
                 else:
                     
-                    text = 'When initialising the client files manager, these file locations did not exist:'
+                    text = 'When initialising the client files manager, these file locations either did not exist or were not available:'
                     text += '\n' * 2
                     text += missing_string
                     text += '\n' * 2

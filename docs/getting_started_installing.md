@@ -165,7 +165,7 @@ The update process:
 * Update your install:
     1. **If you use the installer**, just download the new installer and run it. It should detect where the last install was and overwrite everything automatically.
     2. **If you use the extract**, then just extract the new version right on top of your current install and overwrite manually. *It is wise to extract it straight from the archive to your install folder.*
-    4. **If you run from source**, then run `git pull` as normal. If it has been a few months since you made your venv, or the changelog talks about a new library version specifically, you might like to run `setup_venv` again.
+    3. **If you run from source**, then run `git pull` as normal. If it has been a few months since you made your venv, or the changelog talks about a new library version specifically, you might like to run `setup_venv` again.
 * Start your client or server. It may take a few minutes to update its database. I will say in the release post if it is likely to take longer.
 
 A user has written a longer and more formal guide to updating [here](update_guide.rtf).

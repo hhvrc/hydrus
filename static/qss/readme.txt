@@ -16,6 +16,10 @@ The default_hydrus.qss is used by the client to draw some custom widget colours.
 
 - More QSS -
 
+A hydrus user created the Nereid styles! You can find the latest releases here:
+
+https://github.com/6788-00/nereid-theme-hydrus
+
 For more inspiration, there are more QSS files here:
 
 https://wiki.qt.io/Gallery_of_Qt_CSS_Based_Styles
@@ -27,4 +31,16 @@ https://github.com/ModOrganizer2/modorganizer/tree/master/src/stylesheets
 
 - QSS Assets -
 
-A QSS that has assets under a subfolder, like you see here for 'e621' and 'Paper', can be tricky. The QSS usually defines its assets as a relative path, but hydrus cannot tell Qt where the QSS is coming from, so the relative path is always be calculated from the CWD when you launch the program. We have to make sure these line up all correct (e.g. the e621 qss refers to "[lib/]static/qss/e621/dropdown.svg"). If you ensure your CWD is the base install dir, things should line up for these default QSS files, but for custom QSSes, you should copy and edit the QSS to use absolute paths like "C:\path\to\my\db_dir\static\qss\my_qss\thing.svg" or "/path/to/my/db_dir/static/qss/my_qss/thing.svg" explicitly.
+UNDER TESTING. HIT UP `help->debug->debug modes->qss absolute path test mode` TO TRY THIS OUT!
+
+A QSS that has assets under a subfolder, like you see here for 'e621', 'Nereid', and 'Paper', can be tricky. The question is one of relative vs absolute paths. Relative paths are convenient, but deploying them is difficult.
+
+For a while, because of some funny Qt path rules, we had to be careful about ensuring the CWD was the base install folder or manually replacing relative with absolute paths. Now, I fix it for you by replacing relative paths with the correct absolute path when I load the QSS up.
+
+TO MAKE A PATH LOAD CORRECT, YOU MUST WRITE IT STARTING WITH `"static/qss/`, LIKE THIS:
+
+url("static/qss/my_style/some_asset.svg")
+
+I will replace that `"static/qss` with the respective absolute prefix when I load the file, no matter whether the QSS file is in a source's `install_dir/static/qss`, a built install's `install_dir/lib/static/qss`, or a user-custom `db_dir/static/qss`.
+
+If it doesn't work, your log file will probably get some "Could not create pixmap from whatever/static/qss/blah/blah.svg" lines when the style tries to load, and you'll see the path it tried to use.

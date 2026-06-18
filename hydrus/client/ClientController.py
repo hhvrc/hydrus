@@ -112,6 +112,11 @@ class App( QW.QApplication ):
         
         if HC.PLATFORM_LINUX:
             
+            # if this guy prints a Qt warning to log like this:
+            # Failed to register with host portal QDBusError("org.freedesktop.portal.Error.Failed", "Could not register app ID: Connection already associated with an application ID")
+            # that's fine; it just means 'hey there was no .desktop file in your like ~/.local/share/applications that actually agreed with this, so idk about icons and so on bro'
+            # maybe there's a better way of handling this, but I don't want to scan the users applications folder tbh
+            # maybe we just suppress the warning
             self.setDesktopFileName( 'io.github.hydrusnetwork.hydrus' )
             
         
@@ -209,6 +214,7 @@ class Controller( HydrusController.HydrusController ):
         self.call_after_catcher = ClientGUICallAfter.CallAfterEventCatcher( QW.QApplication.instance() )
         
         self.thumbnails_cache = None
+        self.thumbnails_cache_graphics_view_test = None
         
         Controller.my_instance = self
         
@@ -668,6 +674,7 @@ class Controller( HydrusController.HydrusController ):
         self.images_cache.Clear()
         self.image_tiles_cache.Clear()
         self.thumbnails_cache.Clear()
+        self.thumbnails_cache_graphics_view_test.Clear()
         
     
     def ClipboardHasImage( self ):
@@ -1281,6 +1288,7 @@ class Controller( HydrusController.HydrusController ):
         self.images_cache = ClientCaches.ImageRendererCache( self )
         self.image_tiles_cache = ClientCaches.ImageTileCache( self )
         self.thumbnails_cache = ClientCaches.ThumbnailCache( self )
+        self.thumbnails_cache_graphics_view_test = ClientCaches.ThumbnailCacheGraphicsViewTest( self )
         
         self.frame_splash_status.SetText( 'initialising managers' )
         
@@ -2284,7 +2292,7 @@ class Controller( HydrusController.HydrusController ):
             
             if True in ( service.GetPort() is not None for service in services ):
                 
-                HydrusData.ShowText( 'Twisted failed to import, so could not start the local booru/client api! Specific error has been printed to log. Please contact hydrus dev!' )
+                HydrusData.ShowText( 'Twisted failed to import, so could not start the local client api! Specific error has been printed to log. Please contact hydrus dev!' )
                 
                 HydrusData.Print( HG.twisted_is_broke_exception )
                 
@@ -2372,7 +2380,8 @@ class Controller( HydrusController.HydrusController ):
                 
             except Exception as e:
                 
-                pass # sometimes this throws a wobbler, screw it
+                HydrusData.Print( 'Twisted failed to shut down cleanly:' )
+                HydrusData.PrintException( e, do_wait = False )
                 
             
         
@@ -2421,11 +2430,6 @@ class Controller( HydrusController.HydrusController ):
         
     
     def SynchroniseRepositories( self ):
-        
-        if CG.client_controller.new_options.GetBoolean( 'pause_all_new_network_traffic' ):
-            
-            return
-            
         
         if not self.new_options.GetBoolean( 'pause_repo_sync' ):
             

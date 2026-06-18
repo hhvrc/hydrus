@@ -29,15 +29,17 @@ class RepairFileSystemPanel( ClientGUIScrolledPanels.ManagePanel ):
         
         self._missing_subfolders_to_new_subfolders = {}
         
-        text = 'This dialog has launched because some expected file storage directories were not found. This is a serious error. You have two options:'
+        text = 'This dialog has launched because some expected file storage directories were not found or not available. This is a serious error:'
         text += '\n\n'
-        text += '1) If you know what these should be (e.g. you recently remapped their external drive to another location), update the paths here manually. For most users, this will be clicking _add a possibly correct location_ and then select the new folder where the subdirectories all went. You can repeat this if your folders are missing in multiple locations. Check everything reports _ok!_'
+        text += '1) If you know what these should be (e.g. you recently moved the folders or remapped their folder to another location), update the paths using this dialog. For most users, this will be clicking _add a possibly correct location_ and then select the new folder where the subdirectories all went. You can repeat this if your folders are missing in multiple locations. Check everything reports _ok!_'
         text += '\n\n'
-        text += 'Although it is best if you can find everything, you only _have_ to fix the subdirectories starting with \'f\', which store your original files. Those starting \'t\' and \'r\' are for your thumbnails, which can be regenerated with a bit of work.'
+        text += 'Although it is best if you can find everything, you only _have_ to fix the subdirectories starting with \'f\', which store your original files. Those starting \'t\' are for your thumbnails, which can be regenerated with some work.'
         text += '\n\n'
         text += 'Then hit \'apply\', and the client will launch. You should double-check all your locations under \'database->move media files\' immediately.'
         text += '\n\n'
-        text += '2) If the locations are not available, or you do not know what they should be, or you wish to fix this outside of the program, hit \'cancel\' to gracefully cancel client boot. If you simply forgot to mount your storage. Hit cancel, mount, and try booting again.'
+        text += '2) If the locations are simply not available, or you do not know what they should be, or you wish to otherwise fix this outside of the program, hit \'cancel\' to gracefully cancel client boot.'
+        text += '\n\n'
+        text += '3) If you simply forgot to mount your storage, hit cancel, mount/unlock, and try booting again.'
         text += '\n\n'
         text += 'Feel free to contact hydrus dev for help. Regardless of the situation, the document at "Recovery->Help my media files-folders are broke" in the help may be useful background reading.'
         

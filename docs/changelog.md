@@ -7,6 +7,42 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 675](https://github.com/hydrusnetwork/hydrus/releases/tag/v675)
+
+### misc
+
+* the command palette will now _not_ highlight an item if the initial results list opens underneath the mouse. I'm trying to resolve a common annoyance here, but I don't use this much IRL, so let me know how this feels to you
+* the new 'recognise an unmounted NAS as similar to a missing path on boot' error catching now detects a locked bitlocker drive on Windows. updated the UI text in the dialogs around this, too
+* fixed an unhelpful old status check that said 'if all network traffic is paused, repository sync maintenance daemon will not work', which was blocking local-only repo processing
+* added a link to 'Hydrus Slideshow Frame', a user-made KDE Plasma Widget for a hydrus photo/slideshow frame, to the Client API help (https://github.com/apampurin/hydrus-slideshow)
+
+### custom stylesheets
+
+* A hydrus user created a bunch of great 'Nereid' stylesheets right here: https://github.com/6788-00/nereid-theme-hydrus . these are now rolled into hydrus by default
+* for stylesheet creators, I had an idea how to fix the external asset relative/absolute path problems we've had. I have written a test and would love to have some feedback on Windows and macOS. To do the test--
+    * create/copy a new stylesheet into your `db/static/qss` folder. change any 'url' paths from any existing `url("path/to/my/db/static/qss/blah/my_image.svg")`, to `url("static/qss/blah/my_image.svg)`, as if it were loading from and relative to the install dir. if you are copying from the install qss dir, maybe the paths are already in this format
+    * hit up `help->debug->debug modes->qss absolute path test mode`
+    * load your QSS file in the `options->style` section. ok the dialog if you need to hunt around for an asset. did the assets load ok?
+* let me know how it went. in that test mode, I detect paths in the normalised format and swap them with the absolutes on load. if things worked multiplat, I'll make this normal behaviour and this problem is fixed
+
+### new thumbnail GraphicsView test
+
+* a user has rewritten my ancient old thumbnail grid to a new Qt-nice rendering system. I really appreciate his work. I have integrated his code as a new test, and early results are very promising
+* it is not ready for normal use yet and still has bugs/jank. it is under `options->thumbnails` as an EXPERIMENTAL TEST, DO NOT CLICK checkbox
+* I'll keep working on this, but as it matures, we should have masonry layouts, vertical grids, more dynamic thumbnail sizes, and all sorts, all in a nicer drawing system with more animation options and so on. some bad old design ideas are being swept away at the same time
+
+### boring cleanup
+
+* if `twisted` (the networking library we use to host a server) fails to un-set the current hosting services on program close, the error is now printed to log. previously it was silenced. I'm narrowing down on a 'the program seemed to shut down but the process is still alive' issue, and I think it might be an overloaded/deadlocked Client API doing it
+* updated the 'help my db is broke' file a little regarding clone vs repair
+* fixed a note in the example .desktop file
+* did some misc linting
+* fixed missing executable permissions on the scripts in the main repo. sorry for the long-time problem here
+
+### new dev machine
+
+* just as a side thing, over my vacation I moved to a new dev machine. I'm finally on Linux to dev. I took the opportunity to rework my very messy dev environment and personal workflow and note-taking. my situation is far less stupid now, with a sensible and pleasant IDE connection to the github repo, a browser not overflowing with tabs, and a zeroed-out desktop and daily todo and such. I've got dozens of pages of overflowing note mess to still slowly work through, but I'm going to devote some specific sunday work time to project management and try to stay on top of it going forward!
+
 ## [Version 674](https://github.com/hydrusnetwork/hydrus/releases/tag/v674)
 
 ### misc
@@ -596,42 +632,3 @@ title: Changelog
 * fixed some default options display
 * brushed up all the import options summary statements and rearranged them all into single-line
 * updated some tag filter label grammar. in some cases it was saying 'tags taken: allowing all tags', which comes from internal permissions language, when just a 'tags taken: all tags' was a better fit
-
-## [Version 664](https://github.com/hydrusnetwork/hydrus/releases/tag/v664)
-
-### misc
-
-* the media 'delete' menu is no longer a flyout if there is only one deletion option (you should see 'delete from my files' more often)
-* the preview viewer now has the same style of delete menu as the canvas and thumbnail
-* the system tray options are no longer disabled on non-advanced non-Windows. this stuff works better these days
-
-### audio devices and tracks
-
-* you can now select the output audio device for QtMediaPlayers under `options->media playback`. default is 'default' (issue #1985)
-* there's also a "DEBUG: null" choice to say 'never load any audio output device to QtMediaPlayer'. I know we've had some users who have had trouble with this
-* I then did the same for mpv. it works a little different, so you hit a button to fetch the available options and then select from there, or type in manually if you know otherwise. similarly, you can select a 'DEBUG: null' option
-* QtMediaPlayers now show their audio tracks in the player right-click menu. it says title, language, and codec, depending on what is available. you can select another track and it changes instantly!
-* QtMediaPlayers also now show their video track(s)! I added the same 'switch video track' call as the audio stuff. if anyone has a multi-video-track example vid, I'd love to see it for my testing purposes, but the audio side was a dream so I assume it just werkz
-* some this stuff is very slightly hacky, so let me know how this works for you
-
-### file import object inheritance cleanup
-
-* _tl;dr: some downloaders save modified time better_
-* when a gallery parse or a file post parse creates multiple child file import objects, I have cleaned up how the parent gives the children data--
-* source time is now only propagated if the parent source time is A) sensible and B) the child doesn't already have an older timestamp. all instances of file import object source-time-setting now follow this rule, which is how modified times are generally updated elsewhere in hydrus. 'older is generally more useful and trustworthy, unless it is new year's day 1970 etc..' also, file import objects now clip to thirty seconds ago when given a timestamp from the future (happens with timezone fun sometimes). thanks, particularly, to the user who identified and chased this down (issue #1984)
-* referral url is similarly now propagated more softly; only inherited if it isn't set beforehand (was previously a forced overwrite in all cases. not sure it actually matters, but it might in future)
-
-### some boring cleanup
-
-* some critical image rendering sections now clean up their memory quickly and explicitly rather than waiting for the garbage collector to handle it later. more to come here in future
-* cleaned up how `AsyncQtJob`s do UI restoration after an error, harmonising how the callback and errback restore the UI
-* decoupled how some exception stuff is caught and processed and rendered for the user, and fixed some error-reporting pathways that were not rendering nicely
-
-### boring import options overhaul
-
-* I juggled some more pending import options stuff around, giving the wilder stuff a KISS pass
-* wrote a panel to handle editing the new defaults. I simplified things a good bit and moved it all to the options dialog. it is hidden for now but I feel fairly good about it all
-* filled in a bunch of holes and fixed some display bugs as I stitched it all together
-* improved how import options and their containers present for network vs local imports
-* got the import options editing dialog to remember the last selected options type
-* I've now got to write some favourites UI, polish this all, write some migration tech, and then update the import pipeline to handle it all. feels doable

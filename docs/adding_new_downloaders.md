@@ -10,7 +10,7 @@ The client starts with no downloaders, but all downloaders can be created, edite
 
 Many Hydrus objects can be shared as data encoded into png files, like this:
 
-![](images/artbooru 2026-03-29.png)
+![](images/artbooru_2026-03-29.png)
 
 This simple png is encoded with data that hydrus can read. It contains all the information needed for a client to add an [artbooru](https://artbooru.com) tag search entry to the list you select from when you start a new download or subscription.
 
