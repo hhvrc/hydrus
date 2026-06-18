@@ -1179,26 +1179,41 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
             if not os.path.exists( path ):
                 
                 raise HydrusExceptions.VetoException( 'Source file does not exist!' )
-                
-            
-            ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'file_import' )
-            
-            try:
-                
-                if status_hook is not None:
-                    
-                    status_hook( 'copying file to temp location' )
-                    
-                
-                HydrusPaths.MirrorFile( path, temp_path )
-                
-                self.Import( temp_path, full_import_options_container, status_hook = status_hook )
-                
-            finally:
-                
-                HydrusTemp.CleanUpTempPath( os_file_handle, temp_path )
-                
-            
+
+
+            # normally we copy the source file to our temp dir to work on a stable local copy, but if the source is already on the same logical device as our temp dir, that copy is pure wasted duplication--the import job only reads the file, so we can just work on it in place
+            # PathsAreOnSameDevice resolves any folder links/junctions first, so a source that merely _looks_ like it is on the same drive but really redirects to another volume is not treated as same-device
+
+            hydrus_temp_dir = CG.client_controller.GetHydrusTempDir()
+
+            source_and_temp_on_same_device = HydrusPaths.PathsAreOnSameDevice( path, hydrus_temp_dir )
+
+
+            if source_and_temp_on_same_device:
+
+                self.Import( path, full_import_options_container, status_hook = status_hook )
+
+            else:
+
+                ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'file_import' )
+
+                try:
+
+                    if status_hook is not None:
+
+                        status_hook( 'copying file to temp location' )
+
+
+                    HydrusPaths.MirrorFile( path, temp_path )
+
+                    self.Import( temp_path, full_import_options_container, status_hook = status_hook )
+
+                finally:
+
+                    HydrusTemp.CleanUpTempPath( os_file_handle, temp_path )
+
+
+
             self.WriteContentUpdates( full_import_options_container )
             
         except HydrusExceptions.VetoException as e:
