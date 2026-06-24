@@ -255,16 +255,6 @@ def boot():
             
             HydrusData.Print( 'hydrus client started' )
             
-            if not HG.twisted_is_broke:
-                
-                import threading
-                
-                # noinspection PyUnresolvedReferences
-                target = reactor.run
-                
-                threading.Thread( target = target, name = 'twisted', kwargs = { 'installSignalHandlers' : 0 } ).start()
-                
-            
             from hydrus.client import ClientController
             
             controller = ClientController.Controller( db_dir, logger )
@@ -290,13 +280,25 @@ def boot():
                 controller.pubimmediate( 'wake_daemons' )
                 
             
-            if not HG.twisted_is_broke:
+            if HG.shutdown_report_mode:
                 
-                # noinspection PyUnresolvedReferences
-                target = reactor.stop
+                import time
                 
-                # noinspection PyUnresolvedReferences
-                reactor.callFromThread( target )
+                time.sleep( 1 )
+                
+                import threading
+                
+                print( 'Hey, printing alive threads for shutdown report:' )
+                
+                for t in threading.enumerate():
+                    
+                    if not t.is_alive():
+                        
+                        continue
+                        
+                    
+                    print( f'{t.name}: daemon: {t.daemon}' )
+                    
                 
             
             HydrusData.Print( 'hydrus client shut down' )

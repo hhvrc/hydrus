@@ -6,7 +6,6 @@ import typing
 from qtpy import QtWidgets as QW
 
 from hydrus.core import HydrusData
-from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusStaticDir
 from hydrus.core import HydrusText
@@ -29,6 +28,9 @@ def ConvertRelativeQSSPathsToAbsolute( qss_text: str, path: str ) -> str:
     # it uses the CWD by default, so wew
     # for a while we vacillated on different solutions, but now I say, "Just state url("static/qss/blah... and I'll fix it on load"
     # And here we are.
+    
+    # first off, as a sanity check, is our qss file under a path that includes '/static/qss/' somewhere?
+    # what are we going to be prepending to our relative paths?
     
     MAGIC_PATH_PARTS = ( 'static', 'qss' )
     
@@ -219,10 +221,7 @@ def SetStyleSheetFromPath( filename ):
         qss = f.read()
         
     
-    if HG.qss_absolute_test_mode:
-        
-        qss = ConvertRelativeQSSPathsToAbsolute( qss, path )
-        
+    qss = ConvertRelativeQSSPathsToAbsolute( qss, path )
     
     SetStyleSheet( qss, filename )
     

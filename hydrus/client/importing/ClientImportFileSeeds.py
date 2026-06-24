@@ -26,7 +26,6 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientTime
 from hydrus.client.importing import ClientImportFiles
-from hydrus.client.importing import ClientImporting
 from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import PrefetchImportOptions
 from hydrus.client.importing.options import PresentationImportOptions
@@ -39,6 +38,35 @@ from hydrus.client.parsing import ClientParsingResults
 
 FILE_SEED_TYPE_HDD = 0
 FILE_SEED_TYPE_URL = 1
+
+def ConvertParsedPostsToFileSeeds( parsed_posts: list[ ClientParsingResults.ParsedPost ], source_url: str ) -> "list[ FileSeed ]":
+    
+    file_seeds = []
+    
+    seen_urls = set()
+    
+    for parsed_post in parsed_posts:
+        
+        parsed_urls = parsed_post.GetURLs( ( HC.URL_TYPE_DESIRED, ), only_get_top_priority = True )
+        
+        parsed_urls = [ url for url in parsed_urls if url not in seen_urls ]
+        
+        seen_urls.update( parsed_urls )
+        
+        for url in parsed_urls:
+            
+            file_seed = FileSeed( FILE_SEED_TYPE_URL, url )
+            
+            file_seed.SetReferralURL( source_url )
+            
+            file_seed.AddParsedPost( parsed_post )
+            
+            file_seeds.append( file_seed )
+            
+        
+    
+    return file_seeds
+    
 
 def FilterOneFileURLs( urls ):
     
@@ -1181,37 +1209,43 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                 raise HydrusExceptions.VetoException( 'Source file does not exist!' )
 
 
-            # normally we copy the source file to our temp dir to work on a stable local copy, but if the source is already on the same logical device as our temp dir, that copy is pure wasted duplication--the import job only reads the file, so we can just work on it in place
-            # PathsAreOnSameDevice resolves any folder links/junctions first, so a source that merely _looks_ like it is on the same drive but really redirects to another volume is not treated as same-device
+            if CG.client_controller.new_options.GetBoolean( 'copy_import_files_to_temp_dir' ):
 
-            hydrus_temp_dir = CG.client_controller.GetHydrusTempDir()
+                # normally we copy the source file to our temp dir to work on a stable local copy, but if the source is already on the same logical device as our temp dir, that copy is pure wasted duplication--the import job only reads the file, so we can just work on it in place
+                # PathsAreOnSameDevice resolves any folder links/junctions first, so a source that merely _looks_ like it is on the same drive but really redirects to another volume is not treated as same-device
 
-            source_and_temp_on_same_device = HydrusPaths.PathsAreOnSameDevice( path, hydrus_temp_dir )
+                hydrus_temp_dir = CG.client_controller.GetHydrusTempDir()
+
+                source_and_temp_on_same_device = HydrusPaths.PathsAreOnSameDevice( path, hydrus_temp_dir )
+
+                if source_and_temp_on_same_device:
+
+                    self.Import( path, full_import_options_container, status_hook = status_hook )
+
+                else:
+
+                    ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'file_import' )
+
+                    try:
+
+                        if status_hook is not None:
+
+                            status_hook( 'copying file to temp location' )
 
 
-            if source_and_temp_on_same_device:
+                        HydrusPaths.MirrorFile( path, temp_path )
 
-                self.Import( path, full_import_options_container, status_hook = status_hook )
+                        self.Import( temp_path, full_import_options_container, status_hook = status_hook )
+
+                    finally:
+
+                        HydrusTemp.CleanUpTempPath( os_file_handle, temp_path )
+
+
 
             else:
 
-                ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'file_import' )
-
-                try:
-
-                    if status_hook is not None:
-
-                        status_hook( 'copying file to temp location' )
-
-
-                    HydrusPaths.MirrorFile( path, temp_path )
-
-                    self.Import( temp_path, full_import_options_container, status_hook = status_hook )
-
-                finally:
-
-                    HydrusTemp.CleanUpTempPath( os_file_handle, temp_path )
-
+                self.Import( path, full_import_options_container, status_hook = status_hook )
 
 
             self.WriteContentUpdates( full_import_options_container )
@@ -1580,7 +1614,7 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                         except Exception as e:
                             
                             # something crazy happened, like FFMPEG thinking JSON was an MP4 wew, so let's bail out
-                            raise HydrusExceptions.VetoException( 'The parser found nothing in the document, and while the document initially seemed to actually be an importable file, it looks like it failed to import too!' )
+                            raise HydrusExceptions.VetoException( 'The parser found nothing in the document, and while the document initially seemed to actually be an importable file, it looks like it failed to import too! This is probably some malformed JSON or something.' )
                             
                         finally:
                             
@@ -1592,62 +1626,58 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                             raise HydrusExceptions.VetoException( 'The parser found nothing in the document, nor did it seem to be an importable file!' )
                             
                         
-                    elif len( parsed_posts ) > 1:
-                        
-                        # multiple child urls generated by a subsidiary page parser
-                        
-                        file_seeds = ClientImporting.ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
-                        
-                        for file_seed in file_seeds:
-                            
-                            self._GiveChildFileSeedMyInfo( file_seed, url_for_child_referral )
-                            
-                        
-                        try:
-                            
-                            my_index = file_seed_cache.GetFileSeedIndex( self )
-                            
-                            insertion_index = my_index + 1
-                            
-                        except Exception as e:
-                            
-                            insertion_index = len( file_seed_cache )
-                            
-                        
-                        num_urls_added = file_seed_cache.InsertFileSeeds( insertion_index, file_seeds )
-                        
-                        status = CC.STATUS_SUCCESSFUL_AND_CHILD_FILES
-                        note = f'Found {HydrusNumbers.ToHumanInt( num_urls_added )} new URLs in {HydrusNumbers.ToHumanInt( len( parsed_posts ) )} sub-posts.'
-                        
-                        self.SetStatus( status, note = note )
-                        
                     else:
                         
-                        # no subsidiary page parser results, just one
+                        # one or more posts have been parsed. This could be via:
+                        #
+                        # A) a subsidiary page parser giving a bunch
+                        # B) a single flat parser giving multiple URLs in one content parser
+                        # C) a single post url
+                        # D) other stuff and complicated mixes of situations
+                        #
+                        # for a long time, this had separate pathways for different situations, but keeping inheritance logic the same across them was a mess.
+                        # we want to KISS
+                        #
+                        # Now we have two situations:
+                        #
+                        # A) We got one file URL that we will handle right here right now
+                            # in this case, we want the tags and stuff from the pertinent post
+                        # B) We got stuff that should be one or more child urls and dealt with later
+                            # in this case, all our children need to get any tags and stuff we have
                         
-                        parsed_post = parsed_posts[0]
+                        possible_child_file_seeds = ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
                         
-                        self.AddParsedPost( parsed_post )
-                        
-                        self.CheckPreFetchMetadata( full_import_options_container )
-                        
-                        desired_urls = parsed_post.GetURLs( ( HC.URL_TYPE_DESIRED, ), only_get_top_priority = True )
-                        
-                        child_urls = []
-                        
-                        if len( desired_urls ) == 0:
+                        if len( possible_child_file_seeds ) == 0:
                             
-                            raise HydrusExceptions.VetoException( 'Could not find a file or post URL to download!' )
+                            raise HydrusExceptions.VetoException( 'The parser found something in the document, but could not find a file or post URL to download!' )
                             
-                        elif len( desired_urls ) == 1:
+                        elif len( possible_child_file_seeds ) == 1:
                             
-                            desired_url = desired_urls[0]
+                            possible_file_url = possible_child_file_seeds[0].file_seed_data
                             
-                            ( url_type, match_name, can_parse, cannot_parse_reason ) = CG.client_controller.network_engine.domain_manager.GetURLParseCapability( desired_url )
+                            ( url_type, match_name, can_parse, cannot_parse_reason ) = CG.client_controller.network_engine.domain_manager.GetURLParseCapability( possible_file_url )
                             
                             if url_type in ( HC.URL_TYPE_FILE, HC.URL_TYPE_UNKNOWN ):
                                 
-                                file_url = desired_url
+                                # ok, ding ding ding, we have a single file url. let's give ourselves this metadata and then download it!
+                                possible_child_file_seeds = []
+                                
+                                file_url = possible_file_url
+                                
+                                # we want to get all the tags and stuff from this post. we could suck from the file seed, but let's share code and find that parsed post and just eat that like the file seed did
+                                for parsed_post in parsed_posts:
+                                    
+                                    parsed_urls = parsed_post.GetURLs( ( HC.URL_TYPE_DESIRED, ), only_get_top_priority = True )
+                                    
+                                    if file_url in parsed_urls:
+                                        
+                                        self.AddParsedPost( parsed_post )
+                                        
+                                        break
+                                        
+                                    
+                                
+                                self.CheckPreFetchMetadata( full_import_options_container )
                                 
                                 ( should_download_metadata, should_download_file ) = self.PredictPreImportStatus( full_import_options_container, file_url )
                                 
@@ -1659,42 +1689,18 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                                     self.DownloadAndImportRawFile( file_url, full_import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook, override_bandwidth = override_bandwidth, spawning_url = url_to_fetch, forced_referral_url = url_for_child_referral, file_seed_cache = file_seed_cache )
                                     
                                 
-                            elif url_type == HC.URL_TYPE_POST and can_parse:
-                                
-                                # nested URL type, might be a subsequent 'zoomed in' view or a mini-album page type with n = 1 
-                                
-                                child_urls = [ desired_url ]
-                                
-                            else:
-                                
-                                if can_parse:
-                                    
-                                    raise HydrusExceptions.VetoException( 'Found a URL--{}--but it was not a file/post URL!'.format( desired_url ) )
-                                    
-                                else:
-                                    
-                                    raise HydrusExceptions.VetoException( 'Found a URL--{}--but it was not a file/post URL! Also, even then, it seems I cannot parse it anyway: {}'.format( desired_url, cannot_parse_reason ) )
-                                    
-                                
-                            
-                        else:
-                            
-                            child_urls = desired_urls
                             
                         
-                        child_urls = HydrusLists.DedupeList( child_urls )
-                        
-                        if len( child_urls ) > 0:
+                        if len( possible_child_file_seeds ) > 0:
                             
-                            child_file_seeds = []
+                            # ok, we are situation B. one way or another, we have one or more non-trivial URLs to handle
+                            # we'll give these file seeds our inheritable metadata, queue them up, and we are done
                             
-                            for child_url in child_urls:
+                            child_file_seeds = possible_child_file_seeds
+                            
+                            for child_file_seed in child_file_seeds:
                                 
-                                file_seed = FileSeed( FILE_SEED_TYPE_URL, child_url )
-                                
-                                self._GiveChildFileSeedMyInfo( file_seed, url_for_child_referral )
-                                
-                                child_file_seeds.append( file_seed )
+                                self._GiveChildFileSeedMyInfo( child_file_seed, url_for_child_referral )
                                 
                             
                             try:
@@ -1711,7 +1717,7 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                             num_urls_added = file_seed_cache.InsertFileSeeds( insertion_index, child_file_seeds )
                             
                             status = CC.STATUS_SUCCESSFUL_AND_CHILD_FILES
-                            note = 'Found {} new URLs in one post.'.format( HydrusNumbers.ToHumanInt( num_urls_added ) )
+                            note = f'Found {HydrusNumbers.ToHumanInt( num_urls_added )} new URLs.'
                             
                             self.SetStatus( status, note = note )
                             

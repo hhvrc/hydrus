@@ -27,7 +27,7 @@ from hydrus.client.parsing import ClientParsing
 
 class TestPanel( QW.QWidget ):
     
-    MAX_CHARS_IN_PREVIEW = 1024 * 64
+    MAX_CHARS_IN_PREVIEW = 500 * 1000
     
     def __init__( self, parent, object_callable, test_data: ClientParsing.ParsingTestData | None = None ):
         
@@ -304,7 +304,9 @@ class TestPanel( QW.QWidget ):
                 
                 if len( example_data_to_show ) > self.MAX_CHARS_IN_PREVIEW:
                     
-                    preview = 'PREVIEW:' + '\n' + str( example_data_to_show[:self.MAX_CHARS_IN_PREVIEW] )
+                    description += f'\nThe data was more than {HydrusNumbers.ToHumanInt(self.MAX_CHARS_IN_PREVIEW)} characters. Clipping what is shown.'
+                    
+                    preview = example_data_to_show[:self.MAX_CHARS_IN_PREVIEW]
                     
                 else:
                     
@@ -315,7 +317,7 @@ class TestPanel( QW.QWidget ):
                 
                 if mime in HC.ALLOWED_MIMES:
                     
-                    description = 'that looked like a {}!'.format( HC.mime_string_lookup[ mime ] )
+                    description = 'That looked like a {}!'.format( HC.mime_string_lookup[ mime ] )
                     
                     preview = 'no preview'
                     
@@ -323,11 +325,13 @@ class TestPanel( QW.QWidget ):
                     
                 else:
                     
-                    description = 'that did not look like a full HTML document, nor JSON, but will try to show it anyway'
+                    description = 'That did not look like a full HTML document, nor JSON, but will try to show it anyway'
                     
                     if len( example_data ) > self.MAX_CHARS_IN_PREVIEW:
                         
-                        preview = f'PREVIEW:\n{example_data[:self.MAX_CHARS_IN_PREVIEW]}'
+                        description += f'\nThe data was more than {HydrusNumbers.ToHumanInt(self.MAX_CHARS_IN_PREVIEW)} characters. Clipping what is shown.'
+                        
+                        preview = f'{example_data[:self.MAX_CHARS_IN_PREVIEW]}'
                         
                     else:
                         
@@ -527,15 +531,6 @@ class TestPanelPageParser( TestPanel ):
                     
                     post_conversion_example_data = pre_parsing_converter.Convert( self._example_data_raw )
                     
-                    if len( post_conversion_example_data ) > self.MAX_CHARS_IN_PREVIEW:
-                        
-                        preview = 'PREVIEW:' + '\n' + str( post_conversion_example_data[:self.MAX_CHARS_IN_PREVIEW] )
-                        
-                    else:
-                        
-                        preview = post_conversion_example_data
-                        
-                    
                     parse_phrase = 'uncertain data type'
                     
                     # can't just throw this at bs4 to see if it 'works', as it'll just wrap any unparsable string in some bare <html><body><p> tags
@@ -551,6 +546,17 @@ class TestPanelPageParser( TestPanel ):
                         
                     
                     description = HydrusData.ToHumanBytes( len( post_conversion_example_data ) ) + ' total, ' + parse_phrase
+                    
+                    if len( post_conversion_example_data ) > self.MAX_CHARS_IN_PREVIEW:
+                        
+                        description += f'\nThe data was more than {HydrusNumbers.ToHumanInt(self.MAX_CHARS_IN_PREVIEW)} characters. Clipping what is shown.'
+                        
+                        preview = post_conversion_example_data[:self.MAX_CHARS_IN_PREVIEW]
+                        
+                    else:
+                        
+                        preview = post_conversion_example_data
+                        
                     
                 except Exception as e:
                     

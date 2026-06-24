@@ -664,6 +664,8 @@ def FigureOutDBDir( arg_db_dir: str ):
         
         db_dir = arg_db_dir
         
+        db_dir = os.path.expanduser( db_dir )
+        
         db_dir = ConvertPortablePathToAbsPath( db_dir, base_dir_override = HC.BASE_DIR )
         
     

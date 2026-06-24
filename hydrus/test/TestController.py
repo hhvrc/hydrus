@@ -10,6 +10,8 @@ import unittest
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
+from twisted.internet import reactor
+
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
@@ -202,6 +204,10 @@ class Controller( object ):
         self.main_qt_thread = self.app.thread()
         
         self.call_after_catcher = ClientGUICallAfter.CallAfterEventCatcher( QW.QApplication.instance() )
+        
+        self._twisted_thread = threading.Thread( target = reactor.run, name = 'twisted', daemon = True, kwargs = { 'installSignalHandlers' : 0 } )
+        
+        self._twisted_thread.start()
         
         self._test_db = None
         
@@ -1134,6 +1140,16 @@ class Controller( object ):
         
     
     def TidyUp( self ):
+        
+        if reactor.running:
+            
+            reactor.callFromThread( reactor.stop )
+            
+            if self._twisted_thread is not None:
+                
+                HydrusThreading.ShutdownThread( self._twisted_thread )
+                
+            
         
         time.sleep( 2 )
         

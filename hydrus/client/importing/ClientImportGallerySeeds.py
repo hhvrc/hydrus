@@ -16,7 +16,6 @@ from hydrus.core import HydrusTime
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
-from hydrus.client.importing import ClientImporting
 from hydrus.client.metadata import ClientTags
 from hydrus.client.parsing import ClientParsing
 from hydrus.client.parsing import ClientParsingResults
@@ -527,6 +526,8 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
                     raise HydrusExceptions.VetoException( 'The parser found nothing in the document!' )
                     
                 
+                # title
+                
                 title = ClientParsingResults.GetTitleFromParsedPosts( parsed_posts )
                 
                 if title is not None:
@@ -534,20 +535,11 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
                     title_hook( title )
                     
                 
-                if len( parsed_posts ) == 1: # this is tricky, and I think I need a better answer that is 'if parsed post is top level, then add tags' etc.. so file seeds inherit it
-                    
-                    parsed_post = parsed_posts[0]
-                    
-                    tags = parsed_post.GetTags()
-                    
-                    self.AddExternalFilterableTags( tags )
-                    
-                    request_headers = parsed_post.GetHTTPHeaders()
-                    
-                    self.AddRequestHeaders( request_headers )
-                    
+                # files
                 
-                file_seeds = ClientImporting.ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
+                from hydrus.client.importing import ClientImportFileSeeds
+                
+                file_seeds = ClientImportFileSeeds.ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
                 
                 for file_seed in file_seeds:
                     
@@ -572,15 +564,7 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
                     note += ' - ' + stop_reason
                     
                 
-                if parser.CanOnlyGenerateGalleryURLs() or self._force_next_page_url_generation:
-                    
-                    can_add_more_gallery_urls = True
-                    
-                else:
-                    
-                    # only keep searching if we found any files, otherwise this could be a blank results page with another stub page
-                    can_add_more_gallery_urls = num_urls_added > 0 and can_search_for_more_files
-                    
+                # sub gallery urls
                 
                 sub_gallery_seeds = ConvertParsedPostsToGallerySeeds( parsed_posts, ( HC.URL_TYPE_SUB_GALLERY, ), self._can_generate_more_pages )
                 
@@ -611,6 +595,18 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
                 elif len( sub_gallery_seeds ) > 0:
                     
                     note += f' - {HydrusNumbers.ToHumanInt( len( sub_gallery_seeds ) )} sub-gallery urls found, but they had all already been visited this run and were not added'
+                    
+                
+                # next page urls
+                
+                if parser.CanOnlyGenerateGalleryURLs() or self._force_next_page_url_generation:
+                    
+                    can_add_more_gallery_urls = True
+                    
+                else:
+                    
+                    # only keep searching if we found any files, otherwise this could be a blank results page with another stub page
+                    can_add_more_gallery_urls = num_urls_added > 0 and can_search_for_more_files
                     
                 
                 if self._can_generate_more_pages and can_add_more_gallery_urls:

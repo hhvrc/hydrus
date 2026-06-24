@@ -198,6 +198,8 @@ class Controller( HydrusController.HydrusController ):
         
         HC.options = self.options
         
+        self._have_set_some_twisted_services_at_least_once = False
+        
         self._page_key_lock = threading.Lock()
         
         self._alive_page_keys = set()
@@ -2288,16 +2290,22 @@ class Controller( HydrusController.HydrusController ):
                 
             
         
+        if not self._have_set_some_twisted_services_at_least_once and len( services ) == 0:
+            
+            return
+            
+        
+        self._have_set_some_twisted_services_at_least_once = True
+        
         if HG.twisted_is_broke:
             
-            if True in ( service.GetPort() is not None for service in services ):
-                
-                HydrusData.ShowText( 'Twisted failed to import, so could not start the local client api! Specific error has been printed to log. Please contact hydrus dev!' )
-                
-                HydrusData.Print( HG.twisted_is_broke_exception )
-                
+            HydrusData.ShowText( 'Twisted failed to import, so could not start the local client api! Specific error has been printed to log. Please contact hydrus dev!' )
+            
+            HydrusData.Print( HG.twisted_is_broke_exception )
             
         else:
+            
+            self.StartTwistedIfNeeded()
             
             threads.blockingCallFromThread( reactor, TWISTEDDoIt )
             

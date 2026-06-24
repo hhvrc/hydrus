@@ -99,6 +99,8 @@ class HydrusLogger( object ):
             
             self._log_file.write( HC.UNICODE_BYTE_ORDER_MARK ) # Byte Order Mark, BOM, to help reader software interpret this as utf-8
             
+            self._log_file.write( 'THIS LOG FILE MAY CONTAIN PRIVATE INFORMATION! DO NOT SHARE IT CASUALLY!\n\n' )
+            
         
     
     def _SwitchToANewLogFileIfDue( self ) -> None:

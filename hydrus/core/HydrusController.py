@@ -51,6 +51,8 @@ class HydrusController( object ):
         
         self._thread_slot_lock = threading.Lock()
         
+        self._twisted_thread = None
+        
         self._call_to_threads = []
         self._long_running_call_to_threads = []
         
@@ -813,6 +815,8 @@ class HydrusController( object ):
                 
             
         
+        self.StopTwistedIfRunning()
+        
         HG.model_shutdown = True
         
         self._pubsub.Wake()
@@ -863,6 +867,50 @@ class HydrusController( object ):
             
         
         self.SleepCheck()
+        
+    
+    def StartTwistedIfNeeded( self ):
+        
+        if HG.twisted_is_broke:
+            
+            raise Exception( 'Sorry, twisted did not import correctly! Cannot start any services.' )
+            
+        
+        from twisted.internet import reactor
+        
+        if reactor.running:
+            
+            return
+            
+        
+        self._twisted_thread = threading.Thread( target = reactor.run, name = 'twisted', kwargs = { 'installSignalHandlers' : 0 } )
+        
+        self._twisted_thread.start()
+        
+    
+    def StopTwistedIfRunning( self ):
+        
+        if HG.twisted_is_broke:
+            
+            return
+            
+        
+        from twisted.internet import reactor
+        
+        if reactor.running:
+            
+            reactor.callFromThread( reactor.stop )
+            
+            if self._twisted_thread is not None:
+                
+                HydrusThreading.ShutdownThread( self._twisted_thread )
+                
+            
+            if HG.shutdown_report_mode:
+                
+                HydrusData.Print( 'Just sent twisted shutdown call.' )
+                
+            
         
     
     def SystemBusy( self ):

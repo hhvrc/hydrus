@@ -31,13 +31,11 @@ https://github.com/ModOrganizer2/modorganizer/tree/master/src/stylesheets
 
 - QSS Assets -
 
-UNDER TESTING. HIT UP `help->debug->debug modes->qss absolute path test mode` TO TRY THIS OUT!
+A QSS that has assets under a subfolder, like you see here for 'e621', 'Nereid', and 'Paper', can be tricky. The question is one of relative vs absolute paths. Relative paths are convenient, but deploying them is difficult. Qt does not understand where they are relative to, and will generally use the CWD.
 
-A QSS that has assets under a subfolder, like you see here for 'e621', 'Nereid', and 'Paper', can be tricky. The question is one of relative vs absolute paths. Relative paths are convenient, but deploying them is difficult.
+For a while, we had some funky fixes for this. Now, we have one simple solution: On load, I replace relative paths in the document with the correct absolute path when I load the QSS up.
 
-For a while, because of some funny Qt path rules, we had to be careful about ensuring the CWD was the base install folder or manually replacing relative with absolute paths. Now, I fix it for you by replacing relative paths with the correct absolute path when I load the QSS up.
-
-TO MAKE A PATH LOAD CORRECT, YOU MUST WRITE IT STARTING WITH `"static/qss/`, LIKE THIS:
+TO MAKE A PATH LOAD CORRECT, YOU MUST WRITE IT RELATIVE TO THE INSTALL DIR OF A SOURCE RELEASE STARTING WITH `"static/qss/`, FOR INSTANCE LIKE THIS:
 
 url("static/qss/my_style/some_asset.svg")
 

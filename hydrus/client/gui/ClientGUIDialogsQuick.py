@@ -15,16 +15,36 @@ from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUITopLevelWindowsPanels
 from hydrus.client.gui.panels import ClientGUIScrolledPanelsButtonQuestions
 from hydrus.client.gui.panels import ClientGUIScrolledPanelsEdit
+from hydrus.client.gui.panels import ClientGUIScrolledPanelsNumberEntry
 from hydrus.client.gui.panels import ClientGUIScrolledPanelsSelectFromList
 from hydrus.client.gui.panels import ClientGUIScrolledPanelsTextEntry
 
-def EnterText( win: QW.QWidget, message: str, default = '', placeholder = None, allow_blank = False, suggestions = None, max_chars = None, password_entry = False, min_char_width = 72 ) -> str:
-    
-    title = 'Enter Text'
+def EnterNumber( win: QW.QWidget, message: str, default = 0, min_value = None, max_value = None, title = 'Enter Number' ) -> int:
     
     with ClientGUITopLevelWindowsPanels.DialogEdit( win, title, frame_key = 'quick_entry_dialog' ) as dlg:
         
-        panel = ClientGUIScrolledPanelsTextEntry.EditTextPanel( dlg, message, default, placeholder, allow_blank, suggestions, max_chars, password_entry, min_char_width = min_char_width )
+        panel = ClientGUIScrolledPanelsNumberEntry.EditTextSpinboxPanel( dlg, message, default, min_value, max_value )
+        
+        dlg.SetPanel( panel )
+        
+        if dlg.exec() == QW.QDialog.DialogCode.Accepted:
+            
+            number = panel.GetValue()
+            
+            return number
+            
+        else:
+            
+            raise HydrusExceptions.CancelledException( 'Dialog cancelled.' )
+            
+        
+    
+
+def EnterText( win: QW.QWidget, message: str, default = '', placeholder = None, allow_blank = False, allow_whitespace = True, suggestions = None, max_chars = None, password_entry = False, min_char_width = 72, title = 'Enter Text' ) -> str:
+    
+    with ClientGUITopLevelWindowsPanels.DialogEdit( win, title, frame_key = 'quick_entry_dialog' ) as dlg:
+        
+        panel = ClientGUIScrolledPanelsTextEntry.EditTextPanel( dlg, message, default, placeholder, allow_blank, allow_whitespace, suggestions, max_chars, password_entry, min_char_width = min_char_width )
         
         dlg.SetPanel( panel )
         

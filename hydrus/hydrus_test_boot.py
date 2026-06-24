@@ -37,10 +37,7 @@ HydrusStaticDir.USE_USER_STATIC_DIR = False
 from hydrus.test import TestController
 
 import sys
-import threading
 import traceback
-
-from twisted.internet import reactor
 
 def boot():
     
@@ -58,11 +55,6 @@ def boot():
         
     
     try:
-        
-        # noinspection PyUnresolvedReferences
-        target = reactor.run
-        
-        threading.Thread( target = target, kwargs = { 'installSignalHandlers' : 0 } ).start()
         
         QtInit.MonkeyPatchMissingMethods()
         app = QW.QApplication( sys.argv )
@@ -128,12 +120,6 @@ def boot():
         HydrusData.DebugPrint( traceback.format_exc() )
         
     finally:
-        
-        # noinspection PyUnresolvedReferences
-        target = reactor.stop
-        
-        # noinspection PyUnresolvedReferences
-        reactor.callFromThread( target )
         
         print( 'This was version ' + str( HC.SOFTWARE_VERSION ) )
         

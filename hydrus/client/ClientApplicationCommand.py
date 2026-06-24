@@ -209,6 +209,10 @@ SIMPLE_WINDOW_ALWAYS_ON_TOP_ON = 196
 SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF = 197
 SIMPLE_WINDOW_FRAMELESS_FLIP = 198
 SIMPLE_RENAME_PAGE = 199
+SIMPLE_FLIP_THISWINDOW_SLIDESHOW_SHUFFLE = 200
+SIMPLE_FLIP_GLOBAL_SLIDESHOW_SHUFFLE = 201
+SIMPLE_FLIP_THISWINDOW_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH = 202
+SIMPLE_FLIP_GLOBAL_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH = 203
 
 REARRANGE_THUMBNAILS_TYPE_FIXED = 0
 REARRANGE_THUMBNAILS_TYPE_COMMAND = 1
@@ -463,6 +467,10 @@ simple_enum_to_str_lookup = {
     SIMPLE_WINDOW_ALWAYS_ON_TOP_ON : 'window "always on top": set on',
     SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF : 'window "always on top": set off',
     SIMPLE_WINDOW_FRAMELESS_FLIP : 'window "frameless": flip on/off',
+    SIMPLE_FLIP_THISWINDOW_SLIDESHOW_SHUFFLE : 'slideshow shuffle: override/flip for current window',
+    SIMPLE_FLIP_GLOBAL_SLIDESHOW_SHUFFLE : 'slideshow shuffle: flip global option (and apply to current window)',
+    SIMPLE_FLIP_THISWINDOW_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH: 'always play media once through: override/flip for current window',
+    SIMPLE_FLIP_GLOBAL_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH: 'always play media once through: flip global option (and apply to current window)',
 }
 
 legacy_simple_str_to_enum_lookup = {
@@ -578,6 +586,7 @@ legacy_simple_str_to_enum_lookup = {
 
 APPLICATION_COMMAND_TYPE_SIMPLE = 0
 APPLICATION_COMMAND_TYPE_CONTENT = 1
+APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT = 2
 
 class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
     
@@ -669,6 +678,18 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
             
             serialisable_data = ( service_key.hex(), content_type, action, value )
             
+        elif self._command_type == APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+            
+            ( service_key, content_type, action ) = self._data
+            
+            data_dict = HydrusSerialisable.SerialisableDictionary()
+            
+            data_dict[ 'service_key' ] = service_key.hex()
+            data_dict[ 'content_type' ] = content_type
+            data_dict[ 'action' ] = action
+            
+            serialisable_data = data_dict.GetSerialisableTuple()
+            
         else:
             
             raise NotImplementedError( 'Unknown command type!' )
@@ -712,6 +733,16 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
                 
             
             self._data = ( bytes.fromhex( serialisable_service_key ), content_type, action, value )
+            
+        elif self._command_type == APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+            
+            data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data )
+            
+            service_key = bytes.fromhex( data_dict[ 'service_key' ] )
+            content_type = data_dict[ 'content_type' ]
+            action = data_dict[ 'action' ]
+            
+            self._data = ( service_key, content_type, action )
             
         
     
@@ -972,6 +1003,42 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
         return value
         
     
+    def GetInteractiveContentServiceKey( self ):
+        
+        if self._command_type != APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+            
+            raise Exception( 'Not an interactive content command!' )
+            
+        
+        ( service_key, content_type, action ) = self._data
+        
+        return service_key
+        
+    
+    def GetInteractiveContentType( self ):
+        
+        if self._command_type != APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+            
+            raise Exception( 'Not an interactive content command!' )
+            
+        
+        ( service_key, content_type, action ) = self._data
+        
+        return content_type
+        
+    
+    def GetInteractiveContentAction( self ):
+        
+        if self._command_type != APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+            
+            raise Exception( 'Not an interactive content command!' )
+            
+        
+        ( service_key, content_type, action ) = self._data
+        
+        return action
+        
+    
     def IsSimpleCommand( self ):
         
         return self._command_type == APPLICATION_COMMAND_TYPE_SIMPLE
@@ -980,6 +1047,11 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
     def IsContentCommand( self ):
         
         return self._command_type == APPLICATION_COMMAND_TYPE_CONTENT
+        
+    
+    def IsInteractiveContentCommand( self ):
+        
+        return self._command_type == APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT
         
     
     def ToString( self ):
@@ -1170,6 +1242,14 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
                 components.append( CG.client_controller.services_manager.GetNameSafe( service_key ) )
                 
                 return ' '.join( components )
+                
+            elif self._command_type == APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
+                
+                ( service_key, content_type, action ) = self._data
+                
+                service_name = CG.client_controller.services_manager.GetNameSafe( service_key )
+                
+                return 'popup {} entry dialog for {}'.format( HC.content_type_string_lookup[ content_type ], service_name )
                 
             
         except Exception as e:

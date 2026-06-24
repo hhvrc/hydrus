@@ -517,6 +517,100 @@ def ExportFiles( win: QW.QWidget, medias: collections.abc.Collection[ ClientMedi
         
     
 
+def GetContentApplicationCommandFromInteractiveContentCommand( win: QW.QWidget, command: CAC.ApplicationCommand, media: ClientMediaSingle.MediaSingle ) -> CAC.ApplicationCommand:
+    
+    if not command.IsInteractiveContentCommand():
+        
+        return command
+        
+    
+    service_key = command.GetInteractiveContentServiceKey()
+    content_type = command.GetInteractiveContentType()
+    
+    try:
+        
+        service = CG.client_controller.services_manager.GetService( service_key )
+        
+    except HydrusExceptions.DataMissing:
+        
+        return command
+        
+    
+    service_type = service.GetServiceType()
+    service_name = CG.client_controller.services_manager.GetNameSafe( service_key )
+    
+    if service_type in HC.REAL_TAG_SERVICES:
+        
+        try:
+            
+            recent_tags = CG.client_controller.Read( 'recent_tags', service_key )
+            last_tag = ''
+            
+            if recent_tags is not None:
+                
+                if len( recent_tags ) > 10:
+                    
+                    recent_tags = recent_tags[:10]
+                    
+                if len( recent_tags ) > 0:
+                    
+                    last_tag = recent_tags[0]
+                    
+                
+            
+            value = ClientGUIDialogsQuick.EnterText( win, message=f'Enter the tag to be added to \'{service_name}\'.', allow_whitespace = False, default = last_tag, suggestions = recent_tags )
+            
+        except HydrusExceptions.CancelledException:
+            
+            return command
+            
+        
+        CG.client_controller.Write( 'push_recent_tags', service_key, list( ( value, ) ) )
+        
+    elif service_type in HC.RATINGS_SERVICES:
+        
+        if service_type == HC.LOCAL_RATING_NUMERICAL:
+            
+            num_stars = service.GetNumStars()
+            
+            star_options = [ ( f'{i}', i, f'Set rating to {i}/{num_stars}.' ) for i in range( num_stars + 1 ) ]
+            
+            if not service.AllowZero():
+                
+                star_options = star_options[1:]
+                
+            
+            try:
+                
+                value = ClientGUIDialogsQuick.SelectFromListButtons( win, 'Select the rating to be applied.', star_options )
+                
+                value = service.ConvertStarsToRating( value )
+                
+            except HydrusExceptions.CancelledException:
+                
+                return command
+                
+            
+        elif service_type == HC.LOCAL_RATING_INCDEC:
+            
+            old_value = media.GetRatingsManager().GetRating( service_key )
+            
+            try:
+                
+                value = ClientGUIDialogsQuick.EnterNumber( win, message=f'Enter the number to apply to \'{service_name}\'.', default = old_value, min_value = 0, max_value = 1000000 )
+                
+            except HydrusExceptions.CancelledException:
+                
+                return command
+                
+            
+        
+    
+    content_command = CAC.ApplicationCommand( CAC.APPLICATION_COMMAND_TYPE_CONTENT, ( service_key, content_type, HC.CONTENT_UPDATE_SET, value ) )
+    
+    return content_command
+    
+
 def GetContentUpdatesForAppliedContentApplicationCommandRatingsSetFlip( service_key: bytes, action: int, media: collections.abc.Collection[ ClientMediaSingle.MediaSingle ], rating: float | None, BLOCK_SIZE = None ):
     
     hashes = set()

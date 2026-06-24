@@ -14,7 +14,7 @@ There are now setup scripts that make this easy. You do not need any python expe
 
 ### Summary:
 
-1. Get Python.
+1. Get Git/Python.
 2. Get Hydrus source.
 3. Get mpv/SQLite/FFMPEG.
 4. Run setup_venv script.
@@ -52,19 +52,11 @@ There are now setup scripts that make this easy. You do not need any python expe
         Git should now be installed on your system. Any _new_ terminal/command line/powershell window (right-click on any folder and hit something like 'Open in terminal') now has the `git` command!
         
     
-    ??? warning "Windows 7"
-        For a long time, I supported Windows 7 via running from source. Unfortunately, as libraries and code inevitably updated, this finally seems to no longer be feasible. Python 3.8 will no longer run the program. I understand v582 is one of the last versions of the program to work.
-        
-        First, you will have to install the older [Python 3.8](https://www.python.org/downloads/release/python-3810/), since that is the latest version that you can run.
-        
-        Then, later, when you do the `git clone https://github.com/hydrusnetwork/hydrus` line, you will need to run `git checkout tags/v578`, which will rewind you to that point in time.
-        
-        I can't promise anything though. You may like to think about moving to Linux.
-        
-    
     If you do not know if you have Python, you probably do not. Let's check--right-click on any folder and select 'open in terminal' and copy/paste the following:
     
-    `python --version`
+    ```cmd
+    python --version
+    ```
     
     If you get some nice python version information, you have python. Hydrus should be fine with Python 3.10-3.13. If you are on 3.14+, that may be ok, but select the 'advanced' setup later on and choose the '(t)est' options. If you are stuck on something older, try the same thing, but with the '(o)lder' options (but I can't promise it will work!).
     
@@ -72,9 +64,15 @@ There are now setup scripts that make this easy. You do not need any python expe
     
     Once it is installed, then, _after installation is totally complete_, open up a new terminal (It needs to be a new terminal to catch your now-updated PATH) and copy/paste the following:
     
-    `python --version`  
-    `python -m pip --version`  
-    `python -m venv --help`
+    ```cmd
+    python --version
+    ```  
+    ```cmd
+    python -m pip --version
+    ```  
+    ```cmd
+    python -m venv --help
+    ```
     
     If all these produce good output (no errors), you are good to go!
 
@@ -82,27 +80,42 @@ There are now setup scripts that make this easy. You do not need any python expe
 
     You probably have git, but let's check by opening a new terminal and going:
     
-    `git --version`
+    ```bash
+    git --version
+    ```
     
     If you do not get a nice answer, you will want to install it. If you are on Debian/Ubuntu/Mint, you'll most likely be using `apt`, like this:
     
-    `sudo apt install git`
+    ```bash
+    sudo apt install git
+    ```
     
     If you are in the Arch family, you may be on `pacman`. In this case, where I might say in this help to do `sudo apt install package`, you are probably looking at `sudo pacman -S package`, so:
     
-    `sudo pacman -S git`
+    ```bash
+    sudo pacman -S git
+    ```
     
     You should already have a fairly new python. Hydrus is fine with Python 3.10-3.13. If you are on 3.14+, that may be ok, but select the 'advanced' setup later on and choose the '(t)est' options. If you are stuck on something older, try the same thing, but with the '(o)lder' options (but I can't promise it will work!). You can find out what version you have just by opening a new terminal and typing `python3` or `python`.
     
     You are going to need `pip` and `venv`. These are often bundled with a python install, but not always with a system python. Open a terminal and try these two lines:
     
-    `python3 -m pip --version`  
-    `python3 -m venv --help`
+    ```bash
+    python3 -m pip --version
+    ```  
+    ```bash
+    python3 -m venv --help
+    ```
     
     If it complains about either, you will need to install them. Try this:
     
-    `sudo apt install python3-pip`  
-    `sudo apt install python3-venv`
+    ```bash
+    sudo apt install python3-pip
+    ```  
+    ```bash
+    sudo apt install python3-venv
+    ```
+    
 
 === "macOS"
 
@@ -110,20 +123,47 @@ There are now setup scripts that make this easy. You do not need any python expe
     
     You may not have git already, so open a new terminal and check with:
     
-    `git --version`
+    ```bash
+    git --version
+    ```
     
     If you do not get a nice version back, you will want to install it, most likely with:
     
-    `brew install git`
+    ```bash
+    brew install git
+    ```
     
     You should already have a fairly new python. Hydrus should be fine with Python 3.10-3.13. If you are on 3.14+, that may be ok, but select the 'advanced' setup later on and choose the '(t)est' options. If you are stuck on something older, try the same thing, but with the '(o)lder' options (but I can't promise it will work!). You can find out what version you have just by opening a new terminal and typing `python3` or `python`.
     
     You are going to need `pip` and `venv`. These are often bundled with a python install, but not always with a system python. Open a terminal and try these two lines:
     
-    `python3 -m pip --version`  
-    `python3 -m venv --help`
+    ```bash
+    python3 -m pip --version
+    ```  
+    ```bash
+    python3 -m venv --help
+    ```
     
     If it complains about either, you will need to install them. You do not want to fight with your system python, so you should investigate `brew install python` to install a separate python just for your username.
+
+??? note "I want to use a different python version!"
+    Most 'LTS' releases will have a system python that is frozen at an older version for stability. You can run hydrus with this usually no problem, but you might like to bump things up to take advantage of speed improvements and bug fixes, particularly if your hardware is good and does not strictly need all that stability safety.
+    
+    I recommend [pyenv](https://github.com/pyenv/pyenv), which makes it very simple to install and use multiple versions of python without conflicting with your system python at all. The process I have figured out is:
+    
+    * Hit up their github, check that the primary install line is still: `curl -fsSL https://pyenv.run | bash`
+    * Check the terminal output once it is done. It will probably moan about your bash profiles. You can edit manually but they probably provide this to do it for you: `~/.pyenv/bin/pyenv init --install`
+    * Do this so you can compile python:
+        ```bash
+        sudo apt update
+        ```
+        ```bash
+        sudo apt install build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev curl git libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+        ```
+    * You are now good and a fresh terminal should respond to `pyenv`. The general routine is:
+    * `pyenv install 3.13` (you now have the latest 3.13 installed)
+    * `pyenv shell 3.13` (switches current terminal to that custom python)
+    * Now, when you do `./setup_venv.py`, it'll use that 3.13 to make the venv!
 
 **Then, get the hydrus source.** It is best to get it with Git: make a new folder somewhere, open a terminal in it, and then paste:
 
@@ -230,20 +270,23 @@ Different systems sometimes call python different names. If I tell you to run `p
     
     The file is `setup_venv.py`. You may be able to double-click it. If not, open a terminal in the folder and type:  
     
-    `./setup_venv.py`
+    ```bash
+    ./setup_venv.py
+    ```
     
     -or, explicitly-
     
-    `python setup_venv.py`
+    ```bash
+    python setup_venv.py
+    ```
     
     If you do not have permission to execute the file, do this before trying again:  
     
-    `chmod +x setup_venv.py`
+    ```bash
+    chmod +x setup_venv.py
+    ```
     
     You will likely have to do the same on the other .sh or .py files.
-    
-    !!! info "Desktop File"
-        If you like, you can later run the `setup_desktop.sh` file to install an io.github.hydrusnetwork.hydrus.desktop file to your applications folder. (Or check the template in `install_dir/static/io.github.hydrusnetwork.hydrus.desktop` and do it yourself!)
     
 
 === "macOS"
@@ -253,21 +296,29 @@ Different systems sometimes call python different names. If I tell you to run `p
     
     The file is `setup_venv.py`. You may be able to double-click it. If not, open a terminal in the folder and type:  
     
-    `./setup_venv.py`
+    ```bash
+    ./setup_venv.py
+    ```
     
     -or, explicitly-
     
-    `python setup_venv.py`
+    ```bash
+    python setup_venv.py
+    ```
     
     If you do not have permission to run the .command file, open a terminal on the folder and enter:
     
     If you do not have permission to execute the file, do this before trying again:  
     
-    `chmod +x setup_venv.py`
+    ```bash
+    chmod +x setup_venv.py
+    ```
     
     We used to do this via a .command file. If you want to run one of the other .command files, you likely also need this to tell Gatekeeper you are ok running it:
     
-    `sudo xattr -rd com.apple.quarantine the_script.command`
+    ```bash
+    sudo xattr -rd com.apple.quarantine the_script.command
+    ```
     
     You will likely have to do the same on the other .command files.
     
@@ -280,16 +331,47 @@ The setup should _just work_ on most normal computers, but very old or new syste
 
 Then run the 'setup_help' script to build the help. This isn't necessary, but it is nice to have it built locally. You can run this again at any time to update to the current help.
 
-??? note "Custom python"
-    If you want to set up a venv using a different python than your system, just run `setup_venv.py` with that python, like this:
-    
-    `/path/to/my/python setup_venv.py`
-    
-    You can also select a custom venv destination:
-    
-    `/path/to/my/314/python setup_venv.py -v=venv314`
-    
-    If you are developing with hydrus, you can set up multiple venvs to test out different versions of python or, say, PySide vs PyQt.
+##### Advanced tricks
+
+If you want to set up a venv using a different python than your system, you can just run `setup_venv.py` directly with that python, like this:
+
+```bash
+/path/to/my/python setup_venv.py
+```
+
+Or, as I said above, `pyenv` will let you replace the default python in the current shell easily too, in which case the regular `./setup_venv.py` will use your shimmed python.
+
+You can also select a custom venv destination:
+
+```bash
+/path/to/my/314/python setup_venv.py -v=venv314
+```
+
+And, for automation, you can run the script in non-interactive mode using `-i`:
+
+```bash
+/path/to/my/python setup_venv.py -i=a
+```
+
+`-i=s` will install the `(s)imple` install choice without asking you for confirmation. `-i=a` will choose the `(a)dvanced`, selecting the `(t)est` versions of any choice and saying `(y)es` to all optional libraries.
+
+If you are developing with hydrus, you can set up multiple venvs to test out different versions of python or, say, PySide vs PyQt. Just make a script like this and most of the work can be done in one action:
+
+```bash
+#!/bin/bash
+
+pyenv shell 3.10
+./setup_venv.py -v=~/hyvenvs/venv310 -i=s
+pyenv shell 3.11
+./setup_venv.py -v=~/hyvenvs/venv311 -i=s
+pyenv shell 3.12
+./setup_venv.py -v=~/hyvenvs/venv312 -i=a
+pyenv shell 3.13
+./setup_venv.py -v=~/hyvenvs/venv313 -i=a
+pyenv shell 3.14
+./setup_venv.py -v=~/hyvenvs/venv314 -i=a
+```
+
 
 #### Running it
 
@@ -304,7 +386,9 @@ Then run the 'setup_help' script to build the help. This isn't necessary, but it
     
     Alternately, if you want a very simple shortcut, you can call the venv directly, using the python executable we just installed. The setup venv script may have given you an example. It will look something like this:
     
-    `C:\Hydrus\venv\Scripts\pythonw.exe C:\Hydrus\hydrus_client.py`
+    ```cmd
+    C:\Hydrus\venv\Scripts\pythonw.exe C:\Hydrus\hydrus_client.py
+    ```
 
 === "Linux"
 
@@ -332,8 +416,12 @@ Then run the 'setup_help' script to build the help. This isn't necessary, but it
         
         With `apt`, that will be:
         
-        * `sudo apt install libicu-dev`
-        * `sudo apt install libxcb-cursor-dev`
+        ```bash
+        sudo apt install libicu-dev
+        ```
+        ```bash
+        sudo apt install libxcb-cursor-dev
+        ```
         
         Or check your OS's package manager.
         
@@ -383,6 +471,10 @@ The first start will take a little longer (it has to compile all the code into s
 === "Linux"
 
     If you want to redirect your database or use any other launch arguments, then copy 'hydrus_client.sh' to 'hydrus_client-user.sh' and edit it, inserting your desired db path. Run this instead of 'hydrus_client.sh'. New `git pull` commands will not affect 'hydrus_client-user.sh'.
+    
+    !!! info "Desktop File"
+        If you like, you can run the `setup_desktop.sh` file to install an io.github.hydrusnetwork.hydrus.desktop file to your applications folder. (Or check the template in `install_dir/static/io.github.hydrusnetwork.hydrus.desktop` and do it yourself!)
+    
 
 === "macOS"
 

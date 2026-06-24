@@ -1,6 +1,5 @@
 import random
 
-from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusText
@@ -12,7 +11,6 @@ from hydrus.client.importing import ClientImportFileSeeds
 from hydrus.client.importing.options import ImportOptionsConstants as IOC
 from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.networking import ClientNetworkingJobs
-from hydrus.client.parsing import ClientParsingResults
 
 CHECKER_STATUS_OK = 0
 CHECKER_STATUS_DEAD = 1
@@ -37,35 +35,6 @@ downloader_enum_sort_lookup = {
 DID_SUBSTANTIAL_FILE_WORK_MINIMUM_SLEEP_TIME = 0.1
 
 REPEATING_JOB_TYPICAL_PERIOD = 30.0
-
-def ConvertParsedPostsToFileSeeds( parsed_posts: list[ ClientParsingResults.ParsedPost ], source_url: str ):
-    
-    file_seeds = []
-    
-    seen_urls = set()
-    
-    for parsed_post in parsed_posts:
-        
-        parsed_urls = parsed_post.GetURLs( ( HC.URL_TYPE_DESIRED, ), only_get_top_priority = True )
-        
-        parsed_urls = [ url for url in parsed_urls if url not in seen_urls ]
-        
-        seen_urls.update( parsed_urls )
-        
-        for url in parsed_urls:
-            
-            file_seed = ClientImportFileSeeds.FileSeed( ClientImportFileSeeds.FILE_SEED_TYPE_URL, url )
-            
-            file_seed.SetReferralURL( source_url )
-            
-            file_seed.AddParsedPost( parsed_post )
-            
-            file_seeds.append( file_seed )
-            
-        
-    
-    return file_seeds
-    
 
 def GenerateMultiplePopupNetworkJobPresentationContextFactory( job_status ):
     

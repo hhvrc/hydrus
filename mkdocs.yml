@@ -119,6 +119,8 @@ theme:
     - navigation.top
     - search.suggest
     - content.code.annotate
+    - content.code.copy
+    - content.code.select
     #- navigation.indexes
   icon:
     repo: fontawesome/brands/github

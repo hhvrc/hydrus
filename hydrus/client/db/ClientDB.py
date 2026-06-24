@@ -8229,6 +8229,37 @@ class DB( HydrusDB.HydrusDB ):
                 
             
         
+        if version == 675:
+            
+            try:
+                
+                new_options = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_CLIENT_OPTIONS )
+                
+                qt_stylesheet_name = new_options.GetNoneableString( 'qt_stylesheet_name' )
+                
+                update_mapping = {
+                    'Paper_Dark_built_release.qss' : 'Paper_Dark.qss',
+                    'e621_redux_built_release.qss' : 'e621_redux.qss',
+                    'e621_built_release.qss' : 'e621.qss',
+                }
+                
+                if qt_stylesheet_name in update_mapping:
+                    
+                    new_options.SetNoneableString( 'qt_stylesheet_name', update_mapping[ qt_stylesheet_name ] )
+                    
+                    self.modules_serialisable.SetJSONDump( new_options )
+                    
+                
+            except Exception as e:
+                
+                HydrusData.PrintException( e )
+                
+                message = 'Trying to update your qss stylesheet name failed! Please let hydrus dev know!'
+                
+                self.pub_initial_message( message )
+                
+            
+        
         #
         
         self._controller.frame_splash_status.SetTitleText( 'updated db to v{}'.format( HydrusNumbers.ToHumanInt( version + 1 ) ) )

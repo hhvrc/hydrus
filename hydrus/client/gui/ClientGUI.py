@@ -3614,14 +3614,12 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuItem( debug_modes, 'simulate a wake from sleep', 'Tell the controller to pretend that it just woke up from sleep.', self._controller.SimulateWakeFromSleepEvent )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'thumbnail debug mode', 'Show some thumbnail debug info.', HG.thumbnail_debug_mode, self._SwitchBoolean, 'thumbnail_debug_mode' )
         ClientGUIMenus.AppendSeparator( debug_modes )
-        ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'qss absolute path test mode', 'Test out that QSS thing for hydev.', HG.qss_absolute_test_mode, self._SwitchBoolean, 'qss_absolute_test_mode' )
-        ClientGUIMenus.AppendSeparator( debug_modes )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'allow crashy files in mpv', 'Disable the crash handling that unloads files from mpv when they raise certain fatal errors.', HG.mpv_allow_crashy_files, self._FlipMPVCrashHandling )
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'allow crashy files in mpv (and silence errors)', 'Disable the crash handling that unloads files from mpv when they raise certain fatal errors and do not notify the user when it happens.', HG.mpv_allow_crashy_files_silently, self._FlipMPVSilentCrashHandling )
+        ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'allow crashy files in mpv (and silence errors) (PERSISTENT)', 'Version of the above option that is maintained between program boots.', self._new_options.GetBoolean( 'mpv_allow_crashy_files_silently' ), self._new_options.FlipBoolean, 'mpv_allow_crashy_files_silently' )
         ClientGUIMenus.AppendSeparator( debug_modes )
         crash_reporting_on = CG.client_controller.logger.CurrentlyCrashReporting()
         ClientGUIMenus.AppendMenuCheckItem( debug_modes, 'use faulthandler to log crashes', 'Enable python crash logging. Note this will disable Windows Error Reporting or Linux Dumps, and it does not play well with mpv.', crash_reporting_on, self._FlipCrashReporting )
-        
         
         ClientGUIMenus.AppendMenu( debug_menu, debug_modes, 'debug modes' )
         
@@ -7024,10 +7022,6 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         elif name == 'pubsub_report_mode':
             
             HG.pubsub_report_mode = not HG.pubsub_report_mode
-            
-        elif name == 'qss_absolute_test_mode':
-            
-            HG.qss_absolute_test_mode = not HG.qss_absolute_test_mode
             
         elif name == 'shortcut_report_mode':
             

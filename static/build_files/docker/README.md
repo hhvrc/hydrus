@@ -135,7 +135,7 @@ services:
 Further containerized application of interest:
 
 - [Hybooru](https://github.com/funmaker/hybooru): [Hydrus](https://github.com/hydrusnetwork/hydrus)-based booru-styled imageboard in React, inspired by [hyve](https://github.com/mserajnik/hyve/).
-- [hydownloader](https://github.com/thatfuckingbird/hydownloader): Alternative way of downloading and importing files. Decoupled from hydrus logic and limitations.
+- [hydownloader](https://gitgud.io/thatfuckingbird/hydownloader): Alternative way of downloading and importing files. Decoupled from hydrus logic and limitations.
 
 ## Building
 ```bash

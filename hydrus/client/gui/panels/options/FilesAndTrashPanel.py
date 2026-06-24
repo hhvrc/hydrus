@@ -62,6 +62,9 @@ class FilesAndTrashPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._deferred_file_deletes_in_normal_time = QW.QCheckBox( self )
         self._deferred_file_deletes_in_normal_time.setToolTip( ClientGUIFunctions.WrapToolTip( 'When files are queued for physical deletion, they are deleted slowly in the background. This can always happen in idle time. Check this if you are ok with it running in normal time too. Uncheck this if you notice big trash clears or physical deletes adds lag.' ) )
         
+        self._copy_import_files_to_temp_dir_reverso_because_test = QW.QCheckBox( self )
+        self._copy_import_files_to_temp_dir_reverso_because_test.setToolTip( ClientGUIFunctions.WrapToolTip( 'In the old days, we needed prospective files in a safe path before pre-import scanning because cyrillic and other unicode characters could throw off OpenCV or FFMPEG. This situation is better these days, so some users are going to try it without.\n\nIf you have unstable or expensive-access source-storage and want new files copied to your local system partition before import, you might still want to copy to tempdir first.' ) )
+        
         self._do_not_do_chmod_mode = QW.QCheckBox( self )
         self._do_not_do_chmod_mode.setToolTip( ClientGUIFunctions.WrapToolTip( 'CAREFUL. When hydrus copies files around, it preserves or sets permission bits. If you are on ACL-backed storage, e.g. via NFSv4 with ACL set, chmod is going to raise errors and/or audit logspam. You can try stopping all chmod here--hydrus will use differing copy calls that only copy the file contents and try to preserve access/modified times.' ) )
         
@@ -122,6 +125,7 @@ class FilesAndTrashPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._maintain_trash_in_normal_time.setChecked( self._new_options.GetBoolean( 'maintain_trash_in_normal_time' ) )
         self._deferred_file_deletes_in_normal_time.setChecked( self._new_options.GetBoolean( 'deferred_file_deletes_in_normal_time' ) )
         
+        self._copy_import_files_to_temp_dir_reverso_because_test.setChecked( not self._new_options.GetBoolean( 'copy_import_files_to_temp_dir' ) )
         self._do_not_do_chmod_mode.setChecked( self._new_options.GetBoolean( 'do_not_do_chmod_mode' ) )
         
         self._delete_lock_for_archived_files.setChecked( self._new_options.GetBoolean( 'delete_lock_for_archived_files' ) )
@@ -165,6 +169,7 @@ class FilesAndTrashPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         rows.append( ( 'Maximum size of trash (MB): ', self._trash_max_size ) )
         rows.append( ( 'Allow trash maintenance during normal time: ', self._maintain_trash_in_normal_time ) )
         rows.append( ( 'Allow deferred file deletes during normal time: ', self._deferred_file_deletes_in_normal_time ) )
+        rows.append( ( 'TEST: Import local files directly from source, do not copy to temp dir beforehand.', self._copy_import_files_to_temp_dir_reverso_because_test ) )
         rows.append( ( 'ADVANCED: Do not do chmod when copying files', self._do_not_do_chmod_mode ) )
         
         gridbox = ClientGUICommon.WrapInGrid( self, rows )
@@ -275,6 +280,7 @@ class FilesAndTrashPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._new_options.SetBoolean( 'maintain_trash_in_normal_time', self._maintain_trash_in_normal_time.isChecked() )
         self._new_options.SetBoolean( 'deferred_file_deletes_in_normal_time', self._deferred_file_deletes_in_normal_time.isChecked() )
         
+        self._new_options.SetBoolean( 'copy_import_files_to_temp_dir', not self._copy_import_files_to_temp_dir_reverso_because_test.isChecked() )
         self._new_options.SetBoolean( 'do_not_do_chmod_mode', self._do_not_do_chmod_mode.isChecked() )
         
         self._new_options.SetBoolean( 'only_show_delete_from_all_local_domains_when_filtering', self._only_show_delete_from_all_local_domains_when_filtering.isChecked() )

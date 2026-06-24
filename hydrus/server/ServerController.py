@@ -554,6 +554,8 @@ class Controller( HydrusController.HydrusController ):
                 
             
         
+        self.StartTwistedIfNeeded()
+        
         threads.blockingCallFromThread( reactor, TWISTEDDoIt )
         
     
@@ -592,7 +594,8 @@ class Controller( HydrusController.HydrusController ):
             
         except Exception as e:
             
-            pass # sometimes this throws a wobbler, screw it
+            HydrusData.Print( 'Twisted failed to shut down cleanly:' )
+            HydrusData.PrintException( e, do_wait = False )
             
         
         HydrusController.HydrusController.ShutdownView( self )

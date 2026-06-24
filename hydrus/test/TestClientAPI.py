@@ -40,6 +40,7 @@ from hydrus.client.metadata import ClientContentUpdates
 from hydrus.client.metadata import ClientTags
 from hydrus.client.networking import ClientNetworkingContexts
 from hydrus.client.networking.api import ClientLocalServer
+from hydrus.client.gui.pages import ClientGUIPagesCore
 from hydrus.client.networking.api import ClientLocalServerCore
 from hydrus.client.search import ClientSearchFileSearchContext
 from hydrus.client.search import ClientSearchPredicate
@@ -6432,6 +6433,339 @@ class TestClientAPI( unittest.TestCase ):
         self.assertEqual( result, expected_result )
         
     
+    def _test_manage_pages_new_page( self, connection, set_up_permissions ):
+
+        api_permissions = set_up_permissions[ 'manage_pages' ]
+        access_key_hex = api_permissions.GetAccessKey().hex()
+        headers = { 'Hydrus-Client-API-Access-Key' : access_key_hex, 'Content-Type' : HC.mime_mimetype_string_lookup[ HC.APPLICATION_JSON ] }
+
+        class MockPage:
+
+            def __init__( self, page_manager, page_name ):
+
+                self._page_key = os.urandom( 32 )
+                self._page_manager = page_manager
+                self._page_name = page_name
+
+
+            def GetPageKey( self ):
+
+                return self._page_key
+
+
+            def GetPageManager( self ):
+
+                return self._page_manager
+
+
+            def GetName( self ):
+
+                return self._page_name
+
+
+
+        class MockNotebook:
+            
+            def NewPage( self, page_manager, initial_hashes = None, forced_insertion_index = None, on_deepest_notebook = False, select_page = True ):
+                
+                return MockPage( page_manager, page_manager.GetPageName() )
+                
+            
+            def NewPagesNotebook( self, name = 'pages', forced_insertion_index = None, on_deepest_notebook = False, give_it_a_blank_page = True, select_page = True ):
+                
+                from hydrus.client.gui.pages import ClientGUIPagesCore
+                
+                class MockPagesNotebookPageManager:
+                    
+                    def GetType( self ):
+                        
+                        return ClientGUIPagesCore.PAGE_TYPE_PAGE_OF_PAGES
+                        
+                    
+                
+                return MockPage( MockPagesNotebookPageManager(), name )
+                
+            
+            def GetPageFromPageKey( self, page_key ):
+                
+                return None
+                
+            
+        
+        mock_notebook = MockNotebook()
+        
+        with mock.patch.object( TG.test_controller, 'GetTopLevelNotebook', return_value = mock_notebook, create = True ):
+            
+            path = '/manage_pages/new_page'
+            
+            #
+            # PAGE_TYPE_PAGE_OF_PAGES
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_PAGE_OF_PAGES,
+                'page_name' : 'my sub-notebook',
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            
+            response = connection.getresponse()
+            
+            data = response.read()
+            
+            self.assertEqual( response.status, 200 )
+            
+            text = str( data, 'utf-8' )
+            
+            d = json.loads( text )
+            
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_PAGE_OF_PAGES )
+            self.assertEqual( d[ 'page_name' ], 'my sub-notebook' )
+            
+            #
+            # PAGE_TYPE_QUERY with namespace sort
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'namespace sort page',
+                'tags' : [ 'title:serpent ring' ],
+                'file_service_key' : '48eb05cfcc855f5cebfcf5df7cef5d6458b6867425fad37684718779536813e7',
+                'file_sort_namespaces' : [ 'series', 'creator', 'title', 'volume', 'chapter', 'page' ],
+                'file_sort_asc' : True,
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_QUERY )
+            self.assertEqual( d[ 'page_name' ], 'namespace sort page' )
+            
+            #
+            # PAGE_TYPE_QUERY with tag service key
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'tag service page',
+                'tags' : [ 'title:serpent ring' ],
+                'tag_service_key' : CC.DEFAULT_LOCAL_TAG_SERVICE_KEY.hex(),
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_QUERY )
+            self.assertEqual( d[ 'page_name' ], 'tag service page' )
+            
+            #
+            # PAGE_TYPE_QUERY with collect by tag
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'collect page',
+                'collect_namespaces' : [ 'series', 'volume', 'page' ],
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_QUERY )
+            self.assertEqual( d[ 'page_name' ], 'collect page' )
+            
+            #
+            # PAGE_TYPE_QUERY with hashes + system_hash_locked
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'locked hashes page',
+                'hashes' : [ os.urandom( 32 ).hex() ],
+                'system_hash_locked' : True,
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_QUERY )
+            self.assertEqual( d[ 'page_name' ], 'locked hashes page' )
+            
+            #
+            # system_hash_locked without hashes should error
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'bad lock',
+                'system_hash_locked' : True,
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 400 )
+            
+            #
+            # PAGE_TYPE_IMPORT_URLS with urls
+
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_IMPORT_URLS,
+                'page_name' : 'urls with seeds',
+                'urls' : [ 'https://example.com/image1.png', 'https://example.com/image2.png' ],
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_IMPORT_URLS )
+            self.assertEqual( d[ 'page_name' ], 'urls with seeds' )
+            
+            #
+            # PAGE_TYPE_IMPORT_MULTIPLE_WATCHER with url
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_IMPORT_MULTIPLE_WATCHER,
+                'page_name' : 'my watcher',
+                'url' : 'https://example.com/gallery/page/1',
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_IMPORT_MULTIPLE_WATCHER )
+            self.assertEqual( d[ 'page_name' ], 'my watcher' )
+            
+            #
+            # PAGE_TYPE_DUPLICATE_FILTER with file_service_key
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_DUPLICATE_FILTER,
+                'page_name' : 'filter in service',
+                'file_service_key' : CC.COMBINED_LOCAL_FILE_DOMAINS_SERVICE_KEY.hex(),
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 200 )
+            text = str( data, 'utf-8' )
+            d = json.loads( text )
+            self.assertIn( 'page_key', d )
+            self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_DUPLICATE_FILTER )
+            self.assertEqual( d[ 'page_name' ], 'filter in service' )
+            
+            #
+            # Both file_sort_type and file_sort_namespaces should error
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'bad sort',
+                'file_sort_type' : 0,
+                'file_sort_namespaces' : [ 'series' ],
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 400 )
+            
+            #
+            # PAGE_TYPE_PETITIONS without service_key (should error)
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_PETITIONS,
+                'page_name' : 'no service',
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 400 )
+            
+            #
+            # page_of_pages_key with invalid key (should error)
+            
+            request_dict = {
+                'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                'page_name' : 'bad notebook',
+                'page_of_pages_key' : os.urandom( 32 ).hex(),
+                'focus_page' : False
+            }
+            
+            request_body = json.dumps( request_dict )
+            connection.request( 'POST', path, body = request_body, headers = headers )
+            response = connection.getresponse()
+            data = response.read()
+            self.assertEqual( response.status, 404 )
+            
+            #
+            # focus_page = True
+            
+            with mock.patch.object( TG.test_controller.gui, 'ShowPage', return_value = True, create = True ):
+                
+                request_dict = {
+                    'page_type' : ClientGUIPagesCore.PAGE_TYPE_QUERY,
+                    'page_name' : 'focus test',
+                    'focus_page' : True
+                }
+                
+                request_body = json.dumps( request_dict )
+                connection.request( 'POST', path, body = request_body, headers = headers )
+                response = connection.getresponse()
+                data = response.read()
+                self.assertEqual( response.status, 200 )
+                text = str( data, 'utf-8' )
+                d = json.loads( text )
+                self.assertIn( 'page_key', d )
+                self.assertEqual( d[ 'page_type' ], ClientGUIPagesCore.PAGE_TYPE_QUERY )
+                self.assertEqual( d[ 'page_name' ], 'focus test' )
+                
+            
+        
+    
     def _test_manage_pages_media_viewers( self, connection, set_up_permissions ):
         
         api_permissions = set_up_permissions[ 'manage_pages' ]
@@ -6773,7 +7107,7 @@ class TestClientAPI( unittest.TestCase ):
         sort_by = kwargs[ 'sort_by' ]
         
         self.assertEqual( sort_by.sort_type, ( 'system', CC.SORT_FILES_BY_IMPORT_TIME ) )
-        self.assertEqual( sort_by.sort_order, CC.SORT_DESC )
+        self.assertEqual( sort_by.sort_order, CC.SORT_ASC )
         
         self.assertIn( 'apply_implicit_limit', kwargs )
         
@@ -6892,7 +7226,7 @@ class TestClientAPI( unittest.TestCase ):
         sort_by = kwargs[ 'sort_by' ]
         
         self.assertEqual( sort_by.sort_type, ( 'system', CC.SORT_FILES_BY_IMPORT_TIME ) )
-        self.assertEqual( sort_by.sort_order, CC.SORT_DESC )
+        self.assertEqual( sort_by.sort_order, CC.SORT_ASC )
         
         self.assertIn( 'apply_implicit_limit', kwargs )
         
@@ -6953,7 +7287,7 @@ class TestClientAPI( unittest.TestCase ):
         sort_by = kwargs[ 'sort_by' ]
         
         self.assertEqual( sort_by.sort_type, ( 'system', CC.SORT_FILES_BY_IMPORT_TIME ) )
-        self.assertEqual( sort_by.sort_order, CC.SORT_DESC )
+        self.assertEqual( sort_by.sort_order, CC.SORT_ASC )
         
         self.assertIn( 'apply_implicit_limit', kwargs )
         
@@ -7002,7 +7336,7 @@ class TestClientAPI( unittest.TestCase ):
         sort_by = kwargs[ 'sort_by' ]
         
         self.assertEqual( sort_by.sort_type, ( 'system', CC.SORT_FILES_BY_FRAMERATE ) )
-        self.assertEqual( sort_by.sort_order, CC.SORT_DESC )
+        self.assertEqual( sort_by.sort_order, CC.SORT_ASC )
         
         self.assertIn( 'apply_implicit_limit', kwargs )
         
@@ -8698,6 +9032,7 @@ class TestClientAPI( unittest.TestCase ):
         self._test_manage_cookies( connection, set_up_permissions )
         self._test_manage_headers( connection, set_up_permissions )
         self._test_manage_pages_media_viewers( connection, set_up_permissions )
+        self._test_manage_pages_new_page( connection, set_up_permissions )
         self._test_manage_pages( connection, set_up_permissions )
         self._test_search_files( connection, set_up_permissions )
         

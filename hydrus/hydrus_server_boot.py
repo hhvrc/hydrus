@@ -44,8 +44,6 @@ try:
     
     from hydrus.server import ServerController
     
-    from twisted.internet import reactor
-    
     #
     
     import argparse
@@ -207,11 +205,6 @@ def boot():
                 
                 HydrusData.Print( 'Initialising controller' + HC.UNICODE_ELLIPSIS )
                 
-                # noinspection PyUnresolvedReferences
-                target = reactor.run
-                
-                threading.Thread( target = target, name = 'twisted', kwargs = { 'installSignalHandlers' : 0 } ).start()
-                
                 controller = ServerController.Controller( db_dir, logger )
                 
                 controller.Run()
@@ -243,12 +236,6 @@ def boot():
                 
                 controller.pubimmediate( 'wake_daemons' )
                 
-            
-            # noinspection PyUnresolvedReferences
-            target = reactor.stop
-            
-            # noinspection PyUnresolvedReferences
-            reactor.callFromThread( target )
             
             HydrusData.Print( 'hydrus server shut down' )
             

@@ -365,7 +365,7 @@ You won't see all of these, but the service `type` enum is:
 Rating services have some extra data:
 
 - They all have some `colours` for differing rating states, the same as you'd see in `manage services`. Pen and brush are the line and the fill of the rating star shape, respectively. `like` generally means set/left-click, `dislike` means off/right-click, `null` means not set, and `mixed` is what I show in the edit rating dialog for multiple files when the files have differing values. Feel free to use them however you like.
-- They all have `show_in_thumbnail` and `show_in_thumbnail_even_if_null`, which you can obey in your display context if convenient.
+- They all have `show_in_thumbnail` and `show_in_thumbnail_even_when_null`, which you can obey in your display context if convenient.
 - Like/dislike and numerical services have `star_shape`, which is one of `circle | square | fat star | pentagram star | six point star | eight point star | x shape | square cross | triangle up | triangle down | triangle right | triangle left | diamond | rhombus right | rhombus left | hourglass | pentagon | hexagon | small hexagon | heart | teardrop | crescent moon` -or- `svg`, which means a custom user svg that can be fetched with [/get\_service\_rating\_svg](#get_service_rating_svg).
 - Numerical services have `min_stars` (0 or 1) and `max_stars` (1 to 20). `allows_zero` lines up with `min_stars` and is for your convenience.
 
@@ -3964,6 +3964,110 @@ Response:
 
 Poll the `page_state` in [/manage\_pages/get\_pages](#manage_pages_get_pages) or [/manage\_pages/get\_page\_info](#manage_pages_get_page_info) to see when the search is complete.
 
+### **POST `/manage_pages/new_page`** { id="manage_pages_new_page" }
+
+_Create a new page in the main GUI._
+
+Restricted access: 
+:   YES. Manage Pages permission needed.
+
+Required Headers:
+:   
+    *   `Content-Type`: application/json
+
+Arguments (in JSON):
+:   
+    *   `page_type`: (int, required) The type of page to create.
+
+        The supported page types are:
+
+        *   1 - Gallery downloader
+        *   2 - Simple downloader
+        *   3 - Hard drive import
+        *   5 - Petitions
+        *   6 - File search
+        *   7 - URL downloader
+        *   8 - Duplicates
+        *   9 - Thread watcher
+        *   10 - Page of pages
+
+    *   `page_name`: (optional, string) A name for the new page. If not provided, a default name is used.
+    *   `page_of_pages_key`: (optional, hexadecimal) The page key of a 'page of pages' to insert the new page into. If not provided, the top-level notebook is used.
+    *   `focus_page`: (optional, bool, default `true`) Whether to switch the UI to the new page after creation.
+    *   `tags`: (optional, a list of tag strings, default `[]`) Tags for a file search (page type 6) page's search. Works with the same [system predicate](#get_files_search_files) syntax.
+    *   `file_service_key`: (optional, hexadecimal) The file service for the new page's search domain (page types 6 and 8).
+    *   `tag_service_key`: (optional, hexadecimal) The tag service for the new page's search domain (page type 6).
+    *   `hashes`: (optional, a list of hexadecimal SHA256 hashes) Initial hashes to show on a file search (page type 6) page.
+    *   `service_key`: (optional, hexadecimal) The service key for a petitions (page type 5) page.
+    *   `paths`: (optional, a list of file system paths, default `[]`) File paths to import for a hard drive import (page type 3) page.
+    *   `delete_after_success`: (optional, bool, default `false`) Whether to delete source files after a successful import (page type 3).
+    *   `file_sort_type`: (optional, int) Sort type for the page, same enum as in [/get\_files/search\_files](#get_files_search_files) (page type 6). Mutually exclusive with `file_sort_namespaces`.
+    *   `file_sort_asc`: (optional, bool, default `true`) Sort order for files (page type 6).
+    *   `file_sort_namespaces`: (optional, a list of namespace strings) Sort by namespace order (page type 6). Mutually exclusive with `file_sort_type`.
+    *   `collect_namespaces`: (optional, a list of namespace strings) Namespaces to collect/group files by (page type 6).
+    *   `system_hash_locked`: (optional, bool) If `true`, locks the page to the given hashes and syncs new/removed hashes (page type 6). Requires `hashes` to be provided.
+    *   `urls`: (optional, a list of URL strings, default `[]`) URLs to pend for a URL downloader (page type 7) page.
+    *   `url`: (optional, string) A URL for a gallery/thread watcher (page type 9) page.
+
+```json title="Example request body (file search page)"
+{
+  "page_type" : 6,
+  "page_name" : "my search",
+  "tags" : ["blue eyes", "blonde hair"],
+  "file_service_key" : "6c6f63616c2066696c6573",
+  "tag_service_key" : "6c6f63616c2074616773",
+  "focus_page" : true
+}
+```
+
+```json title="Example request body (page of pages)"
+{
+  "page_type" : 10,
+  "page_name" : "my sub-notebook",
+  "focus_page" : false
+}
+```
+
+```json title="Example request body (URL downloader with seeds)"
+{
+  "page_type" : 7,
+  "page_name" : "my urls",
+  "urls" : ["https://example.com/image1.png", "https://example.com/image2.png"],
+  "focus_page" : false
+}
+```
+
+```json title="Example request body (thread watcher)"
+{
+  "page_type" : 9,
+  "page_name" : "my watcher",
+  "url" : "https://example.com/gallery/page/1",
+  "focus_page" : false
+}
+```
+
+```json title="Example request body (hard drive import)"
+{
+  "page_type" : 3,
+  "page_name" : "my import",
+  "paths" : ["E:\\to_import"],
+  "delete_after_success" : true,
+  "focus_page" : false
+}
+```
+
+Response:
+:   A JSON Object containing the new page's details.
+
+```json title="Example response"
+{
+  "page_key" : "af98318b6eece15fef3cf0378385ce759bfe056916f6e12157cd928eb56c1f18",
+  "page_type" : 6,
+  "page_name" : "my search"
+}
+```
+
+The `page_key` is the page's unique identifier for use in other manage_pages commands. If the `page_of_pages_key` is not found, this will 404. If the `page_type` is unrecognised or unsupported, or contradictory arguments like both `file_sort_type` and `file_sort_namespaces` are provided, this will 400. Petitions pages require a `service_key`, otherwise they will 400.
 
 ## Managing Popups
 

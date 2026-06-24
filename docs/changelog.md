@@ -7,6 +7,69 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 676](https://github.com/hydrusnetwork/hydrus/releases/tag/v676)
+
+### more UI updates
+
+* thanks to a user, we have a slew of additional UI improvements: (#2037)
+* per-viewer mute under media viewer right-click menu!
+* slideshows can now shuffle and 'play media once through' on a per-viewer basis
+* the 'stop' slideshow menu entry now shows the current slideshow period
+* a new type of 'interactive' shortcut action, for the media shortcut set. you set a tag or rating service but nothing else. when you hit the shortcut, it asks you which tag or rating you want to set!
+* new options to choose which types of zoom 'zoom switch' switches between and configure how collapsed the 'eye menu' is under `options->media viewer hovers`, in the new `top hover button/menu controls` panel
+* persistent 'be silent on crashy stuff' mpv option unher `help->debug->debug modes`
+
+### misc
+
+* the `-d` launch parameter for the program now expands a userpath db path correctly. `-d=~/hydrus` now resolves to your user dir properly
+* in the parsing UI, the 'test' panel's preview area, where it shows what you downloaded/pasted, will now show up to 500,000 characters before clipping (up from 65536 chars), and the upper description is now clear when this happens
+* added `TEST: import local files directly from source, do not copy to temp dir beforehand` option to let some advanced users try out direct import. we needed to copy to tempdir in the old days so that some media scanning libraries would not have to deal with cyrillic or other uncode characters in paths, but this situation seems to be resolved these days, so let's try without. if it works ok IRL, I'll keep this for those who do still need a temp dir interim but flip the default behaviour
+
+### stylesheet paths
+
+* me and the guys who make qss stylesheets have been fighting an issue for a while regarding loading external assets, like a little .svg for a button. I solve this today, and it will make loading up stylesheets with assets from your db dir or in the built release much more reliable
+* anyone who was on the `_built_release` versions of the stylesheets will be migrated to the normal ones on update. the `_built_release` versions are deleted from the defults qss dir as the problem they addressed is solved in a better way
+* for the specific change, the new 'absolute path qss test mode' proved successful, so it is now the norm. stylesheets now have to specify their paths in one particular way and I handle the path juggling on my end, on load. the readme.txt in the qss dir is now explicit about this, so if you make qss stylesheets and haven't seen it yet, check it out
+
+### opening new pages with the client api
+
+* thanks to a user who did a really comprehensive job, the Client API gets a new `/manage_pages/new_page` command. it covers pretty much everything, including, say, a new local import page with a list of files. check out the new documentation here: https://hydrusnetwork.github.io/hydrus/developer_api.html#manage_pages_new_page
+* the user also fixed Client API file sorts not defaulting to asc=true and a focus issue when pages are closed
+* the Client API version is now 93
+
+### parsing logic fixes
+
+* _this is for advanced users who make downloaders_
+* with the help of a couple users who poked around my tangle of gallery parsing code, I think we've fixed some stupid parent-child inheritance stuff where a gallery object would take too manytagsfromcertainpostparsesandthenpassthatontoa'nextpage'galleryurl,particularly,say,ifthatnextpageurlwasauto-generatedbtwmyspacebarbrokewhenwritingthis (issue #2035)
+* keyboard fixed. so, I KISSed how gallery objects create child file import objects and sub-gallery urls and next-page gallery urls. there is less overlap of responsibility between an object passing metadata down and a post parse passing metadata down (this latter system is much better these days, and old hacks in the former pipeline were causing the main issues here). gallery import objects will now not update themselves with parsed tags and referral urls after the fact; only their children will get the metadata from their parses
+* relatedly, I cleaned up how file objects create child file download objects. previously, there were separate pathways for file parses that uses subsidiary parsers vs those that simply had a flat content parser that produced multiple urls and then another for a single url that turned out to match a post url class. this has all been collapsed into a single KISS route that says 'if one file url, eat up the metadata from the parsed post and then download it; else create n child objects'. some bespoke error states like 'hey I grabbed one url, it was a post url, but there's no parser for that url' are now deferred and will just get processed as a normal child file import object
+* also cleaned up some crazy python module inheritance happening here
+* overall, things should be more reliable, and the inheritance of metadata from one import object to the next should be clearer. let me know how it all goes for you
+
+### source setup
+
+* `setup_venv.py` now takes an optional `-i` parameter for non-interative (i.e. automated) installs. `-i=s` will do the simple mode, `-i=a` will do the advanced mode with all test/yes choices
+* `setup_venv.py` now expands a userpath venv path correctly. `-v=~/hydrusvenvs/venv313` now resolves to your user dir properly
+
+### safer builds
+
+* thanks to a user, our github build scripts, including Docker, now freeze the various github actions we use (e.g. a thing that says 'ok grab that build zip you just made and upload it to the release') to known good sha256 hashes, rather than getting the latest, say, 'v6'. this insulates against a supply attack, like we've seen recently, ensuring we won't use an action that was updated two hours ago by a bad guy to do bad things
+* there's a script also that updates the hashes. I'll be running this regularly to keep up and verifying every time it does. dependbot apparently interrupts whenever it is a big deal, too
+
+### startup/shutdown
+
+* the `twisted` library, which we use to host the client api and server services, is now started and stopped in a nicer way. previously, it was hacked into the boot scripts. now the main hydrus controller handles it and delivers some additional hydrus shutdown signals
+* `twisted` now only spins up on the client if you actually start up the Client API
+* when 'shutdown report mode' is on, the final client exit moment now prints all alive threads with their name and daemon status. if you have been working with me on the 'program is down but process is still alive', let's see if this catches it
+
+### some help docs work
+
+* rearranged and brushed up the Linux section in 'getting started - installing' and added more notes/links to 'hey running from source is over here'
+* removed the old Win 7 support comments and updated the Win 10 bits to be 'time to move to Linux m8'
+* updated the 'running from source' help to talk about `pyenv`, which makes it easy to install and use a different version of python with hydrus
+* updated the 'running Windows version in Wine' help document for the newest version and added info about Bottles: https://hydrusnetwork.github.io/hydrus/wine.html . I managed to get v675 up with a minimum of fuss and not too much weirdness (even ffmpeg and mpv worked!?!), so I now have a basic Windows test environment, hooray. doing it manually with winetricks on my system wine-9.0 did not work, it needed Bottles's newer wine-11.0
+* added easy copy buttons to the command quotes in 'running from source' help
+
 ## [Version 675](https://github.com/hydrusnetwork/hydrus/releases/tag/v675)
 
 ### misc
@@ -570,65 +633,3 @@ title: Changelog
 * cleaned up some subscription unit tests
 * the media result cache is now a singleton instance that persists through a database restart, and the unit tests now do some careful clearing on test database resetting here
 * fixed a missing definition typo in the filetype labels
-
-## [Version 665](https://github.com/hydrusnetwork/hydrus/releases/tag/v665)
-
-### misc
-
-* fixed an issue where a duplicates page would not re-enable the 'launch the filter' button sometimes when it previously had a count of 0 but got a pair-discovery update in the background that added new pairs (issue #1988)
-* the 'help: random 403 errors' entry is now moved down in the 'retry' buttonlist. it will disappear in a few weeks, leaving just the `network->downloaders` menu item, once people hitting this menu have had more chance to see it
-* fixed an issue where if you selected some files with a subset of trash and then said 'move/copy n files to blah local file domain', it would try and move the trashed files and throw an error. it now filters those files out of the actual operation as you'd expect
-* fixed an issue in numerical rating rendering after deleting a numerical rating service (bad error handling on the missing service)
-* added a section to the 'contact' help page about how to send broken files to hydev (zipping them up explanation etc..)
-* updated the `io.github.hydrusnetwork.hydrus.desktop` file with easy mode help comments on how to edit things and added `StartupWMClass` to help taskbar grouping
-
-### more audio device stuff
-
-* applying the options dialog now updates all open mpv players to use the specified audio device
-* applying the options dialog now updates all open QtMediaPlayers to use the specified audio device
-* the `ao/xxxxxx: There are no playback devices available` mpv error, which until now has sparked the 'hey things are looking unstable with this file, so unloading it' response, now triggers a new 'hey, set all mpv windows to `null` audio device'. if you get this stuff when you unplug your headphones or something, let me know how it goes
-* when a new QtMediaPlayer initialises, if the desired audio device is invalid, it falls back to auto. if the auto device is invalid, it resets to null
-* new DEBUG checkboxes in `options->media playback` allow you to auto-set mpv or the QtMediaPlayer to 'null' audio device when playing silent media like animated gifs. I know we've had some issues around this over the years with mpv on Linux in particular, so let's see how it goes. this used to be default behaviour for the QtMediaPlayer btw; now it isn't
-
-### some boring cleanup
-
-* improved how media objects determine if they are in 'combined local file domains'
-* a database routine used in repository sync and 'are we mostly caught up to this repo?' that fetches missing update hashes is now significantly faster
-* the QtMediaPlayer no longer leaves the video output disconnected until the first non-audio file is loaded. things are more KISS
-* the mpv and QtMediaPlayers recognise better their current audio device and can trigger update calls only on changes
-* cleaned up some more QtMediaPlayer output setting generally
-* updated some critical error text when trying to boot into a database that was created--and failed to initialise--on the last program boot
-* removed some OpenRaster debug statements
-
-### removed Qt5 gubbins
-
-* Qt5 (which for us means PySide2 or PyQt5) is well behind us now, so any lingering support is just getting in the way. I removed it all this week. if you are struggling on a hyperpatched Win7 machine, forgive me but it is time to move to Linux
-* removed Qt5 initialisation code
-* removed debug code that tests for Qt5 support
-* removed old thumbnail UI scaling Qt5 hack
-* removed Qt5 stylesheet hacks
-* removed Qt5 media panel swap hacks
-* removed About Window Qt5 stuff
-* removed an old Qt5 qtpy init hack
-* removed Qt5 patches for mouse and drop events
-* removed Qt5 QPDF check
-* removed Qt5 QKeySequence conversion
-
-### nicer PIL memory cleanup
-
-* PIL images are now closed promptly (freeing up memory better and faster) in more locations: the visual tuning suite; jpeg quality estimation; icc profile inspection; embedded metadata inspection; exif inspection; decompression bomb testing; 'show file metadata' window; import metadata gen; icc profile inspection on load; on forced PIL loads that error out on conversion to numpy; on another standard method to load images; variable frame duration fetching, 'get number of times to play animation'; 'animation has valid duration'; serialisable object import; ugoira rendering; ugoira API rendering; ugoira property fetch; ugoira json property fetch; Ugoira thumb gen; PSD rendering; PSD thumb gen; the native PIL animation renderer; on EXIF rotation conversion; some weird dequantization; resolution fetch; when some thumbnail stuff errors out; some animation property fetch; OpenXML thumbnail gen; Paint.NET thumb gen; Krita thumb gen; Krita rendering; openraster thumb gen; openraster rendering
-* I went overkill here and yet there are still some gaps. I got all the file loads though, I think, which is the main stuff here that I think was lagging. some of it is also a little ugly. we'll see if this improves some lazy memory cleanup during heavy import. if it helps, I may revisit to clean up
-
-### import options overhaul
-
-* wrote migration code that takes the old file/tag/note import options and produces a new populated `ImportOptionsContainer`
-* updated the prefetch import options to track the 'fetch metadata even...' checkboxes, although they will do nothing until migration
-* updated 'note import options' to a legacy object that can deliver a trivially shucked 'note import options' that has no 'is default' properly and works in the new system. the edit notes dialog, Client API add-notes call, duplicate content merge options, notes sidecar exporter, and unit tests now use the new object
-* wrote an edit panel for the new note import options
-* the legacy note import options now holds its shucked version inside it, now only taking responsibility for the 'is default' property otherwise, and all import contexts now consult the new object for work
-* juggled around my options stack preference again for simplicity and added 'import folder' and 'client api' options import contexts
-* brushed up the UI significantly with new labels, better options summaries, better help, a KISSer workflow that filters out overengineered options by default, a little description label for each import type, and another for each options type
-* made the stack description and display clearer and added it to the url class section
-* fixed some default options display
-* brushed up all the import options summary statements and rearranged them all into single-line
-* updated some tag filter label grammar. in some cases it was saying 'tags taken: allowing all tags', which comes from internal permissions language, when just a 'tags taken: all tags' was a better fit
