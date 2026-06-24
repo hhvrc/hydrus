@@ -96,3 +96,6 @@ uv.lock
 
 .cache
 shell.nix
+
+# local path overrides (personal db/files dirs)
+override_paths.json
