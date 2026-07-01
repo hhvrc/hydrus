@@ -23,6 +23,7 @@ def MakeNewPageFromAPI( page_type, page_name, page_of_pages_key, focus_page, pre
             
             raise HydrusExceptions.NotFoundException( 'Could not find a page of pages with that key!' )
             
+        
     else:
         
         target_notebook = root_notebook
@@ -185,5 +186,5 @@ def MakeNewPageFromAPI( page_type, page_name, page_of_pages_key, focus_page, pre
             
         
     
-    return ( page.GetPageKey(), page.GetPageManager().GetType(), page.GetName() )
+    return ( page.GetPageKey(), page_type, page.GetName() )
     

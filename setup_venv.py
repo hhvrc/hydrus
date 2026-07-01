@@ -460,7 +460,7 @@ def main():
             
             if interaction_type == "a":
                 
-                process_advanced_options( requirements_dict )
+                process_advanced_options( requirements_dict, True )
                 
             
         

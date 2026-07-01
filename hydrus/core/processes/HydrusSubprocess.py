@@ -351,7 +351,14 @@ def TerminateAndReapProcess( process: subprocess.Popen ):
     
     # you have to do the communicate after the kill calls or otherwise you get zombies
     
-    process.terminate()
+    try:
+        
+        process.terminate()
+        
+    except PermissionError as e:
+        
+        HydrusData.Print( f'I tried to terminate the process {process} but got {e}!' )
+        
     
     try:
         
@@ -359,9 +366,23 @@ def TerminateAndReapProcess( process: subprocess.Popen ):
         
     except subprocess.TimeoutExpired:
         
-        process.kill()
+        try:
+            
+            process.kill()
+            
+        except PermissionError as e:
+            
+            HydrusData.Print( f'I tried to kill the process {process} after post-terminate communicate timed out but got {e}!' )
+            
         
-        ( stdout, stderr ) = process.communicate()
+        try:
+            
+            ( stdout, stderr ) = process.communicate()
+            
+        except subprocess.TimeoutExpired:
+            
+            ( stdout, stderr ) = ( '', 'I have no stderr, the process would not respond after a kill command. We probably have a zombie.' )
+            
         
     
     return ( stdout, stderr )

@@ -539,7 +539,9 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
                 
                 from hydrus.client.importing import ClientImportFileSeeds
                 
-                file_seeds = ClientImportFileSeeds.ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
+                parsed_posts_and_file_seeds = ClientImportFileSeeds.ConvertParsedPostsToParsedPostsAndFileSeeds( parsed_posts, url_for_child_referral )
+                
+                file_seeds = [ file_seed for ( parsed_post, file_seed ) in parsed_posts_and_file_seeds ]
                 
                 for file_seed in file_seeds:
                     

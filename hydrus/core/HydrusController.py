@@ -426,7 +426,7 @@ class HydrusController( object ):
     
     def CurrentlyPubSubbing( self ) -> bool:
         
-        return self._pubsub.WorkToDo() or self._pubsub.DoingWork()
+        return not self._pubsub.CurrentlyIdle()
         
     
     def DBCurrentlyDoingJob( self ) -> bool:

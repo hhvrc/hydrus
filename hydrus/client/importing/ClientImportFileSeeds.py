@@ -39,9 +39,9 @@ from hydrus.client.parsing import ClientParsingResults
 FILE_SEED_TYPE_HDD = 0
 FILE_SEED_TYPE_URL = 1
 
-def ConvertParsedPostsToFileSeeds( parsed_posts: list[ ClientParsingResults.ParsedPost ], source_url: str ) -> "list[ FileSeed ]":
+def ConvertParsedPostsToParsedPostsAndFileSeeds( parsed_posts: list[ ClientParsingResults.ParsedPost ], source_url: str ) -> "list[ FileSeed ]":
     
-    file_seeds = []
+    parsed_posts_and_file_seeds = []
     
     seen_urls = set()
     
@@ -61,11 +61,11 @@ def ConvertParsedPostsToFileSeeds( parsed_posts: list[ ClientParsingResults.Pars
             
             file_seed.AddParsedPost( parsed_post )
             
-            file_seeds.append( file_seed )
+            parsed_posts_and_file_seeds.append( ( parsed_post, file_seed ) )
             
         
     
-    return file_seeds
+    return parsed_posts_and_file_seeds
     
 
 def FilterOneFileURLs( urls ):
@@ -1645,15 +1645,19 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                         # B) We got stuff that should be one or more child urls and dealt with later
                             # in this case, all our children need to get any tags and stuff we have
                         
-                        possible_child_file_seeds = ConvertParsedPostsToFileSeeds( parsed_posts, url_for_child_referral )
+                        possible_parsed_posts_and_child_file_seeds = ConvertParsedPostsToParsedPostsAndFileSeeds( parsed_posts, url_for_child_referral )
                         
-                        if len( possible_child_file_seeds ) == 0:
+                        possible_child_file_seeds = [ file_seed for ( parsed_post, file_seed ) in possible_parsed_posts_and_child_file_seeds ]
+                        
+                        if len( possible_parsed_posts_and_child_file_seeds ) == 0:
                             
                             raise HydrusExceptions.VetoException( 'The parser found something in the document, but could not find a file or post URL to download!' )
                             
-                        elif len( possible_child_file_seeds ) == 1:
+                        elif len( possible_parsed_posts_and_child_file_seeds ) == 1:
                             
-                            possible_file_url = possible_child_file_seeds[0].file_seed_data
+                            ( possible_parsed_post, possible_file_seed ) = possible_parsed_posts_and_child_file_seeds[0]
+                            
+                            possible_file_url = possible_file_seed.file_seed_data
                             
                             ( url_type, match_name, can_parse, cannot_parse_reason ) = CG.client_controller.network_engine.domain_manager.GetURLParseCapability( possible_file_url )
                             
@@ -1663,19 +1667,9 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                                 possible_child_file_seeds = []
                                 
                                 file_url = possible_file_url
+                                parsed_post_that_applies_to_me = possible_parsed_post
                                 
-                                # we want to get all the tags and stuff from this post. we could suck from the file seed, but let's share code and find that parsed post and just eat that like the file seed did
-                                for parsed_post in parsed_posts:
-                                    
-                                    parsed_urls = parsed_post.GetURLs( ( HC.URL_TYPE_DESIRED, ), only_get_top_priority = True )
-                                    
-                                    if file_url in parsed_urls:
-                                        
-                                        self.AddParsedPost( parsed_post )
-                                        
-                                        break
-                                        
-                                    
+                                self.AddParsedPost( parsed_post_that_applies_to_me )
                                 
                                 self.CheckPreFetchMetadata( full_import_options_container )
                                 

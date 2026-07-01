@@ -326,6 +326,8 @@ class HydrusDB( HydrusDBBase.DBBase ):
         self._we_have_connected_to_the_database_at_least_once = False
         
         self._finished_job_event = threading.Event()
+        self._i_am_idle = threading.Event()
+        self._i_am_idle.set()
         
         main_db_filename = db_name
         
@@ -949,6 +951,13 @@ class HydrusDB( HydrusDBBase.DBBase ):
             
         
     
+    def _PutJob( self, job ):
+        
+        self._jobs.put( job )
+        
+        self._i_am_idle.clear()
+        
+    
     def _Read( self, action, *args, **kwargs ):
         
         if action not in self._read_commands_to_methods:
@@ -1229,6 +1238,11 @@ class HydrusDB( HydrusDBBase.DBBase ):
                 self._current_status = ''
                 self.publish_status_update()
                 
+                if self._jobs.empty():
+                    
+                    self._i_am_idle.set()
+                    
+                
             
             if self._pause_and_disconnect:
                 
@@ -1288,7 +1302,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
             raise HydrusExceptions.ShutdownException( 'Application has shut down!' )
             
         
-        self._jobs.put( job )
+        self._PutJob( job )
         
         return job.GetResult()
         
@@ -1311,15 +1325,14 @@ class HydrusDB( HydrusDBBase.DBBase ):
                 
                 raise HydrusExceptions.ShutdownException( 'Application shutting down!' )
                 
-            elif self.JobsQueueEmpty() and not self.CurrentlyDoingJob():
-                
-                return
-                
             else:
                 
-                self._finished_job_event.wait( 0.5 )
+                i_am_idle = self._i_am_idle.wait( 0.5 )
                 
-                self._finished_job_event.clear()
+                if i_am_idle:
+                    
+                    return
+                    
                 
             
         
@@ -1335,7 +1348,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
             raise HydrusExceptions.ShutdownException( 'Application has shut down!' )
             
         
-        self._jobs.put( job )
+        self._PutJob( job )
         
         if synchronous: return job.GetResult()
         

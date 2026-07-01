@@ -267,7 +267,7 @@ When the client tells you about the available services, it gives you the followi
         "brush": "#BFBFBF",
         "pen": "#000000"
       }
-    },
+    }
   },
   {
     "name": "example local rating numerical service",

@@ -12,12 +12,13 @@ class HydrusPubSub( object ):
         
         self._valid_callable = valid_callable
         
-        self._doing_work = False
-        
         self._pubsubs = []
         
         self._received_job_event = threading.Event()
         self._finished_job_event = threading.Event()
+        
+        self._i_am_idle = threading.Event()
+        self._i_am_idle.set()
         
         self._lock = threading.Lock()
         
@@ -66,9 +67,9 @@ class HydrusPubSub( object ):
         return callable_tuples
         
     
-    def DoingWork( self ):
+    def CurrentlyIdle( self ):
         
-        return self._doing_work
+        return self._i_am_idle.is_set()
         
     
     def Process( self ):
@@ -79,8 +80,6 @@ class HydrusPubSub( object ):
         # the dialog and hence map the new callable to the topic. this was leading to messages not being updated
         # because the (short) processing thread finished and entirely pubsubbed before Qt had a chance to boot the
         # message.
-        
-        self._doing_work = True
         
         try:
             
@@ -151,9 +150,15 @@ class HydrusPubSub( object ):
             
         finally:
             
-            self._doing_work = False
-            
             self._finished_job_event.set()
+            
+            with self._lock:
+                
+                if len( self._pubsubs ) == 0:
+                    
+                    self._i_am_idle.set()
+                    
+                
             
         
     
@@ -162,6 +167,8 @@ class HydrusPubSub( object ):
         with self._lock:
             
             self._pubsubs.append( ( topic, args, kwargs ) )
+            
+            self._i_am_idle.clear()
             
         
         self._received_job_event.set()
@@ -212,14 +219,14 @@ class HydrusPubSub( object ):
                 
                 raise HydrusExceptions.ShutdownException( 'Application shutting down!' )
                 
-            elif not ( self.WorkToDo() or self.DoingWork() ):
-                
-                return
-                
             else:
                 
-                self._finished_job_event.wait( 0.5 )
-                self._finished_job_event.clear()
+                i_am_idle = self._i_am_idle.wait( 0.5 )
+                
+                if i_am_idle:
+                    
+                    return
+                    
                 
             
         

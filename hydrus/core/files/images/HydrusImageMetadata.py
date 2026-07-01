@@ -2,9 +2,10 @@ import base64
 import json
 from PIL import Image as PILImage
 
+from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 
-def render_char_card( chara_text: str, indent_depth: int ):
+def render_char_card( chara_text: str, indent_depth: int ) -> str:
     
     try:
         
@@ -31,11 +32,16 @@ def render_char_card( chara_text: str, indent_depth: int ):
     return render_key_value( indent_depth, 'Character Card?', card_json )
     
 
-def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None ):
+def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None, ignore_these_keys = None ) -> str | None:
     
     if keys_to_put_at_the_top is None:
         
         keys_to_put_at_the_top = []
+        
+    
+    if ignore_these_keys is None:
+        
+        ignore_these_keys = set()
         
     
     def muh_sort( k ):
@@ -68,12 +74,17 @@ def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None ):
 
     for key in keys:
         
-        if key in ( 'exif', 'icc_profile' ):
+        if key in ignore_these_keys:
             
             continue
             
         
         value = d[ key ]
+        
+        if isinstance( value, bytes ):
+            
+            continue
+            
         
         row_text = render_key_value( indent_depth, key, value, keys_to_put_at_the_top = keys_to_put_at_the_top )
 
@@ -96,12 +107,7 @@ def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None ):
         
     
 
-def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) -> str | None:
-    
-    if isinstance( value, bytes ):
-        
-        return None
-        
+def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) -> str:
     
     if keys_to_put_at_the_top is None:
         
@@ -119,6 +125,12 @@ def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) 
             value_string = '{}{}'.format( indent * ( indent_depth + 1 ), 'empty/unknown' )
             
         
+    elif isinstance( value, bytes ):
+        
+        raw_value = f'{HydrusData.ToHumanBytes(len(value))} of data'
+        
+        value_string = ( indent * ( indent_depth + 1 ) ) + raw_value
+        
     else:
         
         raw_value = f'{value}'
@@ -135,13 +147,21 @@ def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) 
     return row_text
     
 
+# we parse exif, icc profile, and jpeg progressive separately
+PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF = {
+    'exif',
+    'icc_profile',
+    'progression',
+    'progressive'
+}
+
 def GetEmbeddedFileText( pil_image: PILImage.Image ) -> str | None:
     
     if hasattr( pil_image, 'info' ):
         
         try:
             
-            return render_dict( pil_image.info, indent_depth = 0 )
+            return render_dict( pil_image.info, indent_depth = 0, ignore_these_keys = PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF )
             
         except Exception as e:
             

@@ -21,14 +21,14 @@ class FileViewingStatisticsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._file_viewing_statistics_active = QW.QCheckBox( self )
         self._file_viewing_statistics_active_on_archive_delete_filter = QW.QCheckBox( self )
         self._file_viewing_statistics_active_on_dupe_filter = QW.QCheckBox( self )
-        self._file_viewing_statistics_media_min_time = ClientGUITime.NoneableTimeDeltaWidget( self, 2.0, none_phrase = 'count every view', minutes = True, seconds = True, milliseconds = True )
+        self._file_viewing_statistics_media_min_time = ClientGUITime.NoneableTimeDeltaWidget( self, 2.0, min = 0.05, none_phrase = 'count every view', minutes = True, seconds = True, milliseconds = True )
         min_tt = 'If you scroll quickly through many files, you probably do not want to count each of those loads as a view. Set a reasonable minimum here and brief looks will not be counted.'
         self._file_viewing_statistics_media_min_time.setToolTip( ClientGUIFunctions.WrapToolTip( min_tt ) )
         self._file_viewing_statistics_media_max_time = ClientGUITime.NoneableTimeDeltaWidget( self, 600.0, hours = True, minutes = True, seconds = True, milliseconds = True )
         max_tt = 'If you view a file for a very long time, the recorded viewtime is truncated to this. This stops an outrageous viewtime being saved because you left something open in the background. If the media you view has duration, like a video, the max viewtime is five times its length or this, whichever is larger.'
         self._file_viewing_statistics_media_max_time.setToolTip( ClientGUIFunctions.WrapToolTip( max_tt ) )
         
-        self._file_viewing_statistics_preview_min_time = ClientGUITime.NoneableTimeDeltaWidget( self, 5.0, none_phrase = 'count every view', minutes = True, seconds = True, milliseconds = True )
+        self._file_viewing_statistics_preview_min_time = ClientGUITime.NoneableTimeDeltaWidget( self, 5.0, min = 0.05, none_phrase = 'count every view', minutes = True, seconds = True, milliseconds = True )
         self._file_viewing_statistics_preview_min_time.setToolTip( ClientGUIFunctions.WrapToolTip( min_tt ) )
         self._file_viewing_statistics_preview_max_time = ClientGUITime.NoneableTimeDeltaWidget( self, 60.0, hours = True, minutes = True, seconds = True, milliseconds = True )
         self._file_viewing_statistics_preview_max_time.setToolTip( ClientGUIFunctions.WrapToolTip( max_tt ) )

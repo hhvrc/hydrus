@@ -7,6 +7,53 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 677](https://github.com/hydrusnetwork/hydrus/releases/tag/v677)
+
+### misc
+
+* fixed an issue with last week's downloader metadata overhaul that broke some downloaders. specifically, when downloaders had a post with one file url and that file url was changed through normalisation (typically through a URL Class), metadata application was not working. if you had a twitter-type downloader that seemed not to add tags in v676 when there was only one file in the post, please queue up those downloads again in a new urls downloader page and they will get their tags and so on
+* the 'min time to view a file in x' settings in `options->file viewing statistics` are now minimum 50ms (previously 1s)
+* when doing 'special duplicate' on a shortcut with F12 as the key, it now jumps to F13 (issue #2042)
+* reduced the overhead on two important 'wait a moment' checks that many of the thread workers consult. previously, when checking if the pubsub or db were busy, threads would wake too frequently in busy periods and thrash as they competed for 'is busy' locks. now the pubsub and db themselves maintain a single 'I am idle' signal the waiters can wait nicely on without needing extra checks
+* the code that terminates and then kills a timed out subprocess (ffmpeg, typically) now catches permission errors better (issue #2046)
+* fixed a stupid typo from the non-interactive `setup_venv.py` mode that broke the 'advanced' manual, interactive install. I was so focused on the new thing, I didn't test the old thing to see it still worked
+
+### client api
+
+* fixed the new `/manage_pages/new_page` command for a 'page of pages' type and updated the unit test to catch this (issue #2044)
+* client api version is now 94
+
+### human-readable metadata fix and improvements
+
+* a user noticed my recent 'chara' file metadata parsing was causing issues for files with metadata that included non-text datatypes and spotted where it was happening. just a stupid logical typo that was causing a bunch of filres with human-readable metadata to parse as not having any at all. I have fixed this issue so these files will show up with metadata again, and it will render correctly
+* any image imported after june 2nd (v674) will get a 'has human-readable metadata?' rescan
+* I have hidden the 'progression/progressive' keys from human-readable metadata presentation; we scan this elsewhere and show it as 'progressive? yes/no' on the same panel. I think I'd like to do the same for some other stuff like the 'jfif' and 'dpi' gubbins you often see
+
+### modern animations and ffmpeg
+
+* tl;dr: fixed some video parsing bugs with the new ffmpeg 8.x.x. avifs and heifs with num_frames=1 should be fixed, you do not have to do anything
+* many users, including all windows built users, have been on ffmpeg 8.x.x for a while now, and my video metadata parser recently broke for the animated 'sequence' variants of AVIF, HEIC, and HEIF. these files were being parsed with a num_frames of 1 and rendering as just a still image or throwing an error depending on the renderer
+* hydrus now recognises when any video file has multiple tracks, and if one track seems to be just a still image file, it selects the true animation stream for fps calculations and so on
+* also, the native renderer will now recognise this situation; if there seems to be no second frame during a render run, it will inspect the file closer to see if there is a different video track to select
+* also, I updated the deprecated `vsync` ffmpeg call to be `fps_mode`. this was another source of errors for various native rendering with modern ffmpeg
+* also updatedk the old `-s` to a combined `-vf` line with optional crop
+* also updated the overcomplicated `-f image2pipe` to `-f rawvideo`. works the same, but it is semantically better and may fix some frame timings
+* also updated the core metadata parse routine to no longer render the first second of the vid at small scale since this is an old hack that burns CPU but isn't used for anything any more and crops resolution parsing to 120 height for certain formats in ffmpeg 8.x.x (old mpegs at least, by my test)
+* all animated AVIF, HEIF, and HEIC files are scheduled for a metadata reparse (issue #2041, #1891)
+
+### new thumbgrid drawing tech
+
+* I found some time to work on the new thumbgrid test. it is better integrated and I fixed some bugs, but there's still some stuff not working so I'll hold off on the wider test
+* so, just as a record, I did--
+   - fixing up some type hints
+   - misc refactoring
+   - undoing thumbnail movable/selectable flags to stop some inherent Qt behaviour stepping in on mouse events (this fixes ctrl+click selection, which was being pseudo-randomly undone I think in the QGraphicsScene event handling)
+   - thumbs now have their own selection bool
+   - moving click-event/selection responsibility to the GraphicsView since thumbs don't do anything but call the parent atm anyway
+   - fixed thumb resolution stuff for non-resolution-having media when cache entry is invalidated
+   - made thumbnail 'media' (and the new 'is_selected') bools public
+   - tiny bit of thumb gen optimisation
+
 ## [Version 676](https://github.com/hydrusnetwork/hydrus/releases/tag/v676)
 
 ### more UI updates
@@ -563,73 +610,3 @@ title: Changelog
 * fixed up several places that do a fast 'is it a jpeg/png' mime check, which was accidentally skipping the png side and doing the slower check
 * fixed a bad layout flag in the 'select from a list of checkboxes now mate' dialog
 * fixed some close-curly-brace typos in the example Client API Services Object JSON
-
-## [☠⛤ Version 666 ⛤☠](https://github.com/hydrusnetwork/hydrus/releases/tag/v666)
-
-### misc
-
-* when you create a new subscription with 'add' button, it now asks you for the downloader up-front. this was easy to forget to set, previously; now you can't miss it
-* the problem where media could sometimes not receive any content updates (rating changes, new tags, archive state, whatever) after a backup, lock, vacuum, or certain database transaction error recovery until a page was refreshed is fixed. a cache that the in-session pages refer to was held by a database module being reinitialised through these processes and thus, after cache reset, the connection to send the update signal on media changes wasn't getting through to UI
-* added `^(?!...$).+$` to the regex input menu's quick selections for 'anything except this exact phrase'. I have to search stackexchange to figure this out every time I need it; now it is just there. also fixed a formatting typo in this menu for the 'any of these' entry
-
-### media players
-
-* improved the guard around the QtMultimedia module for those Qts where it is not available or otherwise fails to import
-* if your options say to show something with QtMediaPlayer but the module isn't available, it now falls back to an 'open externally' button and does a little popup; the same handling for missing mpv
-* improved the popup text when you boot `help->about` with an unusual module load error to report
-* rejiggered the `help->about` 'Optional Libraries' list a little and moved mpv over there
-* added another mpv 'null' audio error text, 'Could not open device', to our new cascade of 'calm down, but set the null audio device now' error handling
-* added a `KDE and QtMediaPlayer` note to the 'installing - linux' help. installing `mit-krb5` may help
-
-### qss
-
-* the e621, e621_redux, and Paper_Dark qss stylesheets get 'built_release' alternates to handle the new 'lib' directory structure of the built release
-* updated the guidance on external asset paths in `options->style`
-
-### import options test panel
-
-* booting the options dialog in 'advanced mode' now adds a 'PREVIEW: import options' panel. this is the new central place that we'll be customising import options after my rewrite here is done
-* this panel saves nothing; it is only for playing around with. it takes your current settings and migrates them to the new system as the expected pending migration will
-* I am happy with the technical side of things here, but this thing is complicated and I would like to throw advanced users in the deep end and get feedback on where the roughest parts are. I'll sand down the roughest corners with better UI and consider it all as I revise the help docs
-* april fools this year is yet more hellish UI from hydev
-
-### removing the default downloaders
-
-* a fresh hydrus client database no longer starts with any downloader definitions! I am cleaning some legacy things and making the program more neutral from the start. users will now add whichever downloaders they want from third-party sources like the user-run downloader repo. not an april fools--sorry for the trouble!
-* existing users keep what they have; this only affects new installs
-* this also frees me from the maintenance burden, which I was failing at. several of the defaults were breaking and I was not keeping up with the issues
-* so, the defaults are removed from the `static` dir and there are no 'add from defaults' buttons in the edit panels. the UI now supports and starts with a 'null' state of 'no downloader selected' everywhere
-* users without any downloaders are pointed to the `network->downloaders` menu and the user-run repository
-* I updated the help documentation all over regarding this change. it may need a revisit to make new-user onboarding smoother
-
-### import options boring work
-
-* added a 'paste-fill' paste type to the options panel, for filling in gaps without overwriting
-* wrote paste buttons for individual options panels and the import options container panel
-* wrote copy buttons for the container panel
-* fleshed out the valueChanged signals for all the new options panels: prefetch; file filtering; tag filtering; locations; tags; notes; presentation
-* wrote a favourites button and adjusted the UI to handle it in the appropriate locations
-* wrote some basic default favourites
-* polished the UI, swapping to icon buttons, bunch of stuff
-* fixed some little logic and label bugs in the new import options stuff
-
-### little stuff and cleanup
-
-* the little `▲/▼` button you see across the program on static boxes and the popup toaster now uses a special shared class that uses nicer Qt tech to signal things and sets two new object names for QSS devs to hook into: `HydrusCollapseArrowCollapsed` and `HydrusCollapseArrowExpanded`. note that these guys use reversed labels depending on whether they expand up or down (I just realised this, working on it now), so if you want to put a new label or icon in, I think we might want to do some more here. let me know how it goes
-* I think I fixed an issue where the 'hey your page is super mega tall, careful' message was showing more than once if the session includes multiple pages in this state
-* updated some new async ui code, the stuff that does new unified callBack/errBack panel restoration after job reset, so that it better handles the error of its parent window being closed early, and a program shutdown call. this was causing some harmless error spam in some things like a delayed subscription popup files button press/dismiss
-* fixed a stupid error in the updated Linux .desktop file deployment script that broke the Icon with quotes around the path
-* made the various widgets, options, and importers ok with having no downloaders available. the first time a GUG comes in via the drag and drop system, it is set as the default
-* amidst the downloader work, cleaned up how subscriptions do some edit panel `Set` stuff, removing some legacy jank
-* fixed up an old hardcoded 'downloader updated' callable with a nicer Qt Signal
-* improved the error messages around invalid/missing/null GUGs at different stages
-* I also removed some legacy downloader db update code that would have fallen to bitrot here
-* fixed a couple `finally/return` syntax issues
-* 'manage login scripts' now has some red text up top warning that it is an ancient system that does not work well
-* updated the 'adding new downloaders' help to be more clear about what is going on with the png files. it now has an example png for artbooru.com
-* updated a bunch of ancient screenshots in the help, particularly the parsing system
-* fixed duplicated 'index to fetch' label in html parsing formula panel
-* replaced some whackadoodle ListBook fixed sizing with a proper `sizeHint` and some live rowheight checking and framewidth correction
-* cleaned up some subscription unit tests
-* the media result cache is now a singleton instance that persists through a database restart, and the unit tests now do some careful clearing on test database resetting here
-* fixed a missing definition typo in the filetype labels

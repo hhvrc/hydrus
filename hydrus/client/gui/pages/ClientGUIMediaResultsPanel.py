@@ -2892,14 +2892,10 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
         
         self._last_visible_rect = None
         
-        # TODO: Assuming the canvas listeningmedialist refactoring went well, this guy is next
-        # take out the class inheritance, instead create a (non-listening) self._media_list, and fix all method calls to self._GetFirst and so on to instead point at that
-        # rewrite process(content/service)updates to update the list as needed
-        # delete the listeningmedialist class def
+        # TODO: time to devolve medialist from the QObject we are
+        # to start off, start tracking a self._media_list that is just self. migrate stuff over to that _media_list, and in the child thumbnail class, until you can simply stop inheriting it here
+        # this simplifies this whack super init, also
         
-        # TODO: BRUH REWRITE THIS GARBAGE
-        # we don't really want to be messing around with *args, **kwargs in __init__/super() gubbins, and this is highlighted as we move to super() and see this is all a mess!!
-        # obviously decouple the list from the panel here so we aren't trying to do everything in one class
         super().__init__( self._page_manager.GetLocationContext(), media_results, parent )
         
         self.setScene( QW.QGraphicsScene( self ) )
@@ -5508,6 +5504,13 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
         self._VisibleRectUpdate()
         
     
+    def scrollContentsBy( self, dx: int, dy: int ):
+        
+        super().scrollContentsBy( dx, dy )
+        
+        self._VisibleRectUpdate()
+        
+    
     def SelectByTags( self, page_key, tag_service_key, and_or_or, tags ):
         
         if page_key == self._page_key:
@@ -5535,18 +5538,33 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
         pass
         
     
-    def scrollContentsBy( self, dx: int, dy: int ):
-        
-        super().scrollContentsBy( dx, dy )
-        
-        self._VisibleRectUpdate()
-        
-    
     def showEvent( self, event: QG.QShowEvent ) -> None:
         
         super().showEvent( event )
         
         self._VisibleRectUpdate()
+        
+    
+    def ShowMediaFullScreen( self, media ):
+        
+        if media is not None:
+            
+            locations_manager = media.GetLocationsManager()
+            
+            if locations_manager.IsLocal():
+                
+                self._LaunchMediaViewer( media )
+                
+            else:
+                
+                can_download = not locations_manager.GetCurrent().isdisjoint( CG.client_controller.services_manager.GetRemoteFileServiceKeys() )
+                
+                if can_download:
+                    
+                    self._DownloadHashes( media.GetHashes() )
+                    
+                
+            
         
     
     def viewportEvent( self, event: QC.QEvent ) -> bool:

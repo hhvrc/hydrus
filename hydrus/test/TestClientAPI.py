@@ -6434,37 +6434,52 @@ class TestClientAPI( unittest.TestCase ):
         
     
     def _test_manage_pages_new_page( self, connection, set_up_permissions ):
-
+        
         api_permissions = set_up_permissions[ 'manage_pages' ]
         access_key_hex = api_permissions.GetAccessKey().hex()
         headers = { 'Hydrus-Client-API-Access-Key' : access_key_hex, 'Content-Type' : HC.mime_mimetype_string_lookup[ HC.APPLICATION_JSON ] }
 
         class MockPage:
-
+            
             def __init__( self, page_manager, page_name ):
-
+                
                 self._page_key = os.urandom( 32 )
                 self._page_manager = page_manager
                 self._page_name = page_name
-
-
-            def GetPageKey( self ):
-
-                return self._page_key
-
-
-            def GetPageManager( self ):
-
-                return self._page_manager
-
-
-            def GetName( self ):
-
+            
+            def GetName(self):
+                
                 return self._page_name
-
-
+                
+            
+            def GetPageKey( self ):
+                
+                return self._page_key
+                
+            
+            def GetPageManager( self ):
+                
+                return self._page_manager
+                
+            
 
         class MockNotebook:
+            
+            def __init__( self, page_name ):
+                
+                self._page_key = os.urandom( 32 )
+                self._page_name = page_name
+                
+            
+            def GetName( self ):
+                
+                return self._page_name
+                
+            
+            def GetPageKey( self ):
+                
+                return self._page_key
+                
             
             def NewPage( self, page_manager, initial_hashes = None, forced_insertion_index = None, on_deepest_notebook = False, select_page = True ):
                 
@@ -6473,17 +6488,7 @@ class TestClientAPI( unittest.TestCase ):
             
             def NewPagesNotebook( self, name = 'pages', forced_insertion_index = None, on_deepest_notebook = False, give_it_a_blank_page = True, select_page = True ):
                 
-                from hydrus.client.gui.pages import ClientGUIPagesCore
-                
-                class MockPagesNotebookPageManager:
-                    
-                    def GetType( self ):
-                        
-                        return ClientGUIPagesCore.PAGE_TYPE_PAGE_OF_PAGES
-                        
-                    
-                
-                return MockPage( MockPagesNotebookPageManager(), name )
+                return MockNotebook( name )
                 
             
             def GetPageFromPageKey( self, page_key ):
@@ -6492,7 +6497,7 @@ class TestClientAPI( unittest.TestCase ):
                 
             
         
-        mock_notebook = MockNotebook()
+        mock_notebook = MockNotebook( 'top level notebook' )
         
         with mock.patch.object( TG.test_controller, 'GetTopLevelNotebook', return_value = mock_notebook, create = True ):
             

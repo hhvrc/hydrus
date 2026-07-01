@@ -2961,6 +2961,20 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
             
         
     
+    def _GetMouseEventMedia( self, event: QG.QMouseEvent ) -> ClientMedia.Media | None:
+        
+        event_gv_item = self.itemAt( event.pos() )
+        
+        if event_gv_item is not None:
+            
+            event_gv_item = typing.cast( ThumbnailGraphicsViewTest, event_gv_item )
+            
+            return event_gv_item.media
+            
+        
+        return None
+        
+    
     def _IsMediaInRect( self, rect, media ):
         
         return self._media_to_thumbnails[ media ].sceneBoundingRect().intersects( rect )
@@ -2972,7 +2986,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         if thumb is not None:
             
-            return thumb.isSelected()
+            return thumb.is_selected
             
         
         return False
@@ -2995,7 +3009,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                 
             elif not m in self._media_to_thumbnails: # new media, make thumbnail
                 
-                thumb = ThumbnailGraphicsViewTest( m, self )
+                thumb = ThumbnailGraphicsViewTest( m, self, self._page_key )
                 self._media_to_thumbnails[ m ] = thumb
                 self.scene().addItem( thumb )
                 
@@ -3057,7 +3071,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         rect = rect.marginsAdded( QC.QMarginsF( SAFETY_MARGIN_PX, SAFETY_MARGIN_PX, SAFETY_MARGIN_PX, SAFETY_MARGIN_PX ) )
         
-        new_possibly_visible_thumbnails = set( self.scene().items( rect, QC.Qt.ItemSelectionMode.IntersectsItemBoundingRect ) )
+        new_possibly_visible_thumbnails: set[ ThumbnailGraphicsViewTest ] = set( self.scene().items( rect, QC.Qt.ItemSelectionMode.IntersectsItemBoundingRect ) )
         
         no_longer_visible_thumbnails = self._possibly_visible_thumbnails.difference( new_possibly_visible_thumbnails )
         
@@ -3068,7 +3082,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         thumbnails_cache = CG.client_controller.thumbnails_cache_graphics_view_test
         
-        thumbnails_cache.CancelWaterfall( self._page_key, [ thumb._media for thumb in no_longer_visible_thumbnails ] )
+        thumbnails_cache.CancelWaterfall( self._page_key, [ thumb.media for thumb in no_longer_visible_thumbnails ] )
         
         self._possibly_visible_thumbnails = new_possibly_visible_thumbnails
         
@@ -3078,11 +3092,12 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
             
             thumb.possibly_visible = True
             
-            if not thumbnails_cache.HasThumbnailCached( thumb._media, thumb._GetContentSize() ):
+            if not thumbnails_cache.HasThumbnailCached( thumb.media, thumb._GetContentSize() ):
                 
-                waterfall_needed.append( thumb._media )
+                waterfall_needed.append( thumb.media )
                 
             
+        
         if waterfall_needed:
             
             thumbnails_cache.Waterfall( self._page_key, waterfall_needed )
@@ -3105,6 +3120,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                 
                 thumb.Invalidate() # not currently visible, but when it will become visible we'll want it to be redrawn
                 
+            
         
         thumbnails_cache = CG.client_controller.thumbnails_cache_graphics_view_test
         
@@ -3113,13 +3129,13 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         for thumb in visible_thumbs:
             
-            if thumbnails_cache.HasThumbnailCached( thumb._media, thumb._GetContentSize() ):
+            if thumbnails_cache.HasThumbnailCached( thumb.media, thumb._GetContentSize() ):
                 
-                thumbnails_to_render_now.append( thumb._media )
+                thumbnails_to_render_now.append( thumb.media )
                 
             else:
                 
-                thumbnails_to_render_later.append( thumb._media )
+                thumbnails_to_render_later.append( thumb.media )
                 
             
         
@@ -3187,7 +3203,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         if thumb is not None:
             
-            thumb.setSelected( selected )
+            thumb.is_selected = selected
             
         
     
@@ -3195,7 +3211,10 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         thumb = self._media_to_thumbnails.get( media )
         
-        if thumb is None: return
+        if thumb is None:
+            
+            return
+            
         
         thumb_pos = thumb.scenePos()
         
@@ -3224,6 +3243,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
             
             ensure_x = thumb_pos.x() + thumbnail_span_width
             
+        
         self.ensureVisible( ensure_x, ensure_y, 0, 0 )
         
     
@@ -3273,33 +3293,11 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         # explicitly clear all references to thumbnail objects just in case, don't want any hanging around
         self._media_to_thumbnails.clear()
-        CG.client_controller.thumbnails_cache_graphics_view_test.CancelWaterfall( self._page_key, [ thumb._media for thumb in self._possibly_visible_thumbnails ] )
+        CG.client_controller.thumbnails_cache_graphics_view_test.CancelWaterfall( self._page_key, [ thumb.media for thumb in self._possibly_visible_thumbnails ] )
         self._possibly_visible_thumbnails.clear()
         self.scene().clear()
         
         super().CleanBeforeDestroy()
-        
-    
-    def ShowMediaFullScreen( self, media ):
-        
-        if media is not None:
-            
-            locations_manager = media.GetLocationsManager()
-            
-            if locations_manager.IsLocal():
-                
-                self._LaunchMediaViewer( media )
-                
-            else:
-                
-                can_download = not locations_manager.GetCurrent().isdisjoint( CG.client_controller.services_manager.GetRemoteFileServiceKeys() )
-                
-                if can_download:
-                    
-                    self._DownloadHashes( media.GetHashes() )
-                    
-                
-            
         
     
     def MaintainPageCache( self ):
@@ -3316,7 +3314,17 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
             
         
     
-    def mouseMoveEvent( self, event ):
+    def mouseDoubleClickEvent( self, event: QG.QMouseEvent ) -> None:
+        
+        event_media = self._GetMouseEventMedia( event )
+        
+        if event.button() == QC.Qt.MouseButton.LeftButton and event_media is not None:
+            
+            self.ShowMediaFullScreen( event_media )
+            
+        
+    
+    def mouseMoveEvent( self, event: QG.QMouseEvent ):
         
         if event.buttons() & QC.Qt.MouseButton.LeftButton:
             
@@ -3384,15 +3392,49 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
     
     def mousePressEvent( self, event: QG.QMouseEvent ):
         
-        # Mouse presses on graphics items will be handled by the items themselves so we are only interested in presses on the empty area here
-        if event.button() != QC.Qt.MouseButton.RightButton and self.itemAt( event.pos() ) is None:
-            
-            self._HitMedia( None, event.modifiers() & QC.Qt.KeyboardModifier.ControlModifier, event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier )
-            
-            return
-            
+        # it is tempting to have QGraphicsItems handle their own clicks, and the first version of this did so, but ultimately the GI ends up just calling us anyway
+        # we don't want a knot of references or a billion signals flying around, so we'll just do it here
+        # itemAt provides a nice way to figure out the guy, so let's do it here
         
-        QW.QGraphicsView.mousePressEvent( self, event )
+        event_media = self._GetMouseEventMedia( event )
+        
+        if event.button() == QC.Qt.MouseButton.RightButton and event_media is None:
+            
+            # this is a right-click on whitespace, which should not do any selection-altering behaviour
+            
+            QW.QGraphicsView.mousePressEvent( self, event )
+            
+        else:
+            
+            # ok this is a selecting-click; either a normal left/middle somewhere or a menu event on a thumb
+            
+            ctrl = event.modifiers() & QC.Qt.KeyboardModifier.ControlModifier
+            shift = event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
+            
+            if event_media is None:
+                
+                # middle-click on whitespace is a no-op
+                if event.buttons() != QC.Qt.MouseButton.MiddleButton:
+                    
+                    self._HitMedia( None, ctrl, shift )
+                    
+                
+            else:
+                
+                if event.buttons() == QC.Qt.MouseButton.MiddleButton:
+                    
+                    self.ShowMediaFullScreen( event_media )
+                    
+                else:
+                    
+                    self._drag_init_coordinates = QG.QCursor.pos()
+                    self._drag_click_timestamp_ms = HydrusTime.GetNowMS()
+                    
+                    # this specifically does not scroll to media, as for clicking (esp. double-clicking attempts), the scroll can be jarring
+                    self._HitMedia( event_media, ctrl, shift )
+                    
+                
+            
         
     
     def MoveMedia( self, medias: list[ ClientMedia.Media ], insertion_index: int ):
@@ -4275,59 +4317,71 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
     
     def TIMERAnimationUpdate( self ):
         
-        if HydrusTime.GetNowPrecise() - self._last_animation_update_time < FRAME_DURATION_60FPS: return
+        if HydrusTime.GetNowPrecise() - self._last_animation_update_time < FRAME_DURATION_60FPS:
             
+            return
+            
+        
         for thumb in self._possibly_visible_thumbnails:
             
-            if thumb.is_animating: thumb.AnimationUpdate()
+            if thumb.is_animating:
+                
+                thumb.AnimationUpdate()
+                
             
+        
         self._last_animation_update_time = HydrusTime.GetNowPrecise()
         
     
-    def WaterfallThumbnails( self, page_key, thumbnails ):
+    def WaterfallThumbnails( self, page_key, medias ):
         
         if self._page_key == page_key:
             
-            self._FadeThumbnails( thumbnails )
+            self._FadeThumbnails( medias )
             
         
     
 
-# TODO: should be moved to a separate file but leaving this here for the time being to minimize code changes
 class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
     
     FADE_DURATION_S = 0.5
     
-    def __init__( self, media: ClientMedia.Media, panel: MediaResultsPanelThumbnails ):
+    def __init__( self, media: ClientMedia.Media, panel: MediaResultsPanelThumbnailsGraphicsViewTest, page_key: bytes ):
         
         super().__init__()
         
-        self._media = media
+        self.media = media
         
         # These will be accessed by the layouting code
         # I leave them as properties instead of having a GetResolution() method
         # to reduce access overhead (the layouting code is VERY performance-sensitive for more complex layouts if the number of thumbnails is large)
-        # Probably easy enough to handle by using default thumb size or something here if no proper resolution is available.
-        # TODO: what if the media resolution changes? Is that possible? Invalidate() already re-sets this at least but this is untested.
-        
         if media.HasUsefulResolution():
             
-            self.res_x, self.res_y = media.GetResolution()
+            ( self.res_x, self.res_y ) = media.GetResolution()
             
         else:
             
-            self.res_x, self.res_y = HC.options[ 'thumbnail_dimensions' ]
+            ( self.res_x, self.res_y ) = HC.options[ 'thumbnail_dimensions' ]
             
         
+        # TODO: it would be nice if we didn't have a handle to the whole view here but instead some sort of colour_requester object, since that's what we use this guy for. nbd for now
         self._view = panel
+        self._page_key = page_key
         
-        self.setAcceptHoverEvents( True )
+        # set this to True if and when we want to play with hover zoom/animation and such
+        self.setAcceptHoverEvents( False )
         
-        # right now we do not really utilize the QGraphicsView/Scene functionality related to these flags,
-        # and just use the selected state for our own purposes, not the scene/view's own selecting/moving handling
-        # but this is ok. these functionalities could get used in the future
-        self.setFlag( QW.QGraphicsItem.GraphicsItemFlag.ItemIsMovable )
-        self.setFlag( QW.QGraphicsItem.GraphicsItemFlag.ItemIsSelectable )
+        self._is_hovered = False
+        
+        # OK hydev discovered that setting the guy selectable (self.setFlag( QW.QGraphicsItem.GraphicsItemFlag.ItemIsSelectable()) causes some Qt inherent ctrl+click logic to apply
+        # it fights with my custom ctrl-click logic and thus pseudo-random ctrl-clicks reverse immediately after my code
+        # I could try and override every selection part, but since I have my own 'selected media' and logic generally, let's just have a bool here instead!
+        # in future maybe we'll have our own 'SelectionRuleset' or whatever it is that Qt uses to back all this
+        self.is_selected = False
+        
+        # we could use this in future if we were to integrate the medialist/media_sorted gubbins into Qt data tech
+        # not right now though, because this starts adding drag tech out of our control!!
+        #self.setFlag( QW.QGraphicsItem.GraphicsItemFlag.ItemIsMovable )
         
         # # be SUPER careful to keep the thumb width/height as integers (when setting them in the layouting code or elsewhere),
         # otherwise caching etc. will be fucked cause the stored width/height won't be exactly the same as the final thumb pixmap's (integer) width/height
@@ -4341,9 +4395,6 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         # But for the time being I think leaving it a simple bool variable is fine too.
         self.possibly_visible = False
         self.is_animating = False
-        
-        self._is_hovered = False
-        self._is_pressed = False
         
         self._last_tags = None
         
@@ -4369,6 +4420,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         if not self.possibly_visible or not self.is_animating:
             
             return
+            
         
         self.update()
         
@@ -4402,54 +4454,22 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         super().hoverLeaveEvent( event )
         
     
-    def hoverMoveEvent( self, event: QW.QGraphicsSceneHoverEvent ) -> None:
-        
-        super().hoverMoveEvent( event )
-        
-    
     def Invalidate( self ) -> None:
         
-        self.res_x, self.res_y = self._media.GetResolution() # TODO see the comment on these in __init__
+        if self.media.HasUsefulResolution():
+            
+            ( self.res_x, self.res_y ) = self.media.GetResolution()
+            
+        else:
+            
+            ( self.res_x, self.res_y ) = HC.options[ 'thumbnail_dimensions' ]
+            
         
         self._cached_pixmap = None
         self._cached_old_pixmap_for_fade = None
         
     
-    def mouseDoubleClickEvent( self, event: QW.QGraphicsSceneMouseEvent ) -> None:
-        
-        self._view.ShowMediaFullScreen( self._media )
-        
-        super().mouseDoubleClickEvent( event )
-        
-    
-    def mousePressEvent( self, event: QW.QGraphicsSceneMouseEvent ) -> None:
-        
-        self._is_pressed = True
-        
-        self._view._drag_init_coordinates = QG.QCursor.pos()
-        self._view._drag_click_timestamp_ms = HydrusTime.GetNowMS()
-        
-        if event.buttons() == QC.Qt.MouseButton.MiddleButton:
-            
-            self._view.ShowMediaFullScreen( self._media )
-            
-        else:
-            
-            # this specifically does not scroll to media, as for clicking (esp. double-clicking attempts), the scroll can be jarring
-            self._view._HitMedia( self._media, event.modifiers() & QC.Qt.KeyboardModifier.ControlModifier, event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier )
-            
-        
-        super().mousePressEvent( event )
-        
-    
-    def mouseReleaseEvent( self, event: QW.QGraphicsSceneMouseEvent ) -> None:
-        
-        self._is_pressed = False
-        
-        super().mouseReleaseEvent( event )
-        
-    
-    def paint( self, painter: QG.QPainter, option: QW.QStyleOptionGraphicsItem, widget: QW.QWidget = None ) -> None:
+    def paint( self, painter: QG.QPainter, option: QW.QStyleOptionGraphicsItem, widget: QW.QWidget | None = None ) -> None:
         
         try:
             
@@ -4457,12 +4477,21 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
             if not self._cached_pixmap or self.width != self._cached_pixmap.width() or self.height != self._cached_pixmap.height():
                 
-                if not thumbnails_cache.HasThumbnailCached( self._media, self._GetContentSize() ):
+                if not thumbnails_cache.HasThumbnailCached( self.media, self._GetContentSize() ):
                     
                     painter.fillRect( self.boundingRect(), QC.Qt.GlobalColor.transparent )
                     
-                    # TODO is this really OK? I guess this is the way to tell the cache to plz load the thumbnail but without blocking in the paint event
-                    thumbnails_cache.Waterfall( self._view._page_key, ( self._media, ) )
+                    # non-blocking reminder to the cache to get going on us if it isn't already
+                    # TODO: I moved to this guy knowing the page key, rather than asking the GV for it, but this whole waterfall cascade is obviously a knot
+                    # it'd be nice to rework how this guy gets informed of or otherwise pulls his thumb
+                    # similarly, it would be nice to draw a placeholder here rather than just like blank or an old pixmap fallback, and then update with the actual guy once it is loaded
+                    # so yeah maybe we go to something like:
+                        # if thumb ready, use it
+                        # else, grab the placeholder and remind the cache to schedule an update
+                        # if the GV is the one catching all this, then we could just pass the bitmap along that route, in the pubsub, tbh
+                        # perhaps all responsibility for thumb load could actually be handled at the GV level. a bunch of it is, and this guy just draws what he has and otherwise takes updates
+                    # ANYWAY, just consider the waterfall ''''''pipeline'''''' in its entirety and consider untying it significantly
+                    thumbnails_cache.Waterfall( self._page_key, ( self.media, ) )
                     
                     # TODO what if fade is not enabled? I think we don't need to check here for that since then StartFadeIn would never be called and
                     #_ cached_old_pixmap_for_fade would be None. Right??
@@ -4477,6 +4506,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
                     
                     return
                     
+                
                 cached_image = QG.QImage( self.width, self.height, QG.QImage.Format.Format_ARGB32_Premultiplied )
                 
                 cached_image.setDevicePixelRatio( painter.device().devicePixelRatio() )
@@ -4485,7 +4515,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
                 
                 image_painter = QG.QPainter( cached_image )
                 
-                self._PaintThumbnailContent( image_painter, self._media, self._view )
+                self._PaintThumbnailContent( image_painter, self.media, self._view )
                 
                 image_painter.end()
                 
@@ -4539,8 +4569,11 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
     
     def GetFadeInOpacity( self ) -> float:
         
-        if self._fade_in_started_at is None: return 1.0
+        if self._fade_in_started_at is None:
             
+            return 1.0
+            
+        
         passed = HydrusTime.GetNowPrecise() - self._fade_in_started_at
         
         if passed >= self.FADE_DURATION_S:
@@ -4558,6 +4591,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             return passed / self.FADE_DURATION_S # linear transition from 0 to 1 opacity, maybe some other easing curve would look better?
             
         
+    
     def _GetContentSize( self ) -> tuple[int, int]:
         
         thumbnail_border = CG.client_controller.new_options.GetInteger( 'thumbnail_border' )
@@ -4569,7 +4603,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         return ( self.width - thumbnail_border * 2, self.height - thumbnail_border * 2 )
         
     
-    def _PaintThumbnailContent( self, painter: QG.QPainter, media: ClientMedia.Media, media_panel: ClientGUIMediaResultsPanel.MediaResultsPanel ) -> None:
+    def _PaintThumbnailContent( self, painter: QG.QPainter, media: ClientMedia.Media, media_panel: ClientGUIMediaResultsPanel.MediaResultsPanelGraphicsViewTest ) -> None:
         
         thumbnails_cache = CG.client_controller.thumbnails_cache_graphics_view_test
         
@@ -4583,7 +4617,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
         else:
             
-            thumbnail_hydrus_bmp = thumbnails_cache.GetThumbnail( media.GetDisplayMedia().GetMediaResult(), content_size )
+            thumbnail_hydrus_bmp = thumbnails_cache.GetThumbnail( media.GetDisplayMediaResult(), content_size )
             
         
         ( width, height ) = self.width, self.height
@@ -4634,7 +4668,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         
         if not local:
             
-            if self.isSelected():
+            if self.is_selected:
                 
                 background_colour_type = CC.COLOUR_THUMB_BACKGROUND_REMOTE_SELECTED
                 
@@ -4645,7 +4679,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
         else:
             
-            if self.isSelected():
+            if self.is_selected:
                 
                 background_colour_type = CC.COLOUR_THUMB_BACKGROUND_SELECTED
                 
@@ -4801,7 +4835,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
             if not local:
                 
-                if self.isSelected():
+                if self.is_selected:
                     
                     border_colour_type = CC.COLOUR_THUMB_BORDER_REMOTE_SELECTED
                     
@@ -4812,7 +4846,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
                 
             else:
                 
-                if self.isSelected():
+                if self.is_selected:
                     
                     border_colour_type = CC.COLOUR_THUMB_BORDER_SELECTED
                     

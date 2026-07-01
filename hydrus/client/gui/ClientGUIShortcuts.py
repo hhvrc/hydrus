@@ -91,6 +91,7 @@ SHORTCUT_KEY_SPECIAL_F21 = 45
 SHORTCUT_KEY_SPECIAL_F22 = 46
 SHORTCUT_KEY_SPECIAL_F23 = 47
 SHORTCUT_KEY_SPECIAL_F24 = 48
+# HEY IF YOU ADD MORE HERE, REVISIT TryToIncrementKey; there is a Backtab enum juggling hack that currently breaks a loop and needs a new link
 
 if HC.PLATFORM_MACOS:
     
@@ -1407,7 +1408,23 @@ class Shortcut( HydrusSerialisable.SerialisableBase ):
             
         elif self.shortcut_type == SHORTCUT_TYPE_KEYBOARD_SPECIAL:
             
-            new_shortcut_key = self.shortcut_key + 1
+            # non-contiguous enum juggling
+            if self.shortcut_key == SHORTCUT_KEY_SPECIAL_F12:
+                
+                new_shortcut_key = SHORTCUT_KEY_SPECIAL_F13
+                
+            elif self.shortcut_key == SHORTCUT_KEY_SPECIAL_F24:
+                
+                new_shortcut_key = SHORTCUT_KEY_SPECIAL_MEDIA_PLAY_PAUSE
+                
+            elif self.shortcut_key == SHORTCUT_KEY_SPECIAL_BACKTAB:
+                
+                raise HydrusExceptions.VetoException( 'Sorry, cannot increment that shortcut!' )
+                
+            else:
+                
+                new_shortcut_key = self.shortcut_key + 1
+                
             
             if new_shortcut_key in special_key_shortcut_str_lookup:
                 

@@ -1764,7 +1764,16 @@ class ThumbnailCacheGraphicsViewTest( object ):
         
         with self._lock:
             
-            self._waterfall_queue_quick.update( ( ( page_key, media ) for media in medias ) )
+            stuff_to_add = { ( page_key, media ) for media in medias }
+            
+            # if there is stuff to add, this generally returns quickly, not wasting time
+            # if there isn't stuff to add, we avoid doing a recalcqueues, saving time
+            if stuff_to_add.issubset( self._waterfall_queue_quick ):
+                
+                return
+                
+            
+            self._waterfall_queue_quick.update( stuff_to_add )
             
             self._RecalcQueues()
             
