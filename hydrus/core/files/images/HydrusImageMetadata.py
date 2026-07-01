@@ -63,15 +63,10 @@ def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None, igno
     if indent_depth == 0 and 'chara' in keys:
         
         keys.remove( 'chara' )
-
-        chara_text = render_char_card( d[ 'chara' ], indent_depth )
-
-        if chara_text is not None:
-
-            texts.append( chara_text )
-
-
-
+        
+        texts.append( render_char_card( d[ 'chara' ], indent_depth ) )
+        
+    
     for key in keys:
         
         if key in ignore_these_keys:
@@ -87,13 +82,7 @@ def render_dict( d: dict, indent_depth: int, keys_to_put_at_the_top = None, igno
             
         
         row_text = render_key_value( indent_depth, key, value, keys_to_put_at_the_top = keys_to_put_at_the_top )
-
-        # render_key_value returns None for bytes values; skip them rather than letting a None poison the '\n'.join below
-        if row_text is None:
-
-            continue
-
-
+        
         texts.append( row_text )
         
     
