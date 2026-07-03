@@ -95,6 +95,47 @@ def GenerateExportFilename( destination_directory, media, terms, file_index, do_
                 filename += str( file_index )
                 
             
+            elif ':' in term:
+
+                # a date/time term, e.g. {modified_time:%Y-%m-%d}
+                # the strftime format string comes after the first colon
+
+                ( time_type, time_format ) = term.split( ':', 1 )
+
+                times_manager = media.GetTimesManager()
+
+                if time_type == 'import_time':
+
+                    timestamp_ms = times_manager.GetImportedTimestampMS( CC.COMBINED_LOCAL_FILE_DOMAINS_SERVICE_KEY )
+
+                elif time_type == 'modified_time':
+
+                    timestamp_ms = times_manager.GetAggregateModifiedTimestampMS()
+
+                elif time_type == 'archived_time':
+
+                    timestamp_ms = times_manager.GetArchivedTimestampMS()
+
+                else:
+
+                    timestamp_ms = None
+
+
+                if timestamp_ms is not None:
+
+                    try:
+
+                        dt = HydrusTime.TimestampMSToDateTime( timestamp_ms, timezone = HC.TIMEZONE_LOCAL )
+
+                        filename += clean_tag_text( dt.strftime( time_format ) )
+
+                    except Exception:
+
+                        pass
+
+
+
+
         elif term_type == 'tag':
             
             tag = term

@@ -1229,6 +1229,12 @@ class ExportPatternButton( BetterButton ):
         
         ClientGUIMenus.AppendSeparator( menu )
         
+        ClientGUIMenus.AppendMenuItem( menu, 'import time - {import_time:%Y-%m-%d}', 'copy "{import_time:%Y-%m-%d}" to the clipboard', CG.client_controller.pub, 'clipboard', 'text', '{import_time:%Y-%m-%d}' )
+        ClientGUIMenus.AppendMenuItem( menu, 'file modified time - {modified_time:%Y-%m-%d}', 'copy "{modified_time:%Y-%m-%d}" to the clipboard', CG.client_controller.pub, 'clipboard', 'text', '{modified_time:%Y-%m-%d}' )
+        ClientGUIMenus.AppendMenuItem( menu, 'archived time - {archived_time:%Y-%m-%d}', 'copy "{archived_time:%Y-%m-%d}" to the clipboard', CG.client_controller.pub, 'clipboard', 'text', '{archived_time:%Y-%m-%d}' )
+
+        ClientGUIMenus.AppendSeparator( menu )
+
         ClientGUIMenus.AppendMenuItem( menu, f'all instances of a particular namespace - [{HC.UNICODE_ELLIPSIS}]', f'copy "[{HC.UNICODE_ELLIPSIS}]" to the clipboard', CG.client_controller.pub, 'clipboard', 'text', f'[{HC.UNICODE_ELLIPSIS}]' )
         
         ClientGUIMenus.AppendSeparator( menu )
