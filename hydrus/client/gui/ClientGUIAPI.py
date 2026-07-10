@@ -192,7 +192,7 @@ class EditAPIPermissionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
             bytes.fromhex( new_access_key_hex )
             
-        except:
+        except Exception as e:
             
             ClientGUIDialogsMessage.ShowCritical( self, 'did not encode', 'Sorry, the key you submitted did not seem to be hexadecimal.' )
             

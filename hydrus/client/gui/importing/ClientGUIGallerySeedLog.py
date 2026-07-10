@@ -27,6 +27,7 @@ from hydrus.client.gui.lists import ClientGUIListCtrl
 from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.importing import ClientImportGallerySeeds
+from hydrus.client.metadata import ClientTagSorting
 from hydrus.client.networking import ClientNetworkingFunctions
 
 def ClearGallerySeeds( win: QW.QWidget, gallery_seed_log: ClientImportGallerySeeds.GallerySeedLog, statuses_to_remove, gallery_type_string ):
@@ -511,6 +512,28 @@ class EditGallerySeedLogPanel( ClientGUIScrolledPanels.EditPanel ):
                     
                 
                 ClientGUIMenus.AppendMenu( menu, header_submenu, 'additional headers' )
+                
+            
+            inherited_tags = list( selected_gallery_seed.GetInheritedTags() )
+            
+            tag_sort = ClientTagSorting.TagSort( sort_type = ClientTagSorting.SORT_BY_HUMAN_TAG, sort_order = CC.SORT_ASC )
+            
+            ClientTagSorting.SortTags( tag_sort, inherited_tags )
+            
+            if len( inherited_tags ) == 0:
+                
+                ClientGUIMenus.AppendMenuLabel( menu, 'no inherited tags' )
+                
+            else:
+                
+                tag_submenu = ClientGUIMenus.GenerateMenu( menu )
+                
+                for tag in inherited_tags:
+                    
+                    ClientGUIMenus.AppendMenuLabel( tag_submenu, tag )
+                    
+                
+                ClientGUIMenus.AppendMenu( menu, tag_submenu, 'inherited tags' )
                 
             
         

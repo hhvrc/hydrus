@@ -7,6 +7,44 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 678](https://github.com/hydrusnetwork/hydrus/releases/tag/v678)
+
+### misc
+
+* audio files that have embedded images will now get thumbnails! all your existing audio files will be scheduled for a thumb regen on update
+* fixed the core ffmpeg video metadata info call to use the 'ffmpeg timeout' option, which by accident it wasn't. thank you for the reports here; this was what was stuck on 15 seconds timeout despite the new option
+* the file import object right-click menu now differentiates parsed tags from inherited tags, and the gallery import object right-click menu now shows inherited tags (issue #2056)
+* pdf documents that have empty human-readable file metadata text (this happens when they have no Title, Author, Subject, or Keywords) are now considered to have no such text. all pdfs are scheduled for a 'has human-readable text' regen on update
+
+### some more UI
+
+* thanks to a user, we have some more UI updates.
+* the options search system reveals some tucked-away widgets better and excludes some other things appropriately
+* there are new shortcut commands for the new per-player mute/unmute/flip-mute (issue #2050)
+* I fixed some issues with the per-player mute (issue #2049)
+* there's an `EXPERIMENTAL: Show tab tree view` setting under `options->gui pages` that has some neat new tech, with a tree to replace the existing tab-bar and some interesting flags to move the main page sidebar to the right. this needs a bit more work but is another thing we are playing with and will bring us a few steps towards a more modular 'place it where you like' UI layout
+
+### boring mute cleanup
+
+* tore out and rewrote the new per-player mute/unmute pipeline, fixing several issues related to mute check logic and subsequent state setting, also cleaned up some bad enum names and non-hooked-up signals (issue #2054)
+* for KISS, the Qt and mpv players no longer track mute options; they just handle the doing of it. the parent container now tracks and reacts to options changes and the new per-player state
+* the volume menu now offers a way to stop forcing mute/unmute
+
+### boring ffmpeg cleanup
+
+* added audio and image ffmpeg stream parsing
+* added image stream rendering for audio thumbnail gen
+* refactored the monolith thumbgen call, made it more reliable for weird failure cases
+* refactored ffmpeg rendering calls to their own file
+* misc ffmpeg calling and parsing refactoring and cleanup
+* removed defunct 'only render first second' frame-counting hack
+* deleted some redundant old psd ffmpeg code
+* added a note to the install help about FFMPEG on Linux (issue #2052)
+
+### other boring code cleanup
+
+* fixed and cleaned up the layout code and some options juggling in the new treeview experiment, cleaned up some misc splitter/sizes stuff along the way
+
 ## [Version 677](https://github.com/hydrusnetwork/hydrus/releases/tag/v677)
 
 ### misc
@@ -560,53 +598,3 @@ title: Changelog
 * fixed a possible count bug in the thread slot system where in certain late-initialisation systems it could undercount the number of active jobs in a slot
 * the 'prefer system ffmpeg' setting no longer needs a client restart. the call that discerns the ffmpeg path to use is also a little more sensible and failsafe, and cycling the options dialog now resets some state so you can put an ffmpeg in your hydrus 'bin' folder, ok the options, and it'll redo the 'is there one there?' test
 * updated `crash.log` to `/db/hydrus_crash.log` in `.gitignore` file
-
-## [Version 667](https://github.com/hydrusnetwork/hydrus/releases/tag/v667)
-
-### misc
-
-* fixed an issue with subs where a sub with all DEAD queries was considered 'no work remaining', and thus subs in that situation with nonetheless outstanding file downloads would not clear those outstanding file downloads if the work spilled over to future sub runs
-* all thumbnail pair lists (which are in the duplicates auto-resolution UI) now have a menu that says 'show x rows in a new page' so can you can review things in more detail. let me know if this swallows deleted thumbnails anywhere
-* the file storage granularisation system can now handle cross-filesystem granularisation. this can happen on 3-to-2 when some of the 3-granular subfolders have been migrated to a second location and need to be collected in a central source that might be on a different partition. it seems to also occur in 2-to-3 when the filesystem has overlapping subfolder orphans from a previous borked migration or similar and things are tidied as part of the regranularisation. the previous very fast atomic 'file rename' was raising an error here; now I do some efficient device checking of subfolders and move to a 'copy2+unlink' combo instead when the device differs
-* the granularisation panel now warns those with weird symlinked storage to stay away
-* the routine that counts up the durations of a gif's frames and the hydrus native renderer now fall back to best-guess defaults if A) the file changes resolution mid-parse or B) any frame appears to have a width or height bigger than 16k pixels. we encountered a malformed gif this week that went from 640x480 to a fake 28579x93263 and caused a memory explosion. should handle this situation better now
-* continuing the 'clean up PIL Images better' work, native animation renders that error out are now explicitly closed before reinitialisation
-* thanks to a user, the 'Paper_Dark' QSS files have fixed, visible `▲/▼` button labels. relatedly, the objectNames I added for this guy last week are renamed to `HydrusCollapseArrowUp/Down`. they were `Expanded/Collapsed`, but since the arrows reverse depending on an upwards or downwards expand, we realised we'd want something more specific to the actual label being shown if we ever wanted custom icons/labels
-
-### sidecars
-
-* sidecars gets an easy one-click template that covers simple stuff. the 'edit metadata migration routers' dialog, which the main guy in sidecar editing, now has a star button. when exporting to sidecars, it offers an 'easy one-click JSON that covers the basics' template that spams out definitions for a single 'filename.jpg.json' JSON sidecar that gets your notes, urls, tags for each tag service by storage (no siblings/parents) and display (with siblings/parents), and timestamps for archived time, main import time, and media/preview viewer 'last viewed time'. when importing from sidecars, the buton offers the same 'easy one-click' option to eat from a JSON using the same format and will line up any tag services that have the same service name
-* if you try to export notes to a .txt sidecar using `\n` as the separator, or conversely import notes from a `\n` .txt sidecar, the 'edit sidecar stuff' dialog now moans at you on ok, asking if you are totally sure that is correct. since notes often _include_ newlines, something like `||||` is more appropriate
-* when dragging and dropping individual files onto the client, it can now give a pretty 'sidecar' result when you drop individual files. this only worked if you dropped directories previously, with individual file drops giving 'PROBLEM: filetype unsupported' for the sidecars. this is an aesthetic change only; it doesn't matter that sidecars are not parsed ok at this step, but it is nice to have the correct 'won't try to import' label
-* in the 'add metadata before we import' sub-dialog of the manual file import, the 'sidecars' list now shows better metadata context around the sidecar content preview. the 'notes' now compresses multiple notes better, with a total count and elided preview; the 'tags' now says to which tag service they are going; the 'URLs' now says how many URLs and elides better; the 'timestamp' now converts to a nice datestring and says what the destination is for that time (previously it just said the UNIX timestamp flat wew)
-
-### Client API and setting archived time
-
-* for sidecars and the Client API, if you push an archived time on a file in the inbox, the file is now auto-archived! the UI and Client API docs now mention this
-* previously, the data was (buggily) recorded but generally swallowed and not reported anywhere
-* the Client API 'file metadata' call now gives a `time_archived` if the file is not in the inbox and there is a known timestamp
-* sidecar routers, when harvesting timestamps to send to a sidecar file, will no longer suck an orphaned archive timestamp from a file that is in the inbox
-* Client API version is now 89
-
-### QtMediaPlayer transparency
-
-* the QtMediaPlayer should now support transparency properly! previously, if you put up an animated gif with transparency, the transparent areas would be black with ugly fuzzy edges. now it does a checkerboard or greenscreen using the same settings as a static image. on some files there is still fuzz, but most of the time it looks great
-* the QtMediaPlayer should also show the normal background colour while it waits for a non-transparent media to load. it probably flashed black before, so should cut down on some load flicker
-* the normal static image checkerboard and greenscreen transparency uses the same, updated tech here. rather than drawing a bunch of boxes, we now have a textured pixmap brush, and in fact in all cases we just set a brush and do an eraseRect, nice and clean. Qt is great
-* the 'show transparency and checkerboard in duplicate filter' setting in `duplicates` is now its own thing and applies independently to the one in `media playback`. previously it had some whack 'only applies if the media playback guy is unchecked', which is the kind of thing you can convince yourself is useful and technically correct but violates KISS
-
-### ingesting serialised objects
-
-* the 'import downloaders' panel now accepts drag-and-drop or pasted JSON files
-* added a `help->debug->what is this object?` debug review panel to figure out mysterious bits of json or png or whatever
-
-### boring stuff
-
-* improved error handling for setting QtMediaPlayer null audio device on media load
-* improved how 'show menu' events are handled, Qt-side, for the: colour picker widget; preview viewer; navigable media viewer; taglist
-* cleaned up some ugly menu generation/show for the main thumbnail grid
-* decoupled the 'import downloaders' serialised object ingestion routine and brushed it up a bit with nicer error reporting and so on
-* all serialisable objects can now describe themselves with regards to the serialisation system, with special hooks for named objects and the special list, dict, and bytes dict
-* fixed up several places that do a fast 'is it a jpeg/png' mime check, which was accidentally skipping the png side and doing the slower check
-* fixed a bad layout flag in the 'select from a list of checkboxes now mate' dialog
-* fixed some close-curly-brace typos in the example Client API Services Object JSON

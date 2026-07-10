@@ -745,6 +745,8 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         self._initialisation_start_time = HydrusTime.GetNow()
         self._cleanup_start_time = 0
         
+        self._last_set_mute_state = False
+        
         global LOCALE_IS_SET
         
         if not LOCALE_IS_SET:
@@ -811,7 +813,6 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         
         self.destroyed.connect( self._player.terminate )
         
-        CG.client_controller.sub( self, 'UpdateAudioMute', 'new_audio_mute' )
         CG.client_controller.sub( self, 'UpdateAudioVolume', 'new_audio_volume' )
         CG.client_controller.sub( self, 'UpdateConfAndCoreOptions', 'notify_new_options' )
         CG.client_controller.sub( self, 'SetLogLevel', 'set_mpv_log_level' )
@@ -1528,7 +1529,6 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                     
                     # some videos have an audio channel that is silent. hydrus thinks these dudes are 'no audio', but when we throw them at mpv, it may play audio for them
                     # would be fine, you think, except in one reported case this causes scratches and pops and hell whitenoise
-                    # so let's see what happens here
                     mute_override = not self._media.HasAudio()
                     
                     self._player.visibility = 'always'
@@ -1577,7 +1577,7 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                         
                     
                     self._player.volume = ClientGUIMediaVolume.GetCorrectCurrentVolume( self._canvas_type )
-                    self._player.mute = mute_override or ClientGUIMediaVolume.GetCorrectCurrentMute( self._canvas_type )
+                    self._player.mute = mute_override or self._last_set_mute_state
                     self._mpv_mediator.SetPaused( start_paused )
                     
                     self.update()
@@ -1656,34 +1656,24 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         return self._player.mute
         
     
-    def UpdateAudioMute( self, mute_state = None ):
+    def SetMute( self, mute: bool ):
+        
+        self._last_set_mute_state = mute
         
         if self._currently_in_media_load_error_state:
             
             return
             
         
-        try:
-            
-            if mute_state is None:
-                
-                self._player.mute = ClientGUIMediaVolume.GetCorrectCurrentMute( self._canvas_type )
-                
-            else:
-                
-                self._player.mute = mute_state
-                
-            
-        except mpv.ShutdownError:
-            
-            # libmpv core probably shut down
-            pass
-            
+        # TODO: Move this to the mediator
+        self._player.mute = mute
         
-        
-
+    
     def UpdateAudioVolume( self ):
         
+        # TODO: like we did with mute, move the responsibility for _what_ volume to set up to the mediacontainer
+        # this guy should only accept 'ok, 43%'
+        
         if self._currently_in_media_load_error_state:
             
             return
@@ -1691,6 +1681,7 @@ class MPVWidget( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         
         try:
             
+            # TODO: Move this to the mediator
             self._player.volume = ClientGUIMediaVolume.GetCorrectCurrentVolume( self._canvas_type )
             
         except mpv.ShutdownError:

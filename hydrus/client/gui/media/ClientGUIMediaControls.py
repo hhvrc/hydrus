@@ -31,21 +31,23 @@ def ChangeVolume( volume_type, volume ):
     
     CG.client_controller.pub( 'new_audio_volume' )
     
+
 def FlipMute( volume_type ):
     
     ( mute_option_name, volume_option_name ) = volume_types_to_option_names[ volume_type ]
     
     CG.client_controller.new_options.FlipBoolean( mute_option_name )
     
-    CG.client_controller.pub( 'new_audio_mute' )
+    CG.client_controller.pub( 'notify_new_audio_mute_options' )
     
+
 def SetMute( volume_type, mute ):
     
     ( mute_option_name, volume_option_name ) = volume_types_to_option_names[ volume_type ]
     
     CG.client_controller.new_options.SetBoolean( mute_option_name, mute )
     
-    CG.client_controller.pub( 'new_audio_mute' )
+    CG.client_controller.pub( 'notify_new_audio_mute_options' )
     
 
 class AudioMuteButton( ClientGUICommon.IconButton ):
@@ -58,7 +60,7 @@ class AudioMuteButton( ClientGUICommon.IconButton ):
         
         super().__init__( parent, icon, FlipMute, self._volume_type )
         
-        CG.client_controller.sub( self, 'UpdateMute', 'new_audio_mute' )
+        CG.client_controller.sub( self, 'NotifyNewAudioMuteOptions', 'notify_new_audio_mute_options' )
         
     
     def _GetCorrectIcon( self ):
@@ -77,7 +79,7 @@ class AudioMuteButton( ClientGUICommon.IconButton ):
         return icon
         
     
-    def UpdateMute( self ):
+    def NotifyNewAudioMuteOptions( self ):
         
         icon = self._GetCorrectIcon()
         
@@ -86,9 +88,6 @@ class AudioMuteButton( ClientGUICommon.IconButton ):
     
 
 class VolumeControl( QW.QWidget ):
-    
-    muteChanged = QC.Signal( object )
-    volumeChanged = QC.Signal( object )
     
     def __init__( self, parent, canvas_type, direction = 'down' ):
         
@@ -369,13 +368,6 @@ class VolumeSlider( QW.QSlider ):
     def SetVolumeType( self, volume_type ):
         
         self._volume_type = volume_type
-        
-        volume = self._GetCorrectValue()
-        
-        self.setValue( volume )
-        
-    
-    def UpdateMute( self ):
         
         volume = self._GetCorrectValue()
         

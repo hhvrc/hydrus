@@ -430,7 +430,7 @@ class ImportOptionsManager( HydrusSerialisable.SerialisableBase ):
                         raise Exception( 'Hey, there is a serious problem in the import options system. Your "global" options container is fully populated, but the stack is not producing a full container. Please let hydev know immediately!' )
                         
                     
-                except:
+                except Exception as e:
                     
                     HydrusData.ShowText( 'Your "global" import options container was missing!' )
                     

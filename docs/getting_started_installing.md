@@ -41,6 +41,8 @@ Running the program from source takes a little extra first-time setup, but it al
         * [AUR package](https://aur.archlinux.org/packages/hydrus/) - *Although please note that since AUR packages work off your system python, this has been known to cause issues when Arch suddenly updates to the latest Qt or something before we have had a chance to test things and it breaks hydrus. If you can, try just [running from source](running_from_source.md) yourself instead, where we can control things better!*
         * [flatpak](https://flathub.org/apps/details/io.github.hydrusnetwork.hydrus) 
     
+    Then please check which of these notes may apply to you:
+    
     !!! note "Qt compatibility"
         
         If `hydrus_client` fails to run, and from terminal it says something like this:
@@ -62,6 +64,17 @@ Running the program from source takes a little extra first-time setup, but it al
         One user reports that Fedora might need `libxkbcommon` too.
         
         **One user had a related error that caused a program crash any time he pressed any key. This was an _incompatibility_ with the `libxkbcommon` bundled with the built release. The solution here--and with any other severe crashes than can be traced to a specific bundled .so file--is to run from source.**
+        
+    
+    !!! note "FFMPEG support"
+        
+        Hydrus uses FFMPEG, but I do not bundle it with the Linux build. I assume you have a version you are happy with on your system.
+        
+        If you are uncertain whether you have FFMPEG, you either A) perhaps do not, or B) probably do, but it is an older 'LTS' version. Do not overwrite any system FFMPEG if you aren't sure of what you are doing.
+        
+        If you want the quick and easy fix, just go [here](https://github.com/BtbN/FFmpeg-Builds/releases) and download the `linux64 gpl non-shared`. Extract the big 'ffmpeg' executable to your install_dir/lib/bin folder.
+        
+        I am probably just going to bundle a nice new version of FFMPEG in the Linux build in future.
         
     
     !!! warning "Wayland (and MPV)"

@@ -8,6 +8,7 @@ from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusTime
 from hydrus.core.files import HydrusAudioHandling
 from hydrus.core.files import HydrusFFMPEG
+from hydrus.core.files import HydrusFFMPEGParsing
 from hydrus.core.processes import HydrusSubprocess
 
 def FileIsAnimated( path ):
@@ -32,74 +33,9 @@ def FileIsAnimated( path ):
         
     
 
-# bits of this were originally cribbed from moviepy
-def GetFFMPEGInfoLines( path, count_frames_manually = False, only_first_second = False, video_stream_mapping = None ):
-    
-    ffmpeg_path = HydrusFFMPEG.GetCurrentFFMPEGPath()
-    
-    # open the file in a pipe, provoke an error, read output
-    
-    cmd = [ ffmpeg_path ]
-    
-    if only_first_second:
-        
-        cmd += [ '-t', '1' ]
-        
-    
-    cmd += [ "-xerror", "-i", path ]
-    
-    if video_stream_mapping is not None:
-        
-        # selecting 0:1 of an avifs etc..
-        cmd += [ '-map', video_stream_mapping ]
-        
-    
-    if count_frames_manually:
-        
-        # added -an here to remove audio component, which was sometimes causing convert fails on single-frame music webms
-        
-        if HC.PLATFORM_WINDOWS:
-            
-            cmd += [ "-vf", "scale=-2:120", "-an", "-f", "null", "NUL" ]
-            
-        else:
-            
-            cmd += [ "-vf", "scale=-2:120", "-an", "-f", "null", "/dev/null" ]
-            
-        
-    
-    HydrusData.CheckProgramIsNotShuttingDown()
-    
-    try:
-        
-        ( stdout, stderr ) = HydrusSubprocess.RunSubprocess( cmd )
-        
-    except HydrusExceptions.SubprocessTimedOut:
-        
-        raise HydrusExceptions.DamagedOrUnusualFileException( 'ffmpeg could not read file info quick enough!' )
-        
-    except FileNotFoundError as e:
-        
-        raise HydrusFFMPEG.HandleFFMPEGFileNotFoundAndGenerateException( e, path )
-        
-    
-    text = stderr
-    
-    if text is None or len( text ) == 0:
-        
-        raise HydrusFFMPEG.HandleFFMPEGNoContentAndGenerateException( path, stdout, stderr )
-        
-    
-    lines = text.splitlines()
-    
-    HydrusFFMPEG.CheckFFMPEGError( lines )
-    
-    return lines
-    
-
 def GetFFMPEGVideoProperties( path, force_count_frames_manually = False ):
     
-    ffmpeg_lines = GetFFMPEGInfoLines( path )
+    ffmpeg_lines = HydrusFFMPEG.GetFFMPEGInfoLines( path )
     
     ( has_video, video_format, video_stream_mapping ) = ParseFFMPEGVideoFormat( ffmpeg_lines )
     
@@ -154,7 +90,7 @@ def GetFFMPEGVideoProperties( path, force_count_frames_manually = False ):
     
     if force_count_frames_manually:
         
-        count_frames_manually_lines = GetFFMPEGInfoLines( path, count_frames_manually = True, video_stream_mapping = video_stream_mapping )
+        count_frames_manually_lines = HydrusFFMPEG.GetFFMPEGInfoLines( path, video_stream_mapping_to_count_frames_manually = video_stream_mapping )
         
         num_frames = ParseFFMPEGNumFramesManually( count_frames_manually_lines )
         
@@ -192,176 +128,14 @@ def GetFFMPEGVideoProperties( path, force_count_frames_manually = False ):
     return ( resolution, duration_in_ms, num_frames, has_audio )
     
 
-def GetMime( path ):
-    
-    lines = GetFFMPEGInfoLines( path )
-    
-    try:
-        
-        mime_text = ParseFFMPEGMimeText( lines )
-        
-    except HydrusExceptions.UnsupportedFileException:
-        
-        return HC.APPLICATION_UNKNOWN
-        
-    
-    ( has_video, video_format, video_stream_mapping ) = ParseFFMPEGVideoFormat( lines )
-    ( has_audio, audio_format ) = HydrusAudioHandling.ParseFFMPEGAudio( lines )
-    
-    if not ( has_video or has_audio ):
-        
-        return HC.APPLICATION_UNKNOWN
-        
-    
-    if 'matroska' in mime_text or 'webm' in mime_text:
-        
-        # a webm has at least vp8/vp9 video and optionally vorbis audio
-        
-        has_webm_video = False
-        
-        if has_video:
-            
-            webm_video_formats = ( 'vp8', 'vp9', 'av1' )
-            
-            has_webm_video = True in ( webm_video_format in video_format for webm_video_format in webm_video_formats )
-            
-        
-        if has_audio:
-            
-            webm_audio_formats = ( 'vorbis', 'opus' )
-            
-            has_webm_audio = True in ( webm_audio_format in audio_format for webm_audio_format in webm_audio_formats )
-            
-        else:
-            
-            # no audio at all is not a vote against webm
-            has_webm_audio = True
-            
-        
-        if has_webm_video and has_webm_audio:
-            
-            return HC.VIDEO_WEBM
-            
-        else:
-            
-            if has_video:
-                
-                return HC.VIDEO_MKV
-                
-            elif has_audio:
-                
-                return HC.AUDIO_MKV
-                
-            
-        
-    elif mime_text in ( 'mpeg', 'mpegvideo', 'mpegts' ):
-        
-        return HC.VIDEO_MPEG
-        
-    elif mime_text == 'flac':
-        
-        return HC.AUDIO_FLAC
-        
-    elif mime_text == 'wav':
-        
-        return HC.AUDIO_WAVE
-        
-    elif mime_text == 'mp3':
-        
-        return HC.AUDIO_MP3
-        
-    elif mime_text == 'tta':
-        
-        return HC.AUDIO_TRUEAUDIO
-        
-    elif 'mp4' in mime_text:
-        
-        container = ParseFFMPEGMetadataContainer( lines )
-        
-        if container == 'M4A':
-            
-            return HC.AUDIO_M4A
-            
-        elif container == 'qt':
-            
-            return HC.VIDEO_MOV
-            
-        elif container in ( 'isom', 'mp42' ): # mp42 is version 2 of mp4 standard
-            
-            if has_video:
-                
-                return HC.VIDEO_MP4
-                
-            elif has_audio:
-                
-                return HC.AUDIO_MP4
-                
-            
-        
-        if has_audio and 'mjpeg' in video_format:
-            
-            return HC.AUDIO_M4A
-            
-        elif has_video:
-            
-            return HC.VIDEO_MP4
-            
-        elif has_audio:
-            
-            return HC.AUDIO_MP4
-            
-        
-    elif mime_text == 'ogg':
-        
-        if has_video:
-            
-            return HC.VIDEO_OGV
-            
-        else:
-            
-            return HC.AUDIO_OGG
-            
-        
-    elif 'rm' in mime_text:
-        
-        if ParseFFMPEGHasVideo( lines ):
-            
-            return HC.VIDEO_REALMEDIA
-            
-        else:
-            
-            return HC.AUDIO_REALMEDIA
-            
-        
-    elif mime_text == 'asf':
-        
-        if ParseFFMPEGHasVideo( lines ):
-            
-            return HC.VIDEO_WMV
-            
-        else:
-            
-            return HC.AUDIO_WMA
-            
-        
-    elif mime_text == 'wav':
-        
-        return HC.AUDIO_WAVE
-        
-    elif mime_text == 'wv':
-        
-        return HC.AUDIO_WAVPACK
-        
-    
-    return HC.APPLICATION_UNKNOWN
-    
-
 def HasVideoStream( path ) -> bool:
     
-    lines = GetFFMPEGInfoLines( path )
+    lines = HydrusFFMPEG.GetFFMPEGInfoLines( path )
     
     return ParseFFMPEGHasVideo( lines )
     
+
+# TODO: Move and refactor most of this 'Parse' stuff to HydrusFFMPEGParsing
 
 def ParseFFMPEGDuration( lines ):
     
@@ -649,8 +423,6 @@ def ParseFFMPEGVideoFormat( lines ):
         return ( False, 'unknown', stream_mapping )
         
     
-    line = line.strip()
-    
     # Stream #0:1[0x1](eng): Video: hevc (Main) (hvc1 / 0x31637668), yuv420p(tv), 256x144, 711 kb/s, 25 fps, 25 tbr, 1k tbn (default)
     
     try:
@@ -674,12 +446,7 @@ def ParseFFMPEGVideoFormat( lines ):
     
     try:
         
-        match = re.search( r'(?<=^Stream #)\d+:\d+', line )
-        
-        if match is not None:
-            
-            stream_mapping = match.group()
-            
+        stream_mapping = HydrusFFMPEGParsing.ParseStreamMappingFromStreamLine( line )
         
     except Exception as e:
         
@@ -691,6 +458,8 @@ def ParseFFMPEGVideoFormat( lines ):
 
 def ParseFFMPEGVideoLine( lines, png_ok = False ) -> str:
     
+    pure_video_lines = HydrusFFMPEGParsing.GetVideoStreamLines( lines )
+    
     if png_ok:
         
         bad_video_formats = [ 'jpg' ]
@@ -701,17 +470,16 @@ def ParseFFMPEGVideoLine( lines, png_ok = False ) -> str:
         
     
     # get the output line that speaks about video
-    # the ^\sStream is to exclude the 'title' line, when it exists, includes the string 'Video: ', ha ha
-    lines_video = [ line for line in lines if re.search( r'^\s*Stream', line ) is not None and 'Video: ' in line and True not in ( 'Video: {}'.format( bad_video_format ) in line for bad_video_format in bad_video_formats ) ] # mp3 says it has a 'png' video stream
+    video_lines = [ line for line in pure_video_lines if True not in ( 'Video: {}'.format( bad_video_format ) in line for bad_video_format in bad_video_formats ) ] # mp3 says it has a 'png' video stream
     
-    if len( lines_video ) == 0:
+    if len( video_lines ) == 0:
         
         raise HydrusExceptions.DamagedOrUnusualFileException( 'Could not find video information!' )
         
     
     # ok, interesting new situation with .avifs and .heifs and new ffmpeg
     # old ffmpeg said one of these animated new formats had one Stream. new one says two--one an image and one a vid, with image first
-    # just going `line = lines_video[0]` was selecting the image, so now we need multi-track awareness
+    # just going `line = video_lines[0]` was selecting the image, so now we need multi-track awareness
     
     # examples:
     
@@ -759,14 +527,14 @@ def ParseFFMPEGVideoLine( lines, png_ok = False ) -> str:
         return len( possible_results ) > 0 and confident
         
     
-    lines_with_good_video = [ line for line in lines_video if fps_looks_good( line ) ]
+    lines_with_good_video = [ line for line in video_lines if fps_looks_good( line ) ]
     
     if len( lines_with_good_video ) > 0:
         
         return lines_with_good_video[0]
         
     
-    return lines_video[0]
+    return video_lines[0]
     
 
 def ParseFFMPEGVideoResolution( lines, png_ok = False ) -> tuple[ int, int ]:
@@ -834,7 +602,7 @@ def VideoHasAudio( path, info_lines ) -> bool:
     
     ffmpeg_path = HydrusFFMPEG.GetCurrentFFMPEGPath()
     
-    ( audio_found, audio_format ) = HydrusAudioHandling.ParseFFMPEGAudio( info_lines )
+    ( audio_found, audio_format, audio_stream_mapping, image_stream_mapping ) = HydrusAudioHandling.ParseFFMPEGAudio( info_lines )
     
     if not audio_found:
         
@@ -1101,7 +869,7 @@ class VideoRendererFFMPEG( object ):
                     
                     self._have_selected_an_explicit_video_stream_mapping = True
                     
-                    ffmpeg_lines = GetFFMPEGInfoLines( self._path )
+                    ffmpeg_lines = HydrusFFMPEG.GetFFMPEGInfoLines( self._path )
                     
                     ( has_video, video_format, video_stream_mapping ) = ParseFFMPEGVideoFormat( ffmpeg_lines )
                     

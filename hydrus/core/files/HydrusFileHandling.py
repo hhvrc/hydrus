@@ -14,7 +14,10 @@ from hydrus.core import HydrusText
 from hydrus.core import HydrusTime
 from hydrus.core.files import HydrusAnimationHandling
 from hydrus.core.files import HydrusArchiveHandling
+from hydrus.core.files import HydrusAudioHandling
 from hydrus.core.files import HydrusClipHandling
+from hydrus.core.files import HydrusFFMPEG
+from hydrus.core.files import HydrusFFMPEGRendering
 from hydrus.core.files import HydrusFlashHandling
 from hydrus.core.files import HydrusKritaHandling
 from hydrus.core.files import HydrusPaintNETHandling
@@ -113,6 +116,155 @@ def PrintMoreThumbErrorInfo( e: Exception, message, extra_description: str | Non
     
 
 def GenerateThumbnailNumPy( path, target_resolution, mime, duration_ms, num_frames, percentage_in = 35, extra_description = None ):
+    
+    thumbnail_numpy = None
+    
+    if mime in HC.IMAGES or mime == HC.ANIMATION_WEBP:
+        
+        try:
+            
+            thumbnail_numpy = HydrusImageHandling.GenerateThumbnailNumPyFromStaticImagePath( path, target_resolution, mime )
+            
+        except Exception as e:
+            
+            PrintMoreThumbErrorInfo( e, f'Problem generating thumbnail for "{path}".', extra_description = extra_description )
+            
+            thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
+            
+        
+    elif mime == HC.ANIMATION_UGOIRA:
+        
+        try:
+            
+            desired_thumb_frame_index = int( ( percentage_in / 100.0 ) * ( num_frames - 1 ) )
+            
+            thumbnail_numpy = HydrusUgoiraHandling.GenerateThumbnailNumPyFromUgoiraPath( path, target_resolution, desired_thumb_frame_index )
+            
+        except Exception as e:
+            
+            PrintMoreThumbErrorInfo( e, f'Problem generating thumbnail for "{path}".', extra_description = extra_description )
+            
+            thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
+            
+        
+    elif mime in HC.VIDEO or mime in HC.ANIMATIONS:
+        
+        thumbnail_numpy = GenerateThumbnailNumPyUsingFFMPEGVideoRenderer( path, target_resolution, mime, duration_ms, num_frames, percentage_in = percentage_in, extra_description = extra_description )
+        
+    elif mime in HC.AUDIO:
+        
+        thumbnail_numpy = GenerateThumbnailNumPyAudio( path, target_resolution, mime, extra_description = extra_description )
+        
+    elif mime in HC.IMAGE_PROJECT_FILES or mime in HC.APPLICATIONS:
+        
+        thumbnail_numpy = GenerateThumbnailNumPyWeirdApplicationGubbins( path, target_resolution, mime, extra_description = extra_description )
+        
+    
+    if thumbnail_numpy is None:
+        
+        return GenerateDefaultThumbnail( mime, target_resolution )
+        
+    
+    return thumbnail_numpy
+    
+
+def GenerateThumbnailNumPyAudio( path, target_resolution, mime, extra_description = None ):
+    
+    thumbnail_numpy = None
+    
+    ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'audio_image' )
+    
+    try:
+        
+        there_was_one = HydrusFFMPEGRendering.RenderAnyAttachedStillImageToPath( path, temp_path )
+        
+        if there_was_one:
+            
+            image_mime = GetMime( temp_path )
+            
+            thumbnail_numpy = HydrusImageHandling.GenerateThumbnailNumPyFromStaticImagePath( temp_path, target_resolution, image_mime )
+            
+        
+    except Exception as e:
+        
+        PrintMoreThumbErrorInfo( e, f'Problem generating thumbnail for "{path}".', extra_description = extra_description )
+        
+        thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
+        
+    finally:
+        
+        HydrusTemp.CleanUpTempPath( os_file_handle, temp_path )
+        
+    
+    return thumbnail_numpy
+    
+
+def GenerateThumbnailNumPyUsingFFMPEGVideoRenderer( path, target_resolution, mime, duration_ms, num_frames, percentage_in = 35, extra_description = None ):
+    
+    thumbnail_numpy = None
+    
+    desired_thumb_frame_index = int( ( percentage_in / 100.0 ) * ( num_frames - 1 ) )
+    
+    try:
+        
+        renderer = HydrusVideoHandling.VideoRendererFFMPEG( path, mime, duration_ms, num_frames, target_resolution, start_pos = desired_thumb_frame_index )
+        
+        try:
+            
+            thumbnail_numpy = renderer.read_frame()
+            
+        finally:
+            
+            renderer.Stop()
+            
+        
+    except Exception as e:
+        
+        message = 'Problem generating thumbnail for "{}" at frame {} ({})--FFMPEG could not render it.'.format( path, desired_thumb_frame_index, HydrusNumbers.FloatToPercentage( percentage_in / 100.0 ) )
+        
+        PrintMoreThumbErrorInfo( e, message, extra_description = extra_description )
+        
+        thumbnail_numpy = None
+        
+    
+    if thumbnail_numpy is None and desired_thumb_frame_index != 0:
+        
+        # try first frame instead
+        
+        try:
+            
+            renderer = HydrusVideoHandling.VideoRendererFFMPEG( path, mime, duration_ms, num_frames, target_resolution )
+            
+            try:
+                
+                thumbnail_numpy = renderer.read_frame()
+                
+            finally:
+                
+                renderer.Stop()
+                
+            
+        except Exception as e:
+            
+            message = 'Problem generating thumbnail for "{}" at first frame--FFMPEG could not render it.'.format( path )
+            
+            PrintMoreThumbErrorInfo( e, message, extra_description = extra_description )
+            
+            thumbnail_numpy = None
+            
+        
+    
+    if thumbnail_numpy is not None:
+        
+        thumbnail_numpy =  HydrusImageHandling.ResizeNumPyImage( thumbnail_numpy, target_resolution ) # just in case ffmpeg doesn't deliver right
+        
+    
+    return thumbnail_numpy
+    
+
+def GenerateThumbnailNumPyWeirdApplicationGubbins( path, target_resolution, mime, extra_description = None ):
+    
+    thumbnail_numpy = None
     
     if mime == HC.APPLICATION_CBZ or mime == HC.APPLICATION_EPUB:
         
@@ -290,106 +442,15 @@ def GenerateThumbnailNumPy( path, target_resolution, mime, duration_ms, num_fram
         # leaving this in place for now, rather than saying 'flash has no thumbs now', to keep legacy flash thumbs alive
         thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
         
-    elif mime in HC.IMAGES or mime == HC.ANIMATION_WEBP:
-        
-        try:
-            
-            thumbnail_numpy = HydrusImageHandling.GenerateThumbnailNumPyFromStaticImagePath( path, target_resolution, mime )
-            
-        except Exception as e:
-            
-            PrintMoreThumbErrorInfo( e, f'Problem generating thumbnail for "{path}".', extra_description = extra_description )
-            
-            thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
-            
-        
-    elif mime == HC.ANIMATION_UGOIRA:
-        
-        try:
-            
-            desired_thumb_frame_index = int( ( percentage_in / 100.0 ) * ( num_frames - 1 ) )
-            
-            thumbnail_numpy = HydrusUgoiraHandling.GenerateThumbnailNumPyFromUgoiraPath( path, target_resolution, desired_thumb_frame_index )
-            
-        except Exception as e:
-            
-            PrintMoreThumbErrorInfo( e, f'Problem generating thumbnail for "{path}".', extra_description = extra_description )
-            
-            thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
-            
-        
-    else: # animations and video
-        
-        renderer = None
-        
-        desired_thumb_frame_index = int( ( percentage_in / 100.0 ) * ( num_frames - 1 ) )
-        
-        try:
-            
-            renderer = HydrusVideoHandling.VideoRendererFFMPEG( path, mime, duration_ms, num_frames, target_resolution, start_pos = desired_thumb_frame_index )
-            
-            try:
-                
-                numpy_image = renderer.read_frame()
-                
-            finally:
-                
-                renderer.Stop()
-                
-            
-        except Exception as e:
-            
-            message = 'Problem generating thumbnail for "{}" at frame {} ({})--FFMPEG could not render it.'.format( path, desired_thumb_frame_index, HydrusNumbers.FloatToPercentage( percentage_in / 100.0 ) )
-            
-            PrintMoreThumbErrorInfo( e, message, extra_description = extra_description )
-            
-            numpy_image = None
-            
-        
-        if numpy_image is None and desired_thumb_frame_index != 0:
-            
-            # try first frame instead
-            
-            try:
-                
-                renderer = HydrusVideoHandling.VideoRendererFFMPEG( path, mime, duration_ms, num_frames, target_resolution )
-                
-                try:
-                    
-                    numpy_image = renderer.read_frame()
-                    
-                finally:
-                    
-                    renderer.Stop()
-                    
-                
-            except Exception as e:
-                
-                message = 'Problem generating thumbnail for "{}" at first frame--FFMPEG could not render it.'.format( path )
-                
-                PrintMoreThumbErrorInfo( e, message, extra_description = extra_description )
-                
-                numpy_image = None
-                
-            
-        
-        if numpy_image is None:
-            
-            thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
-            
-        else:
-            
-            thumbnail_numpy =  HydrusImageHandling.ResizeNumPyImage( numpy_image, target_resolution ) # just in case ffmpeg doesn't deliver right
-            
-        
     
     if thumbnail_numpy is None:
         
-        return GenerateDefaultThumbnail( mime, target_resolution )
+        thumbnail_numpy = GenerateDefaultThumbnail( mime, target_resolution )
         
     
     return thumbnail_numpy
     
+
 def GetExtraHashesFromPath( path ):
     
     h_md5 = hashlib.md5()
@@ -636,7 +697,7 @@ def GetFileInfo( path, mime = None, ok_to_look_for_hydrus_updates = False ):
         
     elif mime in HC.AUDIO:
         
-        ffmpeg_lines = HydrusVideoHandling.GetFFMPEGInfoLines( path )
+        ffmpeg_lines = HydrusFFMPEG.GetFFMPEGInfoLines( path )
         
         ( file_duration_in_s, stream_duration_in_s ) = HydrusVideoHandling.ParseFFMPEGDuration( ffmpeg_lines )
         
@@ -866,9 +927,9 @@ def GetMime( path, ok_to_look_for_hydrus_updates = False ):
                 
                 return HC.APPLICATION_ZIP
                 
-            if mime in ( HC.UNDETERMINED_WM, HC.UNDETERMINED_MP4 ):
+            elif mime in ( HC.UNDETERMINED_WM, HC.UNDETERMINED_MP4 ):
                 
-                return HydrusVideoHandling.GetMime( path )
+                return GetMimeFromFFMPEG( path )
                 
             elif mime == HC.UNDETERMINED_PNG:
                 
@@ -960,7 +1021,7 @@ def GetMime( path, ok_to_look_for_hydrus_updates = False ):
         
         try:
             
-            mime = HydrusVideoHandling.GetMime( path )
+            mime = GetMimeFromFFMPEG( path )
             
             if mime != HC.APPLICATION_UNKNOWN:
                 
@@ -976,6 +1037,173 @@ def GetMime( path, ok_to_look_for_hydrus_updates = False ):
             HydrusData.Print( 'FFMPEG had trouble with: ' + path )
             HydrusData.PrintException( e, do_wait = False )
             
+        
+    
+    return HC.APPLICATION_UNKNOWN
+    
+
+def GetMimeFromFFMPEG( path ):
+    
+    lines = HydrusFFMPEG.GetFFMPEGInfoLines( path )
+    
+    ( has_video, video_format, video_stream_mapping ) = HydrusVideoHandling.ParseFFMPEGVideoFormat( lines )
+    ( has_audio, audio_format, audio_stream_mapping, image_stream_mapping ) = HydrusAudioHandling.ParseFFMPEGAudio( lines )
+    
+    if not ( has_video or has_audio ):
+        
+        return HC.APPLICATION_UNKNOWN
+        
+    
+    try:
+        
+        # TODO: I think rework this guy
+        # it is odd that we have nicer per-stream parsing above, with video_format and audio_format, and then use this weird thing to do most of the mime logic
+        # maybe it makes sense, since we care about the _file_ container more than the streams, but let's have a look anyway
+        mime_text = HydrusVideoHandling.ParseFFMPEGMimeText( lines )
+        
+    except HydrusExceptions.UnsupportedFileException:
+        
+        return HC.APPLICATION_UNKNOWN
+        
+    
+    if 'matroska' in mime_text or 'webm' in mime_text:
+        
+        # a webm has at least vp8/vp9 video and optionally vorbis/opus audio
+        
+        has_webm_video = False
+        
+        if has_video:
+            
+            webm_video_formats = ( 'vp8', 'vp9', 'av1' )
+            
+            has_webm_video = True in ( webm_video_format in video_format for webm_video_format in webm_video_formats )
+            
+        
+        if has_audio:
+            
+            webm_audio_formats = ( 'vorbis', 'opus' )
+            
+            has_webm_audio = True in ( webm_audio_format in audio_format for webm_audio_format in webm_audio_formats )
+            
+        else:
+            
+            # no audio at all is not a vote against webm
+            has_webm_audio = True
+            
+        
+        if has_webm_video and has_webm_audio:
+            
+            return HC.VIDEO_WEBM
+            
+        else:
+            
+            if has_video:
+                
+                return HC.VIDEO_MKV
+                
+            elif has_audio:
+                
+                return HC.AUDIO_MKV
+                
+            
+        
+    elif mime_text in ( 'mpeg', 'mpegvideo', 'mpegts' ):
+        
+        return HC.VIDEO_MPEG
+        
+    elif mime_text == 'flac':
+        
+        return HC.AUDIO_FLAC
+        
+    elif mime_text == 'wav':
+        
+        return HC.AUDIO_WAVE
+        
+    elif mime_text == 'mp3':
+        
+        return HC.AUDIO_MP3
+        
+    elif mime_text == 'tta':
+        
+        return HC.AUDIO_TRUEAUDIO
+        
+    elif 'mp4' in mime_text:
+        
+        container = HydrusVideoHandling.ParseFFMPEGMetadataContainer( lines )
+        
+        if container == 'M4A':
+            
+            return HC.AUDIO_M4A
+            
+        elif container == 'qt':
+            
+            return HC.VIDEO_MOV
+            
+        elif container in ( 'isom', 'mp42' ): # mp42 is version 2 of mp4 standard
+            
+            if has_video:
+                
+                return HC.VIDEO_MP4
+                
+            elif has_audio:
+                
+                return HC.AUDIO_MP4
+                
+            
+        
+        if has_audio and 'mjpeg' in video_format:
+            
+            return HC.AUDIO_M4A
+            
+        elif has_video:
+            
+            return HC.VIDEO_MP4
+            
+        elif has_audio:
+            
+            return HC.AUDIO_MP4
+            
+        
+    elif mime_text == 'ogg':
+        
+        if has_video:
+            
+            return HC.VIDEO_OGV
+            
+        else:
+            
+            return HC.AUDIO_OGG
+            
+        
+    elif 'rm' in mime_text:
+        
+        if HydrusVideoHandling.ParseFFMPEGHasVideo( lines ):
+            
+            return HC.VIDEO_REALMEDIA
+            
+        else:
+            
+            return HC.AUDIO_REALMEDIA
+            
+        
+    elif mime_text == 'asf':
+        
+        if HydrusVideoHandling.ParseFFMPEGHasVideo( lines ):
+            
+            return HC.VIDEO_WMV
+            
+        else:
+            
+            return HC.AUDIO_WMA
+            
+        
+    elif mime_text == 'wav':
+        
+        return HC.AUDIO_WAVE
+        
+    elif mime_text == 'wv':
+        
+        return HC.AUDIO_WAVPACK
         
     
     return HC.APPLICATION_UNKNOWN

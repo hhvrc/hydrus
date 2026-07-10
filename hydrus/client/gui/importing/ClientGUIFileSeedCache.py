@@ -743,13 +743,15 @@ class EditFileSeedCachePanel( ClientGUIScrolledPanels.EditPanel ):
                 
                 #
                 
-                tags = list( selected_file_seed.GetExternalTags() )
+                parsed_tags = list( selected_file_seed.GetParsedTags() )
+                inherited_tags = list( selected_file_seed.GetInheritedTags() )
                 
                 tag_sort = ClientTagSorting.TagSort( sort_type = ClientTagSorting.SORT_BY_HUMAN_TAG, sort_order = CC.SORT_ASC )
                 
-                ClientTagSorting.SortTags( tag_sort, tags )
+                ClientTagSorting.SortTags( tag_sort, parsed_tags )
+                ClientTagSorting.SortTags( tag_sort, inherited_tags )
                 
-                if len( tags ) == 0:
+                if len( parsed_tags ) == 0:
                     
                     ClientGUIMenus.AppendMenuLabel( menu, 'no parsed tags' )
                     
@@ -757,12 +759,28 @@ class EditFileSeedCachePanel( ClientGUIScrolledPanels.EditPanel ):
                     
                     tag_submenu = ClientGUIMenus.GenerateMenu( menu )
                     
-                    for tag in tags:
+                    for tag in parsed_tags:
                         
                         ClientGUIMenus.AppendMenuLabel( tag_submenu, tag )
                         
                     
                     ClientGUIMenus.AppendMenu( menu, tag_submenu, 'parsed tags' )
+                    
+                
+                if len( inherited_tags ) == 0:
+                    
+                    ClientGUIMenus.AppendMenuLabel( menu, 'no inherited tags' )
+                    
+                else:
+                    
+                    tag_submenu = ClientGUIMenus.GenerateMenu( menu )
+                    
+                    for tag in inherited_tags:
+                        
+                        ClientGUIMenus.AppendMenuLabel( tag_submenu, tag )
+                        
+                    
+                    ClientGUIMenus.AppendMenu( menu, tag_submenu, 'inherited tags' )
                     
                 
             

@@ -2120,7 +2120,7 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
             pretty_site = gug_key_and_name[1]
             
-        except:
+        except Exception as e:
             
             pretty_site = 'unknown downloader'
             

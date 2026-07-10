@@ -3,11 +3,9 @@ import re
 
 import numpy
 
-from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
-from hydrus.core.files import HydrusFFMPEG
+from hydrus.core.files import HydrusFFMPEGRendering
 from hydrus.core.files.images import HydrusImageHandling
-from hydrus.core.processes import HydrusSubprocess
 
 def read_uint16(f):
     
@@ -77,41 +75,6 @@ def GetPSDImageResourceIds( image_resources ):
     return { resource_id for ( resource_id, size, data_offset ) in image_resources }
     
 
-def GetFFMPEGPSDLines( path ):
-    
-    ffmpeg_path = HydrusFFMPEG.GetCurrentFFMPEGPath()
-    
-    # open the file in a pipe, provoke an error, read output
-    
-    cmd = [ ffmpeg_path, "-xerror", "-i", path ]
-    
-    HydrusData.CheckProgramIsNotShuttingDown()
-    
-    try:
-        
-        ( stdout, stderr ) = HydrusSubprocess.RunSubprocess( cmd, bufsize = 1024 * 512 )
-        
-    except HydrusExceptions.SubprocessTimedOut:
-        
-        raise HydrusExceptions.DamagedOrUnusualFileException( 'ffmpeg could not get PSD data quick enough!' )
-        
-    except FileNotFoundError as e:
-        
-        raise HydrusFFMPEG.HandleFFMPEGFileNotFoundAndGenerateException( e, path )
-        
-    
-    if stderr is None or len( stderr ) == 0:
-        
-        raise HydrusFFMPEG.HandleFFMPEGNoContentAndGenerateException( path, stdout, stderr )
-        
-    
-    lines = stderr.splitlines()
-    
-    HydrusFFMPEG.CheckFFMPEGError( lines )
-    
-    return lines
-    
-
 def ParseFFMPEGPSDLine( lines ) -> str:
     
     # get the output line that speaks about PSD. something like this:
@@ -165,7 +128,7 @@ def PSDHasICCProfile( path: str ):
 def GeneratePILImageFromPSD( path ):
     
     # could faff around with getting raw bytes and reshaping, but let's KISS for now
-    png_bytes = HydrusFFMPEG.RenderImageToPNGBytes( path )
+    png_bytes = HydrusFFMPEGRendering.RenderImageToPNGBytes( path )
     
     if len( png_bytes ) == 0:
         

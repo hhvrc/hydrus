@@ -367,6 +367,14 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'mpv_allow_crashy_files_silently' : False,
             'test_thumbnails_graphics_view' : False,
             'copy_import_files_to_temp_dir' : True,
+            'treeview_hides_tabs' : False,
+            'treeview_controls_at_top' : False,
+            'treeview_expanding_panel_at_top' : False,
+            'treeview_sidebar_can_collapse' : False,
+            'treeview_always_expand_to_current_tab_after_reset' : False,
+            'treeview_collapse_all_children_upon_parent_closed' : False,
+            'treeview_animate_current_node' : True,
+            'treeview_history_box_pinned' : False,
         }
         
         #
@@ -594,6 +602,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'ffmpeg_subprocess_timeout' : 15,
             'media_viewer_tags_scrolling_behaviour' : CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_ONLY_PROPAGATE_AFTER_DELAY,
             'zoom_switch_command' : CAC.SIMPLE_SWITCH_BETWEEN_100_PERCENT_AND_CANVAS_ZOOM,
+            'page_sidebar_alignment' : CC.DIRECTION_LEFT,
         }
         
         self._dictionary[ 'floats' ] = {
@@ -627,6 +636,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
         self._dictionary[ 'noneable_integers' ] = {
             'forced_search_limit' : None,
             'num_recent_tags' : 20,
+            'num_recent_tags_in_quick_dialog' : 10,
             'duplicate_background_switch_intensity_a' : 0,
             'duplicate_background_switch_intensity_b' : 3,
             'duplicate_filter_auto_commit_batch_size' : 1,
@@ -652,6 +662,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'command_palette_limit_page_results' : None,
             'command_palette_limit_history_results' : 10,
             'command_palette_limit_favourite_searches_results' : None,
+            'treeview_alignment' : None,
         }
         
         #
@@ -715,6 +726,9 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
         self._dictionary[ 'integer_list' ] = {
             'file_viewing_stats_interesting_canvas_types' : [ CC.CANVAS_MEDIA_VIEWER, CC.CANVAS_CLIENT_API ],
             'command_palette_provider_order' : [ CC.COMMAND_PALETTE_PROVIDER_CALCULATOR, CC.COMMAND_PALETTE_PROVIDER_MAIN_MENU, CC.COMMAND_PALETTE_PROVIDER_MEDIA_MENU, CC.COMMAND_PALETTE_PROVIDER_PAGES_HISTORY, CC.COMMAND_PALETTE_PROVIDER_PAGES, CC.COMMAND_PALETTE_PROVIDER_FAVOURITE_SEARCH ],
+            'tab_tree_splitter_sizes_left' : [ 200, 1000 ],
+            'tab_tree_splitter_sizes_right' : [ 1000, 200 ],
+            'treeview_expanding_panel_splitter_size' : [ 700, 150 ],
         }
         
         #

@@ -354,6 +354,11 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
         return self._request_headers
         
     
+    def GetInheritedTags( self ):
+        
+        return set( self._external_filterable_tags )
+        
+    
     def GetReferralURL( self ) -> str:
         
         return self._referral_url

@@ -213,6 +213,9 @@ SIMPLE_FLIP_THISWINDOW_SLIDESHOW_SHUFFLE = 200
 SIMPLE_FLIP_GLOBAL_SLIDESHOW_SHUFFLE = 201
 SIMPLE_FLIP_THISWINDOW_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH = 202
 SIMPLE_FLIP_GLOBAL_SLIDESHOW_ALWAYS_PLAY_DURATION_MEDIA_ONCE_THROUGH = 203
+SIMPLE_PER_PLAYER_AUDIO_MUTE = 204
+SIMPLE_PER_PLAYER_AUDIO_MUTE_FLIP = 205
+SIMPLE_PER_PLAYER_AUDIO_UNMUTE = 206
 
 REARRANGE_THUMBNAILS_TYPE_FIXED = 0
 REARRANGE_THUMBNAILS_TYPE_COMMAND = 1
@@ -323,6 +326,9 @@ simple_enum_to_str_lookup = {
     SIMPLE_GLOBAL_AUDIO_MUTE : 'global audio: mute',
     SIMPLE_GLOBAL_AUDIO_MUTE_FLIP : 'global audio: mute/unmute',
     SIMPLE_GLOBAL_AUDIO_UNMUTE : 'global audio: unmute',
+    SIMPLE_PER_PLAYER_AUDIO_MUTE : 'per-player audio: mute',
+    SIMPLE_PER_PLAYER_AUDIO_MUTE_FLIP : 'per-player audio: mute/unmute',
+    SIMPLE_PER_PLAYER_AUDIO_UNMUTE : 'per-player audio: unmute',
     SIMPLE_HIDE_TO_SYSTEM_TRAY : 'hide to system tray',
     SIMPLE_INBOX_FILE : 'inbox file',
     SIMPLE_LAUNCH_MEDIA_VIEWER : 'launch the media viewer',
@@ -1259,7 +1265,7 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
         
     
     @staticmethod
-    def STATICCreateSimpleCommand( simple_action, simple_data = None ) -> "ApplicationCommand":
+    def STATICCreateSimpleCommand( simple_action, simple_data = None ) -> 'ApplicationCommand':
         
         return ApplicationCommand( APPLICATION_COMMAND_TYPE_SIMPLE, ( simple_action, simple_data ) )
         

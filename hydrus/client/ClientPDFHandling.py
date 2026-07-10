@@ -116,9 +116,9 @@ HydrusPDFHandling.GenerateThumbnailNumPyFromPDFPath = GenerateThumbnailNumPyFrom
 
 PDF_ASSUMED_DPI = 300
 
-def GetHumanReadableEmbeddedMetadata( path ) -> str:
+def GetHumanReadableEmbeddedMetadata( path ) -> str | None:
     
-    def qt_code() -> str:
+    def qt_code() -> str | None:
         
         try:
             
@@ -132,8 +132,8 @@ def GetHumanReadableEmbeddedMetadata( path ) -> str:
         result_components = []
         
         jobs = [
-            ( 'Title', QtPdf.QPdfDocument.MetaDataField.Title ),
             ( 'Author', QtPdf.QPdfDocument.MetaDataField.Author ),
+            ( 'Title', QtPdf.QPdfDocument.MetaDataField.Title ),
             ( 'Subject', QtPdf.QPdfDocument.MetaDataField.Subject ),
             ( 'Keywords', QtPdf.QPdfDocument.MetaDataField.Keywords )
         ]
@@ -151,7 +151,16 @@ def GetHumanReadableEmbeddedMetadata( path ) -> str:
         return '\n'.join( result_components )
         
     
-    return CG.client_controller.CallBlockingToQtTLW( qt_code )
+    result = CG.client_controller.CallBlockingToQtTLW( qt_code )
+    
+    if result == '':
+        
+        return None
+        
+    else:
+        
+        return result
+        
     
 
 def HasHumanReadableEmbeddedMetadata( path ) -> bool:
@@ -165,7 +174,7 @@ def HasHumanReadableEmbeddedMetadata( path ) -> bool:
         return False
         
     
-    return len( text ) > 0
+    return text is not None
     
 
 def GetPDFInfo( path: str ):

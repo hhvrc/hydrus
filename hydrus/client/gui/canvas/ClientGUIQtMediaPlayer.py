@@ -142,6 +142,8 @@ class QtMediaPlayer( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         
         self._my_audio_placeholder = QW.QWidget( self )
         
+        self._last_set_mute_state = False
+        
         # 2026-01: this is the first time hydev has done GraphicsView stuff, and thus all this was divined via haruspex
         # 2026-04: adding transparency checkerboard. the Gods are with us, the stars align in the Weave of Providence
         
@@ -196,7 +198,6 @@ class QtMediaPlayer( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         
         self._my_shortcut_handler = ClientGUIShortcuts.ShortcutsHandler( self, self, [ shortcut_set ], catch_mouse = True )
         
-        CG.client_controller.sub( self, 'UpdateAudioMute', 'new_audio_mute' )
         CG.client_controller.sub( self, 'UpdateAudioVolume', 'new_audio_volume' )
         CG.client_controller.sub( self, 'UpdateFromOptions', 'notify_new_options' )
         CG.client_controller.sub( self, 'UpdateFromTransparencyOptions', 'new_transparency_options' )
@@ -691,7 +692,7 @@ class QtMediaPlayer( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         if self._my_audio_output is not None:
             
             self._my_audio_output.setVolume( ClientGUIMediaVolume.GetCorrectCurrentVolume( self._canvas_type ) / 100 )
-            self._my_audio_output.setMuted( ClientGUIMediaVolume.GetCorrectCurrentMute( self._canvas_type ) )
+            self._my_audio_output.setMuted( self._last_set_mute_state )
             
         
     
@@ -721,22 +722,20 @@ class QtMediaPlayer( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         return self._my_audio_output.isMuted()
         
     
-    def UpdateAudioMute( self, mute_state = None ):
+    def SetMute( self, mute: bool ):
+        
+        self._last_set_mute_state = mute
         
         if self._my_audio_output is not None:
             
-            if mute_state is None:
-                
-                self._my_audio_output.setMuted( ClientGUIMediaVolume.GetCorrectCurrentMute( self._canvas_type ) )
-                
-            else:
-                
-                self._my_audio_output.setMuted( mute_state )
-                
+            self._my_audio_output.setMuted( mute )
             
         
-
+    
     def UpdateAudioVolume( self ):
+        
+        # TODO: like we did with mute, move the responsibility for _what_ volume to set up to the mediacontainer
+        # this guy should only accept 'ok, 43%'
         
         if self._my_audio_output is not None:
             

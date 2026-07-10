@@ -1120,12 +1120,14 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
         return search_file_seeds
         
     
-    def GetExternalTags( self ):
+    def GetInheritedTags( self ):
         
-        t = set( self._tags )
-        t.update( self._external_filterable_tags )
+        return self._external_filterable_tags
         
-        return t
+    
+    def GetParsedTags( self ):
+        
+        return set( self._tags )
         
     
     def GetHTTPHeaders( self ) -> dict:

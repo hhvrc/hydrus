@@ -52,7 +52,7 @@ from hydrus.client.metadata import ClientRatings
 from hydrus.client.metadata import ClientTags
 from hydrus.client.metadata import ClientTagSorting
 
-def AddAudioVolumeMenu( menu, canvas_type, this_container ):
+def AddAudioVolumeMenu( menu, canvas_type, media_container ):
     
     mute_volume_type = None
     volume_volume_type = ClientGUIMediaControls.AUDIO_GLOBAL
@@ -80,7 +80,9 @@ def AddAudioVolumeMenu( menu, canvas_type, this_container ):
     
     ( global_mute_option_name, global_volume_option_name ) = ClientGUIMediaControls.volume_types_to_option_names[ ClientGUIMediaControls.AUDIO_GLOBAL ]
     
-    if CG.client_controller.new_options.GetBoolean( global_mute_option_name ):
+    current_global_mute = CG.client_controller.new_options.GetBoolean( global_mute_option_name )
+    
+    if current_global_mute:
         
         label = 'unmute global'
         
@@ -99,7 +101,9 @@ def AddAudioVolumeMenu( menu, canvas_type, this_container ):
         
         ( mute_option_name, volume_option_name ) = ClientGUIMediaControls.volume_types_to_option_names[ mute_volume_type ]
         
-        if CG.client_controller.new_options.GetBoolean( mute_option_name ):
+        current_options_mute = CG.client_controller.new_options.GetBoolean( mute_option_name )
+        
+        if current_options_mute:
             
             label = 'unmute {}'.format( ClientGUIMediaControls.volume_types_str_lookup[ mute_volume_type ] )
             
@@ -110,16 +114,56 @@ def AddAudioVolumeMenu( menu, canvas_type, this_container ):
         
         ClientGUIMenus.AppendMenuItem( volume_menu, label, 'Mute/unmute audio.', ClientGUIMediaControls.FlipMute, mute_volume_type )
         
-        if this_container.IsMuted():
+        show_per_player_mute = False
+        show_per_player_unmute = False
+        show_undo = False
+        
+        if media_container.HasPerPlayerMuteState():
             
-            label = 'unmute this window'
+            current_per_player_mute = media_container.GetPerPlayerMuteState()
+            
+            if current_per_player_mute:
+                
+                show_per_player_unmute = True
+                
+            else:
+                
+                show_per_player_mute = True
+                
+            
+            show_undo = True
             
         else:
             
-            label = 'mute this window'
+            if current_options_mute or current_global_mute:
+                
+                show_per_player_unmute = True
+                
+            else:
+                
+                show_per_player_mute = True
+                
             
         
-        ClientGUIMenus.AppendMenuItem( volume_menu, label, 'Mute/unmute audio.', this_container.UpdateMediaWindowMute, not this_container.IsMuted() )
+        if show_per_player_mute:
+            
+            ClientGUIMenus.AppendMenuItem( volume_menu, 'force mute just here', 'ignore the options', media_container.SetPerPlayerMuteState, True )
+            
+        
+        if show_per_player_unmute:
+            
+            ClientGUIMenus.AppendMenuItem( volume_menu, 'force unmute just here', 'ignore the options', media_container.SetPerPlayerMuteState, False )
+            
+        
+        if show_undo:
+            
+            current_per_player_mute = media_container.GetPerPlayerMuteState()
+            
+            mute_label = 'mute' if current_per_player_mute else 'unmute'
+            
+            ClientGUIMenus.AppendMenuItem( volume_menu, f'stop forcing {mute_label}', 'reset back to normal options behaviour', media_container.SetPerPlayerMuteState, None )
+            
+        
     
     #
     
@@ -2980,7 +3024,7 @@ class CanvasWithHovers( Canvas ):
             next_check_period_ms = max( 100, min( int( hide_time_ms / 5 ), 250 ) )
             
         
-        mouse_currently_shown = self.cursor().shape() == QC.Qt.CursorShape.ArrowCursor
+        mouse_currently_shown = self.cursor().shape() != QC.Qt.CursorShape.BlankCursor
         
         if should_be_hidden and mouse_currently_shown:
             
@@ -3046,6 +3090,11 @@ class CanvasWithHovers( Canvas ):
             
         
     
+    def GetMediaContainer( self ):
+        
+        return self._media_container
+        
+    
     def HandleMouseMoveWithoutEvent( self, left_down: bool ):
         
         is_dragging = left_down and self._last_drag_pos is not None
@@ -3066,7 +3115,7 @@ class CanvasWithHovers( Canvas ):
         # due to the mouse setPos below, the event pos can get funky I think due to out of order coordinate setting events, so we'll poll current value directly
         event_pos = self.mapFromGlobal( ClientGUIFunctions.GetMousePos() )
         
-        mouse_currently_shown = self.cursor().shape() == QC.Qt.CursorShape.ArrowCursor
+        mouse_currently_shown = self.cursor().shape() != QC.Qt.CursorShape.BlankCursor
         
         has_moved = event_pos != self._last_motion_pos
         
@@ -3249,11 +3298,6 @@ class CanvasWithHovers( Canvas ):
     def UserOKToClose( self ):
         
         return True
-        
-    
-    def UpdateMediaWindowMute( self, mute_state ):
-        
-        self._media_container.UpdateMediaWindowMute( mute_state )
         
     
     def TIMERUIUpdate( self ):

@@ -14,879 +14,15 @@ from qtpy import QtGui as QG
 
 from collections import defaultdict
 
-from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusLists
-from hydrus.core import HydrusTime
 
 from hydrus.client import ClientConstants as CC
-from hydrus.client import ClientGlobals as CG
 from hydrus.client.gui import ClientGUIExceptionHandling
 from hydrus.client.gui import ClientGUIFunctions
 from hydrus.client.gui import QtInit
 
 isValid = QtInit.isValid
-
-def registerEventType():
-    
-    if QtInit.WE_ARE_PYSIDE:
-        
-        return QC.QEvent.Type( QC.QEvent.registerEventType() )
-        
-    else:
-        
-        return QC.QEvent.registerEventType()
-        
-    
-
-class HBoxLayout( QW.QHBoxLayout ):
-    
-    def __init__( self, margin = 2, spacing = 2 ):
-        
-        super().__init__()
-        
-        self.setMargin( margin )
-        self.setSpacing( spacing )
-        
-    
-    def setMargin( self, val ):
-        
-        self.setContentsMargins( val, val, val, val )
-        
-    
-
-class VBoxLayout( QW.QVBoxLayout ):
-    
-    def __init__( self, margin = 2, spacing = 2 ):
-        
-        super().__init__()
-        
-        self.setMargin( margin )
-        self.setSpacing( spacing )
-        
-
-    def setMargin( self, val ):
-        
-        self.setContentsMargins( val, val, val, val )
-        
-    
-
-class LabelledSlider( QW.QWidget ):
-    
-    valueChanged = QC.Signal( int )
-    finishedEditing  = QC.Signal( int )
-    
-    def __init__( self, parent = None ):
-        
-        super().__init__( parent )
-        
-        vbox = VBoxLayout( spacing = 2 )
-        
-        self.setLayout( vbox )
-        
-        top_layout = HBoxLayout( spacing = 2 )
-        
-        self._min_label = QW.QLabel()
-        self._max_label = QW.QLabel()
-        self._value_label = QW.QLabel()
-        self._slider = QW.QSlider()
-        self._slider.setOrientation( QC.Qt.Orientation.Horizontal )
-        self._slider.setTickInterval( 1 )
-        self._slider.setTickPosition( QW.QSlider.TickPosition.TicksBothSides )
-        
-        top_layout.addWidget( self._min_label )
-        top_layout.addWidget( self._slider )
-        top_layout.addWidget( self._max_label )
-        
-        vbox.addLayout( top_layout )
-        vbox.addWidget( self._value_label )
-        self._value_label.setAlignment( QC.Qt.AlignmentFlag.AlignVCenter | QC.Qt.AlignmentFlag.AlignHCenter )
-        vbox.setAlignment( self._value_label, QC.Qt.AlignmentFlag.AlignHCenter )
-        
-        self._slider.valueChanged.connect( self._UpdateLabels )
-        self._slider.valueChanged.connect( self.valueChanged )
-        self._slider.sliderReleased.connect( lambda: self.finishedEditing.emit( self._slider.value() ) )
-        
-        self._UpdateLabels()
-        
-    def _UpdateLabels( self ):
-        
-        self._min_label.setText( str( self._slider.minimum() ) )
-        self._max_label.setText( str( self._slider.maximum() ) )
-        self._value_label.setText( str( self._slider.value() ) )
-        
-    def GetValue( self ):
-        
-        return self._slider.value()
-        
-    
-    def SetInterval( self, interval ):
-        
-        self._slider.setTickInterval( interval )
-        
-        self._UpdateLabels()
-        
-    def SetRange( self, min, max ):
-        
-        self._slider.setRange( min, max )
-        
-        self._UpdateLabels()
-        
-    def SetValue( self, value ):
-        
-        self._slider.setValue( value )
-        
-        self._UpdateLabels()
-        
-
-def SplitterVisibleCount( splitter ):
-    
-    count = 0
-    
-    for i in range( splitter.count() ):
-        
-        if splitter.widget( i ).isVisibleTo( splitter ): count += 1
-        
-    
-    return count
-    
-
-class TabBar( QW.QTabBar ):
-    
-    tabDoubleLeftClicked = QC.Signal( int )
-    tabMiddleClicked = QC.Signal( int )
-    
-    tabSpaceDoubleLeftClicked = QC.Signal()
-    tabSpaceDoubleMiddleClicked = QC.Signal()
-    
-    def __init__( self, parent = None ):
-        
-        super().__init__( parent )
-        
-        if HC.PLATFORM_MACOS:
-            
-            self.setDocumentMode( True )
-            
-        
-        self.setMouseTracking( True )
-        self.setAcceptDrops( True )
-        self._supplementary_drop_target = None
-        
-        self._last_clicked_tab_index = -1
-        self._last_clicked_global_pos = None
-        self._last_clicked_timestamp_ms = 0
-        
-    
-    def AddSupplementaryTabBarDropTarget( self, drop_target ):
-        
-        self._supplementary_drop_target = drop_target
-        
-    
-    def clearLastClickedTabInfo( self ):
-        
-        self._last_clicked_tab_index = -1
-        
-        self._last_clicked_global_pos = None
-        
-        self._last_clicked_timestamp_ms = 0
-        
-    
-    def event( self, event ):
-        
-        return QW.QTabBar.event( self, event )
-        
-    
-    def mouseMoveEvent( self, e ):
-        
-        e.ignore()
-        
-    
-    def mousePressEvent( self, event ):
-        
-        index = self.tabAt( event.position().toPoint() )
-        
-        if event.button() == QC.Qt.MouseButton.LeftButton:
-            
-            self._last_clicked_tab_index = index
-            
-            self._last_clicked_global_pos = event.globalPosition().toPoint()
-            
-            self._last_clicked_timestamp_ms = HydrusTime.GetNowMS()
-            
-        
-        QW.QTabBar.mousePressEvent( self, event )
-        
-    
-    def mouseReleaseEvent( self, event ):
-        
-        index = self.tabAt( event.position().toPoint() )
-        
-        if event.button() == QC.Qt.MouseButton.MiddleButton:
-            
-            if index != -1:
-                
-                self.tabMiddleClicked.emit( index )
-                
-                return
-                
-            
-        
-        QW.QTabBar.mouseReleaseEvent( self, event )
-        
-    
-    def mouseDoubleClickEvent( self, event ):
-        
-        index = self.tabAt( event.position().toPoint() )
-        
-        if event.button() == QC.Qt.MouseButton.LeftButton:
-            
-            if index == -1:
-                
-                self.tabSpaceDoubleLeftClicked.emit()
-                
-            else:
-                
-                self.tabDoubleLeftClicked.emit( index )
-                
-            
-            return
-            
-        elif event.button() == QC.Qt.MouseButton.MiddleButton:
-            
-            if index == -1:
-                
-                self.tabSpaceDoubleMiddleClicked.emit()
-                
-            else:
-                
-                self.tabMiddleClicked.emit( index )
-                
-            
-            return
-            
-        
-        QW.QTabBar.mouseDoubleClickEvent( self, event )
-        
-    
-    def dragEnterEvent(self, event):
-
-        if 'application/hydrus-tab' in event.mimeData().formats():
-            
-            event.ignore()
-            
-        else:
-            
-            event.accept()
-            
-        
-    
-    def dragMoveEvent( self, event ):
-        
-        if 'application/hydrus-tab' not in event.mimeData().formats():
-            
-            tab_index = self.tabAt( event.position().toPoint() )
-            
-            if tab_index != -1:
-                
-                shift_down = event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
-                
-                if shift_down:
-                    
-                    do_navigate = CG.client_controller.new_options.GetBoolean( 'page_drag_change_tab_with_shift' )
-                    
-                else:
-                    
-                    do_navigate = CG.client_controller.new_options.GetBoolean( 'page_drag_change_tab_normally' )
-                    
-                
-                if do_navigate:
-                    
-                    self.parentWidget().setCurrentIndex( tab_index )
-                    
-                
-            
-        else:
-            
-            event.ignore()
-            
-        
-    
-    def lastClickedTabInfo( self ):
-        
-        return ( self._last_clicked_tab_index, self._last_clicked_global_pos, self._last_clicked_timestamp_ms )
-        
-    
-    def dropEvent( self, event ):
-        
-        if self._supplementary_drop_target:
-            
-            self._supplementary_drop_target.eventFilter( self, event )
-            
-        else:
-            
-            event.ignore()
-            
-        
-    
-    def wheelEvent( self, event ):
-        
-        try:
-            
-            if CG.client_controller.new_options.GetBoolean( 'wheel_scrolls_tab_bar' ):
-                
-                children = self.children()
-                
-                if len( children ) >= 2:
-                    
-                    scroll_left = children[0]
-                    scroll_right = children[1]
-                    
-                    if event.angleDelta().y() > 0:
-                        
-                        b = scroll_left
-                        
-                    else:
-                        
-                        b = scroll_right
-                        
-                    
-                    if isinstance( b, QW.QAbstractButton ):
-                        
-                        b.click()
-                        
-                    
-                
-                event.accept()
-                
-                return
-                
-            
-        except Exception as e:
-            
-            pass
-            
-        
-        QW.QTabBar.wheelEvent( self, event )
-        
-    
-
-# A heavily extended/tweaked version of https://forum.qt.io/topic/67542/drag-tabs-between-qtabwidgets/
-class TabWidgetWithDnD( QW.QTabWidget ):
-    
-    pageDragAndDropped = QC.Signal( QW.QWidget, QW.QWidget )
-    
-    def __init__( self, parent = None ):
-        
-        super().__init__( parent )
-        
-        self.setTabBar( TabBar( self ) )
-        
-        self.setAcceptDrops( True )
-        
-        self._tab_bar = self.tabBar()
-        
-        self._my_current_drag_object = None
-        
-        self._supplementary_drop_target = None
-        
-    
-    def _CheckDnDIsOK( self, drag_object ):
-        
-        # drag.cancel is not supported on macOS
-        if HC.PLATFORM_MACOS:
-            
-            return
-            
-        
-        # QW.QApplication.mouseButtons() doesn't work unless mouse is over!
-        if not ClientGUIFunctions.MouseIsOverOneOfOurWindows():
-            
-            return
-            
-        
-        if self._my_current_drag_object == drag_object and QW.QApplication.mouseButtons() != QC.Qt.MouseButton.LeftButton:
-            
-            # awkward situation where, it seems, the DnD is spawned while the 'release left-click' event is in the queue
-            # the DnD spawns after the click release and sits there until the user clicks again
-            # I think this is because I am spawning the DnD in the move event rather than the mouse press
-            
-            self._my_current_drag_object.cancel()
-            
-            self._my_current_drag_object = None
-            
-        
-    
-    def _LayoutPagesHelper( self ):
-        
-        current_index = self.currentIndex()
-
-        for i in range( self.count() ):
-            
-            self.setCurrentIndex( i )
-            
-            widget = self.widget( i )
-            
-            if isinstance( widget, TabWidgetWithDnD ):
-                
-                widget._LayoutPagesHelper()
-                
-            
-        
-        self.setCurrentIndex( current_index )
-        
-    
-    def LayoutPages( self ):
-        
-        # hydev adds: I no longer call this, as I moved splitter setting to a thing called per page when page is first visibly shown
-        # leaving it here for now in case I need it again
-        
-        # Momentarily switch to each page, then back, forcing a layout update.
-        # If this is not done, the splitters on the hidden pages won't resize their widgets properly when we restore
-        # splitter sizes after this, since they would never became visible.
-        # We first have to climb up the widget hierarchy and go down recursively from the root tab widget,
-        # since it's not enough to make a page visible if its a nested page: all of its ancestor pages have to be visible too.
-        # This shouldn't be visible to users since we switch back immediately.
-        # There is probably a proper way to do this...
-
-        highest_ancestor_of_same_type = self
-
-        parent = self.parentWidget()
-
-        while parent is not None:
-
-            if isinstance( parent, TabWidgetWithDnD ):
-                
-                highest_ancestor_of_same_type = parent
-                
-
-            parent = parent.parentWidget()
-            
-        
-        highest_ancestor_of_same_type._LayoutPagesHelper() # This does the actual recursive descent and making pages visible
-        
-    
-    # This is a hack that adds an additional drop target to the tab bar. The added drop target will get drop events from the tab bar.
-    # Used to make the case of files/media droppend onto tabs work.
-    def AddSupplementaryTabBarDropTarget( self, drop_target ):
-        
-        self._supplementary_drop_target = drop_target
-        # noinspection PyUnresolvedReferences
-        self.tabBar().AddSupplementaryTabBarDropTarget( drop_target )
-        
-    
-    def mouseMoveEvent( self, e ):
-        
-        mouse_is_over_actual_page = self.currentWidget() and self.currentWidget().rect().contains( self.currentWidget().mapFromGlobal( self.mapToGlobal( e.position().toPoint() ) ) )
-        
-        if mouse_is_over_actual_page or CG.client_controller.new_options.GetBoolean( 'disable_page_tab_dnd' ):
-            
-            QW.QTabWidget.mouseMoveEvent( self, e )
-            
-            return
-            
-        
-        if e.buttons() != QC.Qt.MouseButton.LeftButton:
-            
-            return
-            
-        
-        my_mouse_pos = e.position().toPoint()
-        global_mouse_pos = self.mapToGlobal( my_mouse_pos )
-        tab_bar_mouse_pos = self._tab_bar.mapFromGlobal( global_mouse_pos )
-        
-        if not self._tab_bar.rect().contains( tab_bar_mouse_pos ):
-            
-            return
-            
-        
-        if not isinstance( self._tab_bar, TabBar ):
-            
-            return
-            
-        
-        ( clicked_tab_index, clicked_global_pos, clicked_timestamp_ms ) = self._tab_bar.lastClickedTabInfo()
-        
-        if clicked_tab_index == -1:
-            
-            return
-            
-        
-        # I used to do manhattanlength stuff, but tbh this works better
-        # delta_pos = e.globalPosition().toPoint() - clicked_global_pos
-        
-        if not HydrusTime.TimeHasPassedMS( clicked_timestamp_ms + 100 ):
-            
-            # don't start a drag until decent movement
-            
-            return
-            
-        
-        tab_rect = self._tab_bar.tabRect( clicked_tab_index )
-        
-        pixmap = QG.QPixmap( tab_rect.size() )
-        self._tab_bar.render( pixmap, QC.QPoint(), QG.QRegion( tab_rect ) )
-        
-        mimeData = QC.QMimeData()
-        
-        mimeData.setData( 'application/hydrus-tab', b'' )
-        
-        self._my_current_drag_object = QG.QDrag( self._tab_bar )
-        
-        self._my_current_drag_object.setMimeData( mimeData )
-        
-        self._my_current_drag_object.setPixmap( pixmap )
-        
-        self._my_current_drag_object.setHotSpot( QC.QPoint( 0, 0 ) )
-        
-        # this puts the tab pixmap exactly where we picked it up, but it looks bad
-        # self._my_current_drag_object.setHotSpot( tab_bar_mouse_pos - tab_rect.topLeft() )
-        
-        cursor = QG.QCursor( QC.Qt.CursorShape.ClosedHandCursor )
-        
-        self._my_current_drag_object.setDragCursor( cursor.pixmap(), QC.Qt.DropAction.MoveAction )
-        
-        CG.client_controller.CallLaterQtSafe( self, 0.1, 'checking DnD is ok', self._CheckDnDIsOK, self._my_current_drag_object )
-        
-        self._my_current_drag_object.exec_( QC.Qt.DropAction.MoveAction )
-        
-        self._my_current_drag_object = None
-        
-    
-    def dragEnterEvent( self, e: QG.QDragEnterEvent ):
-        
-        if self.currentWidget() and self.currentWidget().rect().contains( self.currentWidget().mapFromGlobal( self.mapToGlobal( e.position().toPoint() ) ) ):
-            
-            return QW.QTabWidget.dragEnterEvent( self, e )
-            
-        
-        if 'application/hydrus-tab' in e.mimeData().formats():
-            
-            e.accept()
-            
-        else:
-            
-            e.ignore()
-            
-        
-    
-    def dragMoveEvent( self, event: QG.QDragMoveEvent ):
-        
-        #if self.currentWidget() and self.currentWidget().rect().contains( self.currentWidget().mapFromGlobal( self.mapToGlobal( event.position().toPoint() ) ) ): return QW.QTabWidget.dragMoveEvent( self, event )
-        
-        if 'application/hydrus-tab' not in event.mimeData().formats():
-            
-            event.ignore()
-            
-            return
-            
-        
-        screen_pos = self.mapToGlobal( event.position().toPoint() )
-        
-        tab_pos = self._tab_bar.mapFromGlobal( screen_pos )
-        
-        tab_index = self._tab_bar.tabAt( tab_pos )
-        
-        if tab_index != -1:
-            
-            shift_down = event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
-            
-            if shift_down:
-                
-                do_navigate = CG.client_controller.new_options.GetBoolean( 'page_drag_change_tab_with_shift' )
-                
-            else:
-                
-                do_navigate = CG.client_controller.new_options.GetBoolean( 'page_drag_change_tab_normally' )
-                
-            
-            if do_navigate:
-                
-                self.setCurrentIndex( tab_index )
-                
-            
-        
-
-    def dragLeaveEvent( self, e: QG.QDragLeaveEvent ):
-        
-        #if self.currentWidget() and self.currentWidget().rect().contains( self.currentWidget().mapFromGlobal( self.mapToGlobal( e.position().toPoint() ) ) ): return QW.QTabWidget.dragLeaveEvent( self, e )
-        
-        e.accept()
-        
-
-    def addTab(self, widget, *args, **kwargs ):
-        
-        if isinstance( widget, TabWidgetWithDnD ):
-            
-            widget.AddSupplementaryTabBarDropTarget( self._supplementary_drop_target )
-            
-        
-        QW.QTabWidget.addTab( self, widget, *args, **kwargs )
-        
-    
-    def insertTab(self, index, widget, *args, **kwargs):
-
-        if isinstance( widget, TabWidgetWithDnD ):
-            
-            widget.AddSupplementaryTabBarDropTarget( self._supplementary_drop_target )
-            
-
-        QW.QTabWidget.insertTab( self, index, widget, *args, **kwargs )
-        
-    
-    def dropEvent( self, e: QG.QDropEvent ):
-        
-        if self.currentWidget() and self.currentWidget().rect().contains( self.currentWidget().mapFromGlobal( self.mapToGlobal( e.position().toPoint() ) ) ):
-            
-            return QW.QTabWidget.dropEvent( self, e )
-            
-        
-        if 'application/hydrus-tab' not in e.mimeData().formats(): #Page dnd has no associated mime data
-            
-            e.ignore()
-            
-            return
-            
-        
-        w = self
-        
-        source_tab_bar = e.source()
-        
-        if not isinstance( source_tab_bar, TabBar ):
-            
-            return
-            
-        
-        ( source_page_index, source_page_click_global_pos, source_page_clicked_timestamp_ms ) = source_tab_bar.lastClickedTabInfo()
-        
-        source_tab_bar.clearLastClickedTabInfo()
-        
-        source_notebook: TabWidgetWithDnD = source_tab_bar.parentWidget()
-        source_page = source_notebook.widget( source_page_index )
-        source_name = source_tab_bar.tabText( source_page_index )
-        
-        while w is not None:
-            
-            if source_page == w:
-                
-                # you cannot drop a page of pages inside itself
-                
-                return
-                
-            
-            w = w.parentWidget()
-            
-
-        e.setDropAction( QC.Qt.DropAction.MoveAction )
-        
-        e.accept()
-        
-        counter = self.count()
-        
-        screen_pos = self.mapToGlobal( e.position().toPoint() )
-        
-        tab_pos = self.tabBar().mapFromGlobal( screen_pos )
-        
-        dropped_on_tab_index = self.tabBar().tabAt( tab_pos )
-        
-        if source_notebook == self and dropped_on_tab_index == source_page_index:
-            
-            return # if we drop on ourself, make no action, even on the right edge
-            
-        
-        dropped_on_left_edge = False
-        dropped_on_right_edge = False
-        
-        if dropped_on_tab_index != -1:
-            
-            EDGE_PADDING = 15
-            
-            tab_rect = self.tabBar().tabRect( dropped_on_tab_index )
-            
-            edge_size = QC.QSize( EDGE_PADDING, tab_rect.height() )
-            
-            left_edge_rect = QC.QRect( tab_rect.topLeft(), edge_size )
-            right_edge_rect = QC.QRect( tab_rect.topRight() - QC.QPoint( EDGE_PADDING, 0 ), edge_size )
-            
-            drop_pos = e.position().toPoint()
-            
-            dropped_on_left_edge = left_edge_rect.contains( drop_pos )
-            dropped_on_right_edge = right_edge_rect.contains( drop_pos )
-            
-        
-        if counter == 0:
-            
-            self.addTab( source_page, source_name )
-            
-        else:
-            
-            if dropped_on_tab_index == -1:
-                
-                insert_index = counter
-                
-            else:
-                
-                insert_index = dropped_on_tab_index
-                
-                if dropped_on_right_edge:
-                    
-                    insert_index += 1
-                    
-                
-                if self == source_notebook:
-                    
-                    if insert_index == source_page_index + 1 and not dropped_on_left_edge:
-                        
-                        pass # in this special case, moving it confidently one to the right, we will disobey the normal rules and indeed move one to the right, rather than no-op
-                        
-                    elif insert_index > source_page_index:
-                        
-                        # we are inserting to our right, which needs a shift since we will be removing ourselves from the list
-                        
-                        insert_index -= 1
-                        
-                    
-                
-            
-            if source_notebook == self and insert_index == source_page_index:
-                
-                return # if we mean to insert on ourself, make no action
-                
-            
-            self.insertTab( insert_index, source_page, source_name )
-
-            shift_down = e.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
-            
-            follow_dropped_page = not shift_down
-
-            new_options = CG.client_controller.new_options
-            
-            if shift_down:
-                
-                follow_dropped_page = new_options.GetBoolean( 'page_drop_chase_with_shift' )
-                
-            else:
-                
-                follow_dropped_page = new_options.GetBoolean( 'page_drop_chase_normally' )
-                
-            
-            if follow_dropped_page:
-                
-                self.setCurrentIndex( self.indexOf( source_page ) )
-                
-            else:
-                
-                if source_page_index > 1:
-                    
-                    neighbour_page = source_notebook.widget( source_page_index - 1 )
-                    
-                    # TODO: Probably ditch this for signals somehow
-                    # noinspection PyUnresolvedReferences
-                    page_key = neighbour_page.GetPageKey()
-                    
-                else:
-                    
-                    # TODO: Probably ditch this for signals somehow
-                    # noinspection PyUnresolvedReferences
-                    page_key = source_notebook.GetPageKey()
-                    
-                
-                CG.client_controller.CallAfterQtSafe( self, CG.client_controller.gui.ShowPage, page_key )
-                
-            
-        
-        self.pageDragAndDropped.emit( source_page, source_tab_bar )
-        
-    
-def DeleteAllNotebookPages( notebook ):
-    
-    while notebook.count() > 0:
-        
-        tab = notebook.widget( 0 )
-        
-        notebook.removeTab( 0 )
-        
-        tab.deleteLater()
-        
-    
-
-def SplitVertically( splitter: QW.QSplitter, w1, w2, hpos ):
-    
-    if w1.parentWidget() != splitter:
-        
-        splitter.addWidget( w1 )
-        
-
-    w1.setVisible( True )
-
-    if w2.parentWidget() != splitter:
-        
-        splitter.addWidget( w2 )
-        
-
-    w2.setVisible( True )
-    
-    total_sum = sum( splitter.sizes() )
-
-    if hpos < 0:
-        
-        splitter.setSizes( [ total_sum + hpos, -hpos ] )
-        
-    elif hpos > 0:
-        
-        splitter.setSizes( [ hpos, total_sum - hpos ] )
-        
-    
-
-def SplitHorizontally( splitter: QW.QSplitter, w1, w2, vpos ):
-    
-    if w1.parentWidget() != splitter:
-        
-        splitter.addWidget( w1 )
-        
-    w1.setVisible( True )
-        
-    if w2.parentWidget() != splitter:
-        
-        splitter.addWidget( w2 )
-        
-
-    w2.setVisible( True )
-    
-    total_sum = sum( splitter.sizes() )
-    
-    if vpos < 0:
-        
-        splitter.setSizes( [ total_sum + vpos, -vpos ] )
-        
-    elif vpos > 0:
-        
-        splitter.setSizes( [ vpos, total_sum - vpos ] )
-        
-
-class GridLayout( QW.QGridLayout ):
-    
-    def __init__( self, cols = 1, spacing = 2 ):
-        
-        super().__init__()
-        
-        self._col_count = cols
-        self.setMargin( 2 )
-        self.setSpacing( spacing )
-        
-        self.next_row = 0
-        self.next_col = 0
-        
-    
-    def GetFixedColumnCount( self ):
-        
-        return self._col_count
-        
-    
-    def setMargin( self, val ):
-        
-        self.setContentsMargins( val, val, val, val )
-        
-    
 
 def AddToLayout( layout, item, flag = None, alignment = None ):
     
@@ -1087,26 +223,6 @@ def AddToLayout( layout, item, flag = None, alignment = None ):
         
     
 
-def ScrollAreaVisibleRect( scroll_area ):
-    
-    if not scroll_area.widget(): return QC.QRect( 0, 0, 0, 0 )
-    
-    rect = scroll_area.widget().visibleRegion().boundingRect()
-
-    # Do not allow it to be smaller than the scroll area's viewport size:
-    
-    if rect.width() < scroll_area.viewport().width():
-        
-        rect.setWidth( scroll_area.viewport().width() )
-
-    if rect.height() < scroll_area.viewport().height():
-        
-        rect.setHeight( scroll_area.viewport().height() )
-        
-    
-    return rect
-    
-
 def AdjustOpacity( image: QG.QImage, opacity_factor ):
     
     new_image = QG.QImage( image.width(), image.height(), QG.QImage.Format.Format_RGBA8888 )
@@ -1124,11 +240,6 @@ def AdjustOpacity( image: QG.QImage, opacity_factor ):
     return new_image
     
 
-def ToKeySequence( modifiers, key ):
-    
-    return QG.QKeySequence( QC.QKeyCombination( modifiers, key ) ) # pylint: disable=E1101
-    
-
 def AddShortcut( widget, modifier, key, func: collections.abc.Callable, *args ):
     
     shortcut = QW.QShortcut( widget )
@@ -1140,9 +251,11 @@ def AddShortcut( widget, modifier, key, func: collections.abc.Callable, *args ):
     shortcut.activated.connect( lambda: func( *args ) )
     
 
-def GetBackgroundColour( widget ):
+def CenterOnWindow( parent, window ):
     
-    return widget.palette().color( QG.QPalette.ColorRole.Window )
+    parent_window = parent.window()
+    
+    window.move( parent_window.frameGeometry().center() - window.rect().center() )
     
 
 def ClearLayout( layout, delete_widgets = False ):
@@ -1174,19 +287,65 @@ def ClearLayout( layout, delete_widgets = False ):
         
     
 
-def Unsplit( splitter, widget ):
+def DeleteAllNotebookPages( notebook ):
     
-    if widget.parentWidget() == splitter:
+    while notebook.count() > 0:
         
-        widget.setVisible( False )
+        tab = notebook.widget( 0 )
+        
+        notebook.removeTab( 0 )
+        
+        tab.deleteLater()
         
     
 
-def CenterOnWindow( parent, window ):
+def GetBackgroundColour( widget ):
     
-    parent_window = parent.window()
+    return widget.palette().color( QG.QPalette.ColorRole.Window )
     
-    window.move( parent_window.frameGeometry().center() - window.rect().center() )
+
+def ListsToTuples( potentially_nested_lists ):
+    
+    if HydrusLists.IsAListLikeCollection( potentially_nested_lists ):
+        
+        return tuple( map( ListsToTuples, potentially_nested_lists ) )
+        
+    else:
+        
+        return potentially_nested_lists
+        
+    
+
+def registerEventType():
+    
+    if QtInit.WE_ARE_PYSIDE:
+        
+        return QC.QEvent.Type( QC.QEvent.registerEventType() )
+        
+    else:
+        
+        return QC.QEvent.registerEventType()
+        
+    
+
+def ScrollAreaVisibleRect( scroll_area ):
+    
+    if not scroll_area.widget(): return QC.QRect( 0, 0, 0, 0 )
+    
+    rect = scroll_area.widget().visibleRegion().boundingRect()
+
+    # Do not allow it to be smaller than the scroll area's viewport size:
+    
+    if rect.width() < scroll_area.viewport().width():
+        
+        rect.setWidth( scroll_area.viewport().width() )
+
+    if rect.height() < scroll_area.viewport().height():
+        
+        rect.setHeight( scroll_area.viewport().height() )
+        
+    
+    return rect
     
 
 def SetInitialSize( widget, size ):
@@ -1246,73 +405,268 @@ def SetMinClientSize( widget, size ):
     if size.height() >= 0: widget.setMinimumHeight( size.height() )
     
 
-class StatusBar( QW.QStatusBar ):
+def SplitterVisibleCount( splitter ):
     
-    def __init__( self, status_widths ):
+    count = 0
+    
+    for i in range( splitter.count() ):
         
-        super().__init__()
-        
-        self._labels = []
-        
-        for w in status_widths:
-            
-            label = QW.QLabel()
-            
-            self._labels.append( label )
-            
-            if w < 0:
-                
-                self.addWidget( label, -1 * w )
-                
-            else:
-                
-                label.setFixedWidth( w )
-                
-                self.addWidget( label )
-                
-            
+        if splitter.widget( i ).isVisibleTo( splitter ): count += 1
         
     
-    def SetStatusText( self, text, index, tooltip = None ):
+    return count
+    
+
+def SplitVertically( splitter: QW.QSplitter, w1, w2, hpos ):
+    
+    if w1.parentWidget() != splitter:
         
-        if tooltip is None:
-            
-            tooltip = text
-            
+        splitter.addWidget( w1 )
         
-        cell = self._labels[ index ]
+
+    w1.setVisible( True )
+
+    if w2.parentWidget() != splitter:
         
-        if cell.text() != text:
-            
-            cell.setText( text )
-            
+        splitter.addWidget( w2 )
         
-        if cell.toolTip() != tooltip:
-            
-            cell.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) )
-            
+
+    w2.setVisible( True )
+    
+    total_sum = sum( splitter.sizes() )
+
+    if hpos < 0:
+        
+        splitter.setSizes( [ total_sum + hpos, -hpos ] )
+        
+    elif hpos > 0:
+        
+        splitter.setSizes( [ hpos, total_sum - hpos ] )
         
     
 
-class UIActionSimulator:
+def SplitHorizontally( splitter: QW.QSplitter, w1, w2, vpos ):
     
-    def __init__( self ):
+    if w1.parentWidget() != splitter:
         
-        pass
+        splitter.addWidget( w1 )
+        
+    w1.setVisible( True )
+        
+    if w2.parentWidget() != splitter:
+        
+        splitter.addWidget( w2 )
+        
+
+    w2.setVisible( True )
+    
+    total_sum = sum( splitter.sizes() )
+    
+    if vpos < 0:
+        
+        splitter.setSizes( [ total_sum + vpos, -vpos ] )
+        
+    elif vpos > 0:
+        
+        splitter.setSizes( [ vpos, total_sum - vpos ] )
         
     
-    def Char( self, widget, key, text = None ):
+
+def ToKeySequence( modifiers, key ):
+    
+    return QG.QKeySequence( QC.QKeyCombination( modifiers, key ) ) # pylint: disable=E1101
+    
+
+def Unsplit( splitter, widget ):
+    
+    if widget.parentWidget() == splitter:
         
-        if widget is None:
+        widget.setVisible( False )
+        
+    
+
+class HBoxLayout( QW.QHBoxLayout ):
+    
+    def __init__( self, margin = 2, spacing = 2 ):
+        
+        super().__init__()
+        
+        self.setMargin( margin )
+        self.setSpacing( spacing )
+        
+    
+    def setMargin( self, val ):
+        
+        self.setContentsMargins( val, val, val, val )
+        
+    
+
+class VBoxLayout( QW.QVBoxLayout ):
+    
+    def __init__( self, margin = 2, spacing = 2 ):
+        
+        super().__init__()
+        
+        self.setMargin( margin )
+        self.setSpacing( spacing )
+        
+
+    def setMargin( self, val ):
+        
+        self.setContentsMargins( val, val, val, val )
+        
+    
+
+class LabelledSlider( QW.QWidget ):
+    
+    valueChanged = QC.Signal( int )
+    finishedEditing  = QC.Signal( int )
+    
+    def __init__( self, parent = None ):
+        
+        super().__init__( parent )
+        
+        vbox = VBoxLayout( spacing = 2 )
+        
+        self.setLayout( vbox )
+        
+        top_layout = HBoxLayout( spacing = 2 )
+        
+        self._min_label = QW.QLabel()
+        self._max_label = QW.QLabel()
+        self._value_label = QW.QLabel()
+        self._slider = QW.QSlider()
+        self._slider.setOrientation( QC.Qt.Orientation.Horizontal )
+        self._slider.setTickInterval( 1 )
+        self._slider.setTickPosition( QW.QSlider.TickPosition.TicksBothSides )
+        
+        top_layout.addWidget( self._min_label )
+        top_layout.addWidget( self._slider )
+        top_layout.addWidget( self._max_label )
+        
+        vbox.addLayout( top_layout )
+        vbox.addWidget( self._value_label )
+        self._value_label.setAlignment( QC.Qt.AlignmentFlag.AlignVCenter | QC.Qt.AlignmentFlag.AlignHCenter )
+        vbox.setAlignment( self._value_label, QC.Qt.AlignmentFlag.AlignHCenter )
+        
+        self._slider.valueChanged.connect( self._UpdateLabels )
+        self._slider.valueChanged.connect( self.valueChanged )
+        self._slider.sliderReleased.connect( lambda: self.finishedEditing.emit( self._slider.value() ) )
+        
+        self._UpdateLabels()
+        
+    def _UpdateLabels( self ):
+        
+        self._min_label.setText( str( self._slider.minimum() ) )
+        self._max_label.setText( str( self._slider.maximum() ) )
+        self._value_label.setText( str( self._slider.value() ) )
+        
+    def GetValue( self ):
+        
+        return self._slider.value()
+        
+    
+    def SetInterval( self, interval ):
+        
+        self._slider.setTickInterval( interval )
+        
+        self._UpdateLabels()
+        
+    def SetRange( self, min, max ):
+        
+        self._slider.setRange( min, max )
+        
+        self._UpdateLabels()
+        
+    def SetValue( self, value ):
+        
+        self._slider.setValue( value )
+        
+        self._UpdateLabels()
+        
+
+class GridLayout( QW.QGridLayout ):
+    
+    def __init__( self, cols = 1, spacing = 2 ):
+        
+        super().__init__()
+        
+        self._col_count = cols
+        self.setMargin( 2 )
+        self.setSpacing( spacing )
+        
+        self.next_row = 0
+        self.next_col = 0
+        
+    
+    def GetFixedColumnCount( self ):
+        
+        return self._col_count
+        
+    
+    def setMargin( self, val ):
+        
+        self.setContentsMargins( val, val, val, val )
+        
+    
+
+class Dialog( QW.QDialog ):
+    
+    def __init__( self, parent = None, **kwargs ):
+
+        title = None 
+        
+        if 'title' in kwargs:
             
-            widget = QW.QApplication.focusWidget()
+            title = kwargs['title']
+            
+            del kwargs['title']
             
         
-        ev1 = QG.QKeyEvent( QC.QEvent.Type.KeyPress, key, QC.Qt.KeyboardModifier.NoModifier, text = text )
-        ev2 = QG.QKeyEvent( QC.QEvent.Type.KeyRelease, key, QC.Qt.KeyboardModifier.NoModifier, text = text )
+        super().__init__( parent, **kwargs )
         
-        QW.QApplication.postEvent( widget, ev1 )
-        QW.QApplication.postEvent( widget, ev2 )
+        self.setWindowFlag( QC.Qt.WindowType.WindowContextHelpButtonHint, on = False )
+        
+        if title is not None:
+            
+            self.setWindowTitle( title )
+            
+        
+        self._closed_by_user = False
+        
+    
+    def closeEvent( self, event ):
+        
+        if event.spontaneous():
+            
+            self._closed_by_user = True
+            
+        
+        QW.QDialog.closeEvent( self, event )
+        
+    
+    # True if the dialog was closed by the user clicking on the X on the titlebar (so neither reject nor accept was chosen - the dialog result is still reject in this case though)    
+    def WasCancelled( self ):
+        
+        return self._closed_by_user
+        
+    
+    def SetCancelled( self, closed ):
+        
+        self._closed_by_user = closed
+        
+    
+    def __enter__( self ):
+        
+        return self
+        
+    
+    def __exit__( self, exc_type, exc_val, exc_tb ):
+        
+        if isValid( self ):
+            
+            self.deleteLater()
+            
         
     
 
@@ -1466,66 +820,6 @@ class EllipsizedLabel( QW.QLabel ):
         
     
 
-class Dialog( QW.QDialog ):
-    
-    def __init__( self, parent = None, **kwargs ):
-
-        title = None 
-        
-        if 'title' in kwargs:
-            
-            title = kwargs['title']
-            
-            del kwargs['title']
-            
-        
-        super().__init__( parent, **kwargs )
-        
-        self.setWindowFlag( QC.Qt.WindowType.WindowContextHelpButtonHint, on = False )
-        
-        if title is not None:
-            
-            self.setWindowTitle( title )
-            
-        
-        self._closed_by_user = False
-        
-    
-    def closeEvent( self, event ):
-        
-        if event.spontaneous():
-            
-            self._closed_by_user = True
-            
-        
-        QW.QDialog.closeEvent( self, event )
-        
-    
-    # True if the dialog was closed by the user clicking on the X on the titlebar (so neither reject nor accept was chosen - the dialog result is still reject in this case though)    
-    def WasCancelled( self ):
-        
-        return self._closed_by_user
-        
-    
-    def SetCancelled( self, closed ):
-        
-        self._closed_by_user = closed
-        
-    
-    def __enter__( self ):
-        
-        return self
-        
-    
-    def __exit__( self, exc_type, exc_val, exc_tb ):
-        
-        if isValid( self ):
-            
-            self.deleteLater()
-            
-        
-    
-
 class PasswordEntryDialog( Dialog ):
     
     def __init__( self, parent, message, caption ):
@@ -1565,6 +859,54 @@ class PasswordEntryDialog( Dialog ):
     def GetValue( self ):
         
         return self._password.text()
+        
+    
+
+class StatusBar( QW.QStatusBar ):
+    
+    def __init__( self, status_widths ):
+        
+        super().__init__()
+        
+        self._labels = []
+        
+        for w in status_widths:
+            
+            label = QW.QLabel()
+            
+            self._labels.append( label )
+            
+            if w < 0:
+                
+                self.addWidget( label, -1 * w )
+                
+            else:
+                
+                label.setFixedWidth( w )
+                
+                self.addWidget( label )
+                
+            
+        
+    
+    def SetStatusText( self, text, index, tooltip = None ):
+        
+        if tooltip is None:
+            
+            tooltip = text
+            
+        
+        cell = self._labels[ index ]
+        
+        if cell.text() != text:
+            
+            cell.setText( text )
+            
+        
+        if cell.toolTip() != tooltip:
+            
+            cell.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) )
+            
         
     
 
@@ -1636,15 +978,25 @@ class TreeWidgetWithInheritedCheckState( QW.QTreeWidget ):
         
     
 
-def ListsToTuples( potentially_nested_lists ):
+class UIActionSimulator:
     
-    if HydrusLists.IsAListLikeCollection( potentially_nested_lists ):
+    def __init__( self ):
         
-        return tuple( map( ListsToTuples, potentially_nested_lists ) )
+        pass
         
-    else:
+    
+    def Char( self, widget, key, text = None ):
         
-        return potentially_nested_lists
+        if widget is None:
+            
+            widget = QW.QApplication.focusWidget()
+            
+        
+        ev1 = QG.QKeyEvent( QC.QEvent.Type.KeyPress, key, QC.Qt.KeyboardModifier.NoModifier, text = text )
+        ev2 = QG.QKeyEvent( QC.QEvent.Type.KeyRelease, key, QC.Qt.KeyboardModifier.NoModifier, text = text )
+        
+        QW.QApplication.postEvent( widget, ev1 )
+        QW.QApplication.postEvent( widget, ev2 )
         
     
 
