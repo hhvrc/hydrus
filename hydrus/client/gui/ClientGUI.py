@@ -509,13 +509,15 @@ def THREADUploadPending( service_key ):
 
 class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.MainFrameThatResizes ):
     
+    geometryOrStateChange = QC.Signal()
+    
     def __init__( self, controller: "CG.ClientController.Controller" ):
         
         self._controller = controller
         
         super().__init__( None, 'main', 'main_gui' )
         
-        self._currently_minimised_to_system_tray = False
+        self._currently_hidden_to_system_tray = False
         
         bandwidth_width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 17 )
         idle_width = ClientGUIFunctions.ConvertTextToPixelWidth( self, 6 )
@@ -562,6 +564,8 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         self._tabs_tree_view.setModel( self._tabs_tree_model )
         self._tabs_tree_sidebar = ClientGUIPagesTreeView.TreeViewWithControls( self._tabs_tree_view )
         
+        self.geometryOrStateChange.connect( self._tabs_tree_sidebar.NotifyWindowGeometryOrStateChange )
+        
         self._tabs_tree_sidebar.widgetAlignmentChanged.connect( self._RebuildMainFrameLayout )
         self._tabs_tree_sidebar.tagBarAlignmentChanged.connect( self._notebook.RebuildSidebarMediaLayout )
         self._tabs_tree_sidebar.tabBarVisibilityChanged.connect( self._notebook.UpdateTabVisibility )
@@ -579,8 +583,6 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         self._last_clipboard_watched_text = ''
         self._clipboard_watcher_destination_page_watcher = None
         self._clipboard_watcher_destination_page_urls = None
-        
-        self.installEventFilter( self )
         
         drop_target = ClientGUIDragDrop.FileDropTarget( self, self.ImportFiles, self.ImportURLFromDragAndDrop, self._notebook.MediaDragAndDropDropped )
         self.installEventFilter( ClientGUIDragDrop.FileDropTarget( self, self.ImportFiles, self.ImportURLFromDragAndDrop, self._notebook.MediaDragAndDropDropped ) )
@@ -636,7 +638,8 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         
         ClientGUITopLevelWindows.SetInitialTLWSizeAndPosition( self, self._frame_key )
         
-        self._was_maximised = self.isMaximized()
+        self._pre_minimise_window_state = self.windowState()
+        self._last_systray_hide_happened_because_of_main_gui_minimise = False
         
         self._InitialiseMenubar()
         
@@ -668,11 +671,11 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         
         if ClientGUISystemTray.SystemTrayAvailable() and self._controller.new_options.GetBoolean( 'start_client_in_system_tray' ):
             
-            self._currently_minimised_to_system_tray = True
+            self._currently_hidden_to_system_tray = True
             
             self.hide()
             
-            self._system_tray_hidden_tlws.append( ( self.isMaximized(), self ) )
+            self._system_tray_hidden_tlws.append( ( self.windowState(), self ) )
             
         else:
             
@@ -1217,7 +1220,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
     
     def _CurrentlyMinimisedOrHidden( self ):
         
-        return self.isMinimized() or self._currently_minimised_to_system_tray
+        return self.isMinimized() or self._currently_hidden_to_system_tray
         
     
     def _DebugFetchAURL( self ):
@@ -2032,21 +2035,6 @@ QMenuBar::item { padding: 2px 8px; margin: 0px; }'''
             
         
     
-    def _FlipMinimiseRestore( self ):
-        
-        if not self._currently_minimised_to_system_tray:
-            
-            if self.isMinimized():
-                
-                self.RestoreOrActivateWindow()
-                
-            else:
-                
-                self.showMinimized()
-                
-            
-        
-    
     def _FlipMPVCrashHandling( self ):
         
         HG.mpv_allow_crashy_files = not HG.mpv_allow_crashy_files
@@ -2054,87 +2042,6 @@ QMenuBar::item { padding: 2px 8px; margin: 0px; }'''
     def _FlipMPVSilentCrashHandling( self ):
         
         HG.mpv_allow_crashy_files_silently = not HG.mpv_allow_crashy_files_silently
-        
-    
-    def _FlipShowHideWholeUI( self ):
-        
-        if not ClientGUISystemTray.SystemTrayAvailable():
-            
-            try:
-                
-                raise Exception( 'Was called to flip hide/show to system tray, but system tray is not available!' )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e, do_wait = False )
-                
-            
-            return
-            
-        
-        if not self._currently_minimised_to_system_tray:
-            
-            visible_tlws = [ tlw for tlw in QW.QApplication.topLevelWidgets() if tlw.isVisible() or tlw.isMinimized() ]
-            
-            visible_dialogs = [ tlw for tlw in visible_tlws if isinstance( tlw, QW.QDialog ) ]
-            
-            if len( visible_dialogs ) > 0:
-                
-                dialog = visible_dialogs[ -1 ]
-                
-                dialog.activateWindow()
-                
-                return
-                
-            
-            page = self.GetCurrentPage()
-            
-            if page is not None:
-                
-                page.PageHidden()
-                
-            
-            CG.client_controller.pub( 'pause_all_media' )
-            
-            for tlw in visible_tlws:
-                
-                tlw.hide()
-                
-                self._system_tray_hidden_tlws.append( ( tlw.isMaximized(), tlw ) )
-                
-            
-        else:
-            
-            for ( was_maximised, tlw ) in self._system_tray_hidden_tlws:
-                
-                if QP.isValid( tlw ):
-                    
-                    tlw.show()
-                    
-                    if was_maximised:
-                        
-                        tlw.showMaximized()
-                        
-                    
-                
-            
-            self._have_shown_once = True
-            
-            page = self.GetCurrentPage()
-            
-            if page is not None:
-                
-                page.PageShown()
-                
-            
-            self._system_tray_hidden_tlws = []
-            
-            self.RestoreOrActivateWindow()
-            
-        
-        self._currently_minimised_to_system_tray = not self._currently_minimised_to_system_tray
-        
-        self._UpdateSystemTrayIcon()
         
     
     def _GenerateNewAccounts( self, service_key ):
@@ -3571,7 +3478,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
             label += ' (may be buggy/crashy!)'
             
         
-        self._menubar_file_minimise_to_system_tray = ClientGUIMenus.AppendMenuItem( menu, label, 'Hide the client to an icon on your system tray.', self._FlipShowHideWholeUI, role = QW.QAction.MenuRole.ApplicationSpecificRole )
+        self._menubar_file_minimise_to_system_tray = ClientGUIMenus.AppendMenuItem( menu, label, 'Hide the client to an icon on your system tray.', self._SystemTrayHide, role = QW.QAction.MenuRole.ApplicationSpecificRole )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -7163,6 +7070,145 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         self._controller.CallToThread( do_it )
         
     
+    def _SystemTrayActivation( self ):
+        
+        # user just clicked the system tray nice and simple. if the window isn't available, we make it so; otherwise, we hide
+        
+        if self._currently_hidden_to_system_tray:
+            
+            self._SystemTrayShow()
+            
+            self.RestoreAndActivateWindow()
+            
+        else:
+            
+            if self.isActiveWindow():
+                
+                if self._controller.new_options.GetBoolean( 'minimise_client_to_system_tray' ):
+                    
+                    self._SystemTrayHide()
+                    
+                else:
+                    
+                    self.showMinimized()
+                    
+                
+            else:
+                
+                self.RestoreAndActivateWindow()
+                
+            
+        
+    
+    def _SystemTrayFlipShowHide( self ):
+        
+        if self._currently_hidden_to_system_tray:
+            
+            self._SystemTrayShow()
+            
+        else:
+            
+            self._SystemTrayHide()
+            
+        
+    
+    def _SystemTrayHide( self, happening_because_of_main_gui_minimise = False ):
+        
+        if not ClientGUISystemTray.SystemTrayAvailable():
+            
+            try:
+                
+                raise Exception( 'Was called to hide to system tray, but system tray is not available!' )
+                
+            except Exception as e:
+                
+                HydrusData.PrintException( e, do_wait = False )
+                
+            
+            return
+            
+        
+        if self._currently_hidden_to_system_tray:
+            
+            return
+            
+        
+        self._last_systray_hide_happened_because_of_main_gui_minimise = happening_because_of_main_gui_minimise
+        
+        visible_tlws = [ tlw for tlw in QW.QApplication.topLevelWidgets() if tlw.isVisible() or tlw.isMinimized() ]
+        
+        visible_dialogs = [ tlw for tlw in visible_tlws if isinstance( tlw, QW.QDialog ) ]
+        
+        if len( visible_dialogs ) > 0:
+            
+            dialog = visible_dialogs[ -1 ]
+            
+            dialog.activateWindow()
+            
+            return
+            
+        
+        page = self.GetCurrentPage()
+        
+        if page is not None:
+            
+            page.PageHidden()
+            
+        
+        CG.client_controller.pub( 'pause_all_media' )
+        
+        for tlw in visible_tlws:
+            
+            self._system_tray_hidden_tlws.append( ( tlw.windowState(), tlw ) )
+            
+            tlw.hide()
+            
+        
+        self._currently_hidden_to_system_tray = True
+        
+        self._UpdateSystemTrayIcon()
+        
+    
+    def _SystemTrayShow( self ):
+        
+        if not self._currently_hidden_to_system_tray:
+            
+            return
+            
+        
+        for ( window_state, tlw ) in self._system_tray_hidden_tlws:
+            
+            if QP.isValid( tlw ):
+                
+                tlw.show()
+                
+                tlw.setWindowState( window_state )
+                
+            
+        
+        self._have_shown_once = True
+        
+        if CG.client_controller.new_options.GetBoolean( 'minimise_client_to_system_tray_bugfix_restore_after_show' ) and self._last_systray_hide_happened_because_of_main_gui_minimise:
+            
+            self.setWindowState( self._pre_minimise_window_state )
+            
+        
+        self._last_systray_hide_happened_because_of_main_gui_minimise = False
+        
+        page = self.GetCurrentPage()
+        
+        if page is not None:
+            
+            page.PageShown()
+            
+        
+        self._system_tray_hidden_tlws = []
+        
+        self._currently_hidden_to_system_tray = False
+        
+        self._UpdateSystemTrayIcon()
+        
+    
     def _TestServerBusy( self, service_key ):
         
         def do_it( service ):
@@ -7314,7 +7360,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
     def _UpdateSystemTrayIcon( self, currently_booting = False ):
         
-        if not ClientGUISystemTray.SystemTrayAvailable() or ( not (HC.PLATFORM_WINDOWS or HC.PLATFORM_MACOS ) and not CG.client_controller.new_options.GetBoolean( 'advanced_mode' ) ):
+        if not ClientGUISystemTray.SystemTrayAvailable():
             
             return
             
@@ -7325,7 +7371,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
         need_system_tray = always_show_system_tray_icon
         
-        if self._currently_minimised_to_system_tray:
+        if self._currently_hidden_to_system_tray:
             
             need_system_tray = True
             
@@ -7336,9 +7382,8 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
                 
                 self._system_tray_icon = ClientGUISystemTray.ClientSystemTrayIcon( self )
                 
-                self._system_tray_icon.highlight.connect( self.RestoreOrActivateWindow )
-                self._system_tray_icon.flip_show_ui.connect( self._FlipShowHideWholeUI )
-                self._system_tray_icon.flip_minimise_ui.connect( self._FlipMinimiseRestore )
+                self._system_tray_icon.flip_show_ui.connect( self._SystemTrayFlipShowHide )
+                self._system_tray_icon.activation.connect( self._SystemTrayActivation )
                 self._system_tray_icon.exit_client.connect( self.TryToExit )
                 self._system_tray_icon.flip_pause_network_jobs.connect( self.FlipNetworkTrafficPaused )
                 self._system_tray_icon.flip_pause_subscription_jobs.connect( self.FlipSubscriptionsPaused )
@@ -7349,10 +7394,8 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             self._system_tray_icon.show()
             
             self._system_tray_icon.SetShouldAlwaysShow( always_show_system_tray_icon )
-            self._system_tray_icon.SetUIIsCurrentlyShown( not self._currently_minimised_to_system_tray )
-            self._system_tray_icon.SetUIIsCurrentlyMinimised( self.isMinimized() )
-            self._system_tray_icon.SetNetworkTrafficPaused( new_options.GetBoolean( 'pause_all_new_network_traffic' ) )
-            self._system_tray_icon.SetSubscriptionsPaused( new_options.GetBoolean( 'pause_subs_sync' ) )
+            self._system_tray_icon.SetUIIsCurrentlyShown( not self._currently_hidden_to_system_tray )
+            self._system_tray_icon.RegenOptionsCheckboxes()
             
         else:
             
@@ -7549,7 +7592,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
             if ClientGUISystemTray.SystemTrayAvailable() and self._controller.new_options.GetBoolean( 'close_client_to_system_tray' ):
                 
-                self._FlipShowHideWholeUI()
+                self._SystemTrayHide()
                 
                 return
                 
@@ -7644,36 +7687,63 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         self._MoveMediaFiles()
         
     
-    def eventFilter( self, watched, event ):
+    def changeEvent( self, event ):
         
         try:
             
-            if watched == self:
+            if event.type() == QC.QEvent.Type.WindowStateChange:
                 
-                if event.type() == QC.QEvent.Type.WindowStateChange:
+                self.geometryOrStateChange.emit()
+                
+                #
+                
+                event = typing.cast( QG.QWindowStateChangeEvent, event )
+                
+                was_minimised = event.oldState() == QC.Qt.WindowState.WindowMinimized
+                is_minimised = self.isMinimized()
+                
+                if not was_minimised and is_minimised:
                     
-                    event = typing.cast( QG.QWindowStateChangeEvent, event )
+                    self._pre_minimise_window_state = event.oldState()
                     
-                    was_minimised = event.oldState() == QC.Qt.WindowState.WindowMinimized
-                    is_minimised = self.isMinimized()
-                    
-                    if was_minimised != is_minimised:
+                    if ClientGUISystemTray.SystemTrayAvailable() and self._controller.new_options.GetBoolean( 'minimise_client_to_system_tray' ):
                         
-                        if self._have_system_tray_icon:
+                        if CG.client_controller.new_options.GetBoolean( 'minimise_client_to_system_tray_bugfix_restore_after_show' ):
                             
-                            self._system_tray_icon.SetUIIsCurrentlyMinimised( is_minimised )
+                            self._SystemTrayHide( happening_because_of_main_gui_minimise = True )
                             
-                        
-                        if is_minimised:
+                            return
                             
-                            self._was_maximised = event.oldState() == QC.Qt.WindowState.WindowMaximized
+                        elif CG.client_controller.new_options.GetBoolean( 'minimise_client_to_system_tray_bugfix_deferred_state_set' ):
                             
-                            if ClientGUISystemTray.SystemTrayAvailable() and not self._currently_minimised_to_system_tray and self._controller.new_options.GetBoolean( 'minimise_client_to_system_tray' ):
+                            def do_it():
                                 
-                                self._FlipShowHideWholeUI()
+                                # ok this is a special thing but it makes sense
+                                # when we restore the window, we want to restore it as it was before the hide
+                                # the triggering action is a minimise, which means the restore point is before that
+                                # this set-state here is so quick the user does not see, but it sets flags nicely before the hide
+                                # when I cleaned up the changeEvent stuff, I noticed we were getting weird paired restore-minimise events as it tried to navigate this stuff quickly
+                                # but moving to this, and remembering whole window_state rather than 'was maximised' alone, seems to have fixed it
+                                self.setWindowState( self._pre_minimise_window_state )
                                 
-                                return True
+                                self._SystemTrayHide( happening_because_of_main_gui_minimise = True )
                                 
+                            
+                            CG.client_controller.CallAfterQtSafe( self, do_it )
+                            
+                        else:
+                            
+                            # ok this is a special thing but it makes sense
+                            # when we restore the window, we want to restore it as it was before the hide
+                            # the triggering action is a minimise, which means the restore point is before that
+                            # this set-state here is so quick the user does not see, but it sets flags nicely before the hide
+                            # when I cleaned up the changeEvent stuff, I noticed we were getting weird paired restore-minimise events as it tried to navigate this stuff quickly
+                            # but moving to this, and remembering whole window_state rather than 'was maximised' alone, seems to have fixed it
+                            self.setWindowState( self._pre_minimise_window_state )
+                            
+                            self._SystemTrayHide( happening_because_of_main_gui_minimise = True )
+                            
+                            return
                             
                         
                     
@@ -7683,15 +7753,27 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
             HydrusData.ShowException( e )
             
-            return True
-            
         
-        return False
+        super().changeEvent( event )
+        
+    
+    def moveEvent( self, event ):
+        
+        super().moveEvent( event )
+        
+        self.geometryOrStateChange.emit()
+        
+    
+    def resizeEvent( self, event ):
+        
+        super().resizeEvent( event )
+        
+        self.geometryOrStateChange.emit()
         
     
     def TIMEREventAnimationUpdate( self ):
         
-        if self._currently_minimised_to_system_tray:
+        if self._currently_hidden_to_system_tray:
             
             return
             
@@ -7951,7 +8033,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
     
     def HideToSystemTray( self ):
         
-        shown = not self._currently_minimised_to_system_tray
+        shown = not self._currently_hidden_to_system_tray
         
         windows_or_advanced_mode = HC.PLATFORM_WINDOWS or CG.client_controller.new_options.GetBoolean( 'advanced_mode' )
         
@@ -7959,7 +8041,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         
         if shown and good_to_go:
             
-            self._FlipShowHideWholeUI()
+            self._SystemTrayHide()
             
         
     
@@ -8674,7 +8756,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
     
     def REPEATINGBandwidth( self ):
         
-        if self._currently_minimised_to_system_tray:
+        if self._currently_hidden_to_system_tray:
             
             return
             
@@ -8773,7 +8855,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
     
     def REPEATINGPageUpdate( self ):
         
-        if self._currently_minimised_to_system_tray:
+        if self._currently_hidden_to_system_tray:
             
             return
             
@@ -8796,7 +8878,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
     
     def REPEATINGUIUpdate( self ):
         
-        if self._currently_minimised_to_system_tray:
+        if self._currently_hidden_to_system_tray:
             
             return
             
@@ -8930,23 +9012,14 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
         
     
-    def RestoreOrActivateWindow( self ):
+    def RestoreAndActivateWindow( self ):
         
         if self.isMinimized():
             
-            if self._was_maximised:
-                
-                self.showMaximized()
-                
-            else:
-                
-                self.showNormal()
-                
+            self.setWindowState( self._pre_minimise_window_state )
             
-        else:
-            
-            self.activateWindow()
-            
+        
+        self.activateWindow()
         
     
     def SaveAndHide( self ):

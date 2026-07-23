@@ -155,7 +155,7 @@ def GenerateThumbnailNumPy( path, target_resolution, mime, duration_ms, num_fram
         
         thumbnail_numpy = GenerateThumbnailNumPyAudio( path, target_resolution, mime, extra_description = extra_description )
         
-    elif mime in HC.IMAGE_PROJECT_FILES or mime in HC.APPLICATIONS:
+    elif mime in HC.IMAGE_PROJECT_FILES or mime in HC.APPLICATIONS or mime in HC.ARCHIVES:
         
         thumbnail_numpy = GenerateThumbnailNumPyWeirdApplicationGubbins( path, target_resolution, mime, extra_description = extra_description )
         
@@ -838,6 +838,8 @@ def passes_offsets_and_headers( offsets_and_headers, first_bytes_of_file ) -> bo
     return True
     
 
+ALLOW_COMIC_BOOK_ARCHIVE_INSPECTION = True
+
 def GetMime( path, ok_to_look_for_hydrus_updates = False ):
     
     size = os.path.getsize( path )
@@ -920,7 +922,7 @@ def GetMime( path, ok_to_look_for_hydrus_updates = False ):
                     return HC.ANIMATION_UGOIRA
                     
                 
-                if HydrusArchiveHandling.ZipLooksLikeCBZ( path ):
+                if ALLOW_COMIC_BOOK_ARCHIVE_INSPECTION and HydrusArchiveHandling.ZipLooksLikeCBZ( path ):
                     
                     return HC.APPLICATION_CBZ
                     

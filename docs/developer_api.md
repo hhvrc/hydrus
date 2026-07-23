@@ -46,7 +46,7 @@ In general, the API deals with standard UTF-8 JSON. POST requests and 200 OK res
     ```
     
 
-The API returns JSON for everything except actual file/thumbnail requests. Every JSON response includes the `version` of the Client API and `hydrus_version` of the Client hosting it (for brevity, these values are not included in the example responses in this help). For errors, you'll typically get 400 for a missing/invalid parameter, 401/403/419 for missing/insufficient/expired access, and 500 for a real deal serverside error.
+The API returns JSON for everything except actual file/thumbnail requests. **Every JSON response includes the `version` of the Client API and `hydrus_version` of the Client hosting it (for brevity, these values are not included in the example responses in this help).** For errors, you'll typically get 400 for a missing/invalid parameter, 401/403/419 for missing/insufficient/expired access, and 500 for a real deal serverside error.
 
 !!! note
     For any request sent to the API, the total size of the initial request line (this includes the URL and any parameters) and the headers must not be larger than 2 megabytes.

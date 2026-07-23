@@ -546,6 +546,7 @@ The formula should attempt to parse full or relative urls. If the url is relativ
         return node
         
     
+
 class EditParsingScriptFileLookupPanel( ClientGUIScrolledPanels.EditPanel ):
     
     def __init__( self, parent, script ):
@@ -857,6 +858,7 @@ And pass that html to a number of 'parsing children' that will each look through
         return script
         
     
+
 class ManageParsingScriptsPanel( ClientGUIScrolledPanels.ManagePanel ):
     
     SCRIPT_TYPES = []
@@ -1029,6 +1031,8 @@ class ManageParsingScriptsPanel( ClientGUIScrolledPanels.ManagePanel ):
         scripts = self._scripts.GetData()
         
         CG.client_controller.Write( 'serialisables_overwrite', self.SCRIPT_TYPES, scripts )
+        
+        ClientParsingLegacy.LookupScriptsCache.instance().NotifyNewScripts()
         
     
     def Delete( self ):

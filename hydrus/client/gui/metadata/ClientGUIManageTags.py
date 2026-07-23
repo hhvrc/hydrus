@@ -141,7 +141,7 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
         
         self._UpdatePageTabNames()
         
-        CG.client_controller.CallAfterQtSafe( self, self._SetSearchFocus )
+        CG.client_controller.CallAfterQtSafe( self, self._NotifyCurrentPageWeAreLookingAtIt )
         
     
     def _GetContentUpdatePackages( self ):
@@ -154,6 +154,16 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
             
         
         return content_update_packages
+        
+    
+    def _NotifyCurrentPageWeAreLookingAtIt( self ):
+        
+        current_page: ManageTagsPanel._Panel | None = self._tag_services.currentWidget()
+        
+        if current_page is not None:
+            
+            CG.client_controller.CallAfterQtSafe( current_page, current_page.NotifyPageChange )
+            
         
     
     def _SetSearchFocus( self ):
@@ -241,14 +251,11 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
             return
             
         
+        self._NotifyCurrentPageWeAreLookingAtIt()
+        
         current_page: ManageTagsPanel._Panel | None = self._tag_services.currentWidget()
         
-        if current_page is not None:
-            
-            CG.client_controller.CallAfterQtSafe( current_page, current_page.SetTagBoxFocus )
-            
-        
-        if CG.client_controller.new_options.GetBoolean( 'save_default_tag_service_tab_on_change' ):
+        if current_page is not None and CG.client_controller.new_options.GetBoolean( 'save_default_tag_service_tab_on_change' ):
             
             CG.client_controller.new_options.SetKey( 'default_tag_service_tab', current_page.GetServiceKey() )
             
@@ -307,14 +314,10 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
         
         self._tag_services.SelectRight()
         
-        self._SetSearchFocus()
-        
     
     def MovePageLeft( self ):
         
         self._tag_services.SelectLeft()
-        
-        self._SetSearchFocus()
         
     
     def ShowNext( self ):
@@ -1111,6 +1114,13 @@ class ManageTagsPanel( CAC.ApplicationCommandProcessorMixin, ClientGUIScrolledPa
         def HasChanges( self ):
             
             return len( self._pending_content_update_packages ) > 0
+            
+        
+        def NotifyPageChange( self ):
+            
+            self.SetTagBoxFocus()
+            
+            self._suggested_tags.NotifyPageChange()
             
         
         def NotifyTagDisplaySettingsChanged( self ):

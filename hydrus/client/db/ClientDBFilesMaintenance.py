@@ -6,6 +6,7 @@ from hydrus.core import HydrusData
 from hydrus.client import ClientData
 from hydrus.client import ClientTime
 from hydrus.client.db import ClientDBDefinitionsCache
+from hydrus.client.db import ClientDBFilesDuplicatesAutoResolutionStorage
 from hydrus.client.db import ClientDBFilesMaintenanceQueue
 from hydrus.client.db import ClientDBFilesMetadataBasic
 from hydrus.client.db import ClientDBMediaResults
@@ -28,7 +29,8 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
         modules_files_timestamps: ClientDBFilesTimestamps.ClientDBFilesTimestamps,
         modules_similar_files: ClientDBSimilarFiles.ClientDBSimilarFiles,
         modules_repositories: ClientDBRepositories.ClientDBRepositories,
-        modules_media_results: ClientDBMediaResults.ClientDBMediaResults
+        modules_media_results: ClientDBMediaResults.ClientDBMediaResults,
+        modules_files_duplicates_auto_resolution_storage: ClientDBFilesDuplicatesAutoResolutionStorage.ClientDBFilesDuplicatesAutoResolutionStorage
         ):
         
         super().__init__( 'client files maintenance', cursor )
@@ -41,6 +43,7 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
         self.modules_similar_files = modules_similar_files
         self.modules_repositories = modules_repositories
         self.modules_media_results = modules_media_results
+        self.modules_files_duplicates_auto_resolution_storage = modules_files_duplicates_auto_resolution_storage
         
     
     def _ScheduleJobsForChangedAppearance( self, hash_id ):
@@ -59,6 +62,7 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
     
     def ClearJobs( self, cleared_job_tuples ):
         
+        possibly_new_auto_resolution_hash_ids = set()
         new_file_info_managers_info = set()
         new_modified_timestamps_info = set()
         
@@ -115,6 +119,8 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                         self._ScheduleJobsForChangedAppearance( hash_id )
                         
                     
+                    possibly_new_auto_resolution_hash_ids.add( hash_id )
+                    
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_OTHER_HASHES:
                     
                     ( md5, sha1, sha512 ) = additional_data
@@ -133,8 +139,9 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                         
                         self._ScheduleJobsForChangedAppearance( hash_id )
                         
-                    
-                    new_file_info_managers_info.add( ( hash_id, hash ) )
+                        new_file_info_managers_info.add( ( hash_id, hash ) )
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_EXIF:
                     
@@ -148,8 +155,9 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                         
                         self._ScheduleJobsForPossiblyChangedRotation( hash_id )
                         
-                    
-                    new_file_info_managers_info.add( ( hash_id, hash ) )
+                        new_file_info_managers_info.add( ( hash_id, hash ) )
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_HUMAN_READABLE_EMBEDDED_METADATA:
                     
@@ -161,8 +169,9 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                         
                         self.modules_files_metadata_basic.SetHasHumanReadableEmbeddedMetadata( hash_id, has_human_readable_embedded_metadata )
                         
-                    
-                    new_file_info_managers_info.add( ( hash_id, hash ) )
+                        new_file_info_managers_info.add( ( hash_id, hash ) )
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_ICC_PROFILE:
                     
@@ -176,8 +185,9 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                         
                         self._ScheduleJobsForChangedAppearance( hash_id )
                         
-                    
-                    new_file_info_managers_info.add( ( hash_id, hash ) )
+                        new_file_info_managers_info.add( ( hash_id, hash ) )
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_PIXEL_HASH:
                     
@@ -185,9 +195,13 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                     
                     pixel_hash_id = self.modules_hashes.GetHashId( pixel_hash )
                     
-                    self.modules_similar_files.SetPixelHash( hash_id, pixel_hash_id )
+                    it_changed = self.modules_similar_files.SetPixelHash( hash_id, pixel_hash_id )
                     
-                    new_file_info_managers_info.add( ( hash_id, hash ) )
+                    if it_changed:
+                        
+                        new_file_info_managers_info.add( ( hash_id, hash ) )
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_MODIFIED_TIMESTAMP:
                     
@@ -196,12 +210,18 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                     self.modules_files_timestamps.SetTime( [ hash_id ], ClientTime.TimestampData.STATICFileModifiedTime( file_modified_timestamp_ms ) )
                     
                     new_modified_timestamps_info.add( ( hash_id, hash ) )
+                    possibly_new_auto_resolution_hash_ids.add( hash_id )
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_SIMILAR_FILES_METADATA:
                     
                     perceptual_hashes = additional_data
                     
-                    self.modules_similar_files.SetPerceptualHashes( hash_id, perceptual_hashes )
+                    changes_made = self.modules_similar_files.SetPerceptualHashes( hash_id, perceptual_hashes )
+                    
+                    if changes_made:
+                        
+                        possibly_new_auto_resolution_hash_ids.add( hash_id )
+                        
                     
                 elif job_type == ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_CHECK_SIMILAR_FILES_MEMBERSHIP:
                     
@@ -213,6 +233,8 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
                             
                             self.modules_files_maintenance_queue.AddJobs( ( hash_id, ), ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_SIMILAR_FILES_METADATA )
                             self.modules_files_maintenance_queue.AddJobs( ( hash_id, ), ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_PIXEL_HASH )
+                            
+                            possibly_new_auto_resolution_hash_ids.add( hash_id )
                             
                         
                     else:
@@ -257,7 +279,12 @@ class ClientDBFilesMaintenance( ClientDBModule.ClientDBModule ):
             
             job_types_to_delete.extend( ClientFilesMaintenance.regen_file_enum_to_overruled_jobs[ job_type ] )
             
-            self._ExecuteMany( 'DELETE FROM file_maintenance_jobs WHERE hash_id = ? AND job_type = ?;', ( ( hash_id, job_type_to_delete ) for job_type_to_delete in job_types_to_delete ) )
+            self.modules_files_maintenance_queue.ClearJobs( hash_id, job_types_to_delete )
+            
+        
+        for hash_id in possibly_new_auto_resolution_hash_ids:
+            
+            self.modules_files_duplicates_auto_resolution_storage.ResetFileSearchProgress( hash_id )
             
         
         if len( new_file_info_managers_info ) > 0:

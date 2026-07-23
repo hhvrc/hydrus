@@ -221,7 +221,8 @@ class ClientDBTagSiblings( ClientDBModule.ClientDBModule ):
             
         else:
             
-            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_sibling_lookup_table_name} WHERE bad_tag_id = ? OR ideal_tag_id = ?;', ( ( tag_id, tag_id ) for tag_id in tag_ids ) )
+            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_sibling_lookup_table_name} WHERE bad_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids ) )
+            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_sibling_lookup_table_name} WHERE ideal_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids ) )
             
         
         if service_id in self._service_ids_to_display_application_status:
@@ -260,7 +261,8 @@ class ClientDBTagSiblings( ClientDBModule.ClientDBModule ):
         self.modules_db_maintenance.DeferredDropTable( cache_actual_tag_siblings_lookup_table_name )
         self.modules_db_maintenance.DeferredDropTable( cache_ideal_tag_siblings_lookup_table_name )
         
-        self._Execute( 'DELETE FROM tag_sibling_application WHERE master_service_id = ? OR application_service_id = ?;', ( tag_service_id, tag_service_id ) )
+        self._Execute( 'DELETE FROM tag_sibling_application WHERE master_service_id = ?;', ( tag_service_id, ) )
+        self._Execute( 'DELETE FROM tag_sibling_application WHERE application_service_id = ?;', ( tag_service_id, ) )
         
         self._service_ids_to_applicable_service_ids = None
         self._service_ids_to_interested_service_ids = None
@@ -1059,7 +1061,8 @@ class ClientDBTagSiblings( ClientDBModule.ClientDBModule ):
                 stuff_deleted = set()
                 
             
-            self._ExecuteMany( 'DELETE FROM {} WHERE bad_tag_id = ? OR ideal_tag_id = ?;'.format( cache_tag_siblings_lookup_table_name ), ( ( tag_id, tag_id ) for tag_id in tag_ids_to_clear_and_regen ) )
+            self._ExecuteMany( f'DELETE FROM {cache_tag_siblings_lookup_table_name} WHERE bad_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids_to_clear_and_regen ) )
+            self._ExecuteMany( f'DELETE FROM {cache_tag_siblings_lookup_table_name} WHERE ideal_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids_to_clear_and_regen ) )
             
             applicable_tag_service_ids = self.GetApplicableServiceIds( tag_service_id )
             

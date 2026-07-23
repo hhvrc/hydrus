@@ -616,6 +616,8 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
         
         with self._MakeTemporaryIntegerTable( pairs_to_sync_to, ( 'smaller_media_id', 'larger_media_id' ) ) as temp_media_ids_table_name:
             
+            self._AnalyzeTempTable( temp_media_ids_table_name )
+            
             if pairs_stored_in_duplicates_proper is None:
                 
                 table_join = f'{temp_media_ids_table_name} CROSS JOIN {master_potential_duplicate_pairs_table_name} USING ( smaller_media_id, larger_media_id )'
@@ -624,6 +626,8 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
                 
             
             for ( rule_id, resolution_rule ) in self._rule_ids_to_rules.items():
+                
+                pairs_i_should_have = set( self.modules_files_duplicates_storage.FilterMediaIdPairs( resolution_rule.GetLocationContext(), pairs_stored_in_duplicates_proper ) )
                 
                 statuses_to_table_names = GenerateAutoResolutionQueueTableNames( rule_id )
                 
@@ -638,7 +642,7 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
                 
                 all_my_pairs = HydrusLists.MassUnion( statuses_to_pairs_i_have.values() )
                 
-                pairs_we_should_add = pairs_stored_in_duplicates_proper.difference( all_my_pairs )
+                pairs_we_should_add = pairs_i_should_have.difference( all_my_pairs )
                 
                 if len( pairs_we_should_add ) > 0:
                     
@@ -661,7 +665,7 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
                 
                 for ( status, pairs_i_have ) in statuses_to_pairs_i_have.items():
                     
-                    pairs_we_should_remove = pairs_i_have.difference( pairs_stored_in_duplicates_proper )
+                    pairs_we_should_remove = pairs_i_have.difference( pairs_i_should_have )
                     
                     if len( pairs_we_should_remove ) > 0:
                         
@@ -935,9 +939,13 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
             
             for ( status, table_name ) in statuses_to_table_names.items():
                 
-                self._Execute( f'DELETE FROM {table_name} WHERE smaller_media_id = ? OR larger_media_id = ?;', ( media_id, media_id ) )
+                self._Execute( f'DELETE FROM {table_name} WHERE smaller_media_id = ?;', ( media_id, ) )
                 
                 num_deleted = self._GetRowCount()
+                
+                self._Execute( f'DELETE FROM {table_name} WHERE larger_media_id = ?;', ( media_id, ) )
+                
+                num_deleted += self._GetRowCount()
                 
                 if num_deleted > 0:
                     
@@ -952,6 +960,40 @@ class ClientDBFilesDuplicatesAutoResolutionStorage( ClientDBModule.ClientDBModul
             
             self._cursor_transaction_wrapper.pub_after_job( 'duplicates_auto_resolution_rules_properties_have_changed' )
             
+        
+    
+    def ResetFileSearchProgress( self, hash_id ):
+        
+        media_id = self.modules_files_duplicates_storage.GetMediaId( hash_id, do_not_create = True )
+        
+        if media_id is None:
+            
+            return
+            
+        
+        for ( rule_id, rule ) in self._rule_ids_to_rules.items():
+            
+            statuses_to_table_names = GenerateAutoResolutionQueueTableNames( rule_id )
+            
+            for status in [
+                ClientDuplicatesAutoResolution.DUPLICATE_STATUS_DOES_NOT_MATCH_SEARCH,
+                ClientDuplicatesAutoResolution.DUPLICATE_STATUS_MATCHES_SEARCH_BUT_NOT_TESTED,
+                ClientDuplicatesAutoResolution.DUPLICATE_STATUS_MATCHES_SEARCH_FAILED_TEST,
+                ClientDuplicatesAutoResolution.DUPLICATE_STATUS_MATCHES_SEARCH_PASSED_TEST_READY_TO_ACTION
+            ]:
+                
+                table_name = statuses_to_table_names[ status ]
+                
+                pairs = self._Execute( f'SELECT smaller_media_id, larger_media_id FROM {table_name} WHERE smaller_media_id = ? OR larger_media_id = ?;', ( media_id, media_id ) ).fetchall()
+                
+                if len( pairs ) > 0:
+                    
+                    self.SetPairsToSimpleQueue( rule, pairs, ClientDuplicatesAutoResolution.DUPLICATE_STATUS_NOT_SEARCHED )
+                    
+                
+            
+        
+        self._cursor_transaction_wrapper.pub_after_job( 'duplicates_auto_resolution_rules_properties_have_changed' )
         
     
     def ResetRuleDenied( self, rule: ClientDuplicatesAutoResolution.DuplicatesAutoResolutionRule ):

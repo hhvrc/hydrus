@@ -133,7 +133,9 @@ try:
     
     if result.temp_dir is not None:
         
-        HydrusTemp.SetEnvTempDir( result.temp_dir )
+        temp_dir = HydrusPaths.FigureOutTempDir( result.temp_dir )
+        
+        HydrusTemp.SetEnvTempDir( temp_dir )
         
     
 except Exception as e:

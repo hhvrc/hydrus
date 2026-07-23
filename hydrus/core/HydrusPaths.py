@@ -693,11 +693,29 @@ def FigureOutDBDir( arg_db_dir: str ):
             
         else:
             
-            raise Exception( f'The chosen db path "{db_dir}" is not writeable-to!' )
+            raise Exception( f'The chosen db dir path "{arg_db_dir}", which resolved to "{db_dir}", did not appear to be writeable-to!' )
             
         
     
     return db_dir
+    
+
+def FigureOutTempDir( temp_dir: str ) -> str:
+    
+    original_temp_dir = temp_dir
+    
+    temp_dir = os.path.expanduser( temp_dir )
+    
+    temp_dir = ConvertPortablePathToAbsPath( temp_dir, base_dir_override = HC.BASE_DIR )
+    
+    if DirectoryIsWriteable( temp_dir ):
+        
+        return str( temp_dir )
+        
+    else:
+        
+        raise Exception( f'The chosen temp dir path "{original_temp_dir}", which resolved to "{temp_dir}", did not appear to be writeable-to!' )
+        
     
 
 def FileisWriteable( path: str ):
@@ -1170,6 +1188,24 @@ def safe_copystat( source_path, dest_path ):
         
     
 
+def permission_recovering_shutil_move( source, dest ):
+    
+    try:
+        
+        shutil.move( source, dest, copy_function = safe_copy2 )
+        
+    except PermissionError as e:
+        
+        # sometimes a file ends up in storage with read-only bits. we do a 'move files now' and it breaks something
+        # sometimes we can simply update the bits and things are fine, so let's try that now
+        HydrusData.Print( f'While trying to move "{source}" to "{dest}", we had a permission issue. Trying to set nicer permission bits now.' )
+        
+        TryToGiveFileNicePermissionBits( source )
+        
+        shutil.move( source, dest, copy_function = safe_copy2 )
+        
+    
+
 def MergeFile( source, dest ) -> bool:
     """
     Moves a file unless it already exists with same size and modified date, in which case it simply deletes the source.
@@ -1244,7 +1280,7 @@ def MergeFile( source, dest ) -> bool:
         
     
     # this overwrites on conflict without hassle
-    retry_blocking_io_call( shutil.move, source, dest, copy_function = safe_copy2 )
+    retry_blocking_io_call( permission_recovering_shutil_move, source, dest )
     
     return True
     
@@ -1362,7 +1398,7 @@ def MergeTree( source: str, dest: str, text_update_hook = None ):
         
         try:
             
-            retry_blocking_io_call( shutil.move, source, dest, copy_function = safe_copy2 )
+            retry_blocking_io_call( permission_recovering_shutil_move, source, dest )
             
         except OSError:
             
@@ -1906,7 +1942,7 @@ def TryToGiveFileNicePermissionBits( path ):
         
     except Exception as e:
         
-        HydrusData.Print( 'Wanted to add read and write permission to "{}", but had an error: {}'.format( path, str( e ) ) )
+        HydrusData.Print( f'Wanted to add read and write permission to "{path}", but had an error: {e}' )
         
     
 

@@ -167,6 +167,10 @@ class ClientDBFilesDuplicatesStorage( ClientDBModule.ClientDBModule ):
             ( [ 'larger_media_id', 'smaller_media_id' ], True, 469 )
         ]
         
+        index_generation_dict[ 'main.confirmed_alternate_pairs' ] = [
+            ( [ 'larger_media_id', 'smaller_media_id' ], True, 679 )
+        ]
+        
         return index_generation_dict
         
     

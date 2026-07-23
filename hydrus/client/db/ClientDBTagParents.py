@@ -208,7 +208,8 @@ class ClientDBTagParents( ClientDBModule.ClientDBModule ):
             
         else:
             
-            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_parents_lookup_table_name} WHERE child_tag_id = ? OR ancestor_tag_id = ?;', ( ( tag_id, tag_id ) for tag_id in tag_ids ) )
+            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_parents_lookup_table_name} WHERE child_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids ) )
+            self._ExecuteMany( f'DELETE FROM {cache_actual_tag_parents_lookup_table_name} WHERE ancestor_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids ) )
             
         
         if service_id in self._service_ids_to_display_application_status:
@@ -247,7 +248,8 @@ class ClientDBTagParents( ClientDBModule.ClientDBModule ):
         self.modules_db_maintenance.DeferredDropTable( cache_actual_tag_parents_lookup_table_name )
         self.modules_db_maintenance.DeferredDropTable( cache_ideal_tag_parents_lookup_table_name )
         
-        self._Execute( 'DELETE FROM tag_parent_application WHERE master_service_id = ? OR application_service_id = ?;', ( tag_service_id, tag_service_id ) )
+        self._Execute( 'DELETE FROM tag_parent_application WHERE master_service_id = ?;', ( tag_service_id, ) )
+        self._Execute( 'DELETE FROM tag_parent_application WHERE application_service_id = ?;', ( tag_service_id, ) )
         
         self._service_ids_to_applicable_service_ids = None
         self._service_ids_to_interested_service_ids = None
@@ -935,7 +937,8 @@ class ClientDBTagParents( ClientDBModule.ClientDBModule ):
                 stuff_deleted = set()
                 
             
-            self._ExecuteMany( 'DELETE FROM {} WHERE child_tag_id = ? OR ancestor_tag_id = ?;'.format( cache_tag_parents_lookup_table_name ), ( ( tag_id, tag_id ) for tag_id in tag_ids_to_clear_and_regen ) )
+            self._ExecuteMany( f'DELETE FROM {cache_tag_parents_lookup_table_name} WHERE child_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids_to_clear_and_regen ) )
+            self._ExecuteMany( f'DELETE FROM {cache_tag_parents_lookup_table_name} WHERE ancestor_tag_id = ?;', ( ( tag_id, ) for tag_id in tag_ids_to_clear_and_regen ) )
             
             # we wipe them
             

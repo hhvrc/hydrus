@@ -112,13 +112,28 @@ class App( QW.QApplication ):
         
         if HC.PLATFORM_LINUX:
             
-            # if this guy prints a Qt warning to log like this:
-            # Failed to register with host portal QDBusError("org.freedesktop.portal.Error.Failed", "Could not register app ID: Connection already associated with an application ID")
-            # that's fine; it just means 'hey there was no .desktop file in your like ~/.local/share/applications that actually agreed with this, so idk about icons and so on bro'
-            # maybe there's a better way of handling this, but I don't want to scan the users applications folder tbh
-            # maybe we just suppress the warning
-            self.setDesktopFileName( 'io.github.hydrusnetwork.hydrus' )
+            desktop_name = 'io.github.hydrusnetwork.hydrus'
             
+            try:
+                
+                desktop_file_path_or_empty_string = QC.QStandardPaths.locate( QC.QStandardPaths.StandardLocation.ApplicationsLocation, desktop_name + '.desktop' )
+                
+                if desktop_file_path_or_empty_string is not None and desktop_file_path_or_empty_string != '':
+                    
+                    # if this guy prints a Qt warning to log like this:
+                    # Failed to register with host portal QDBusError("org.freedesktop.portal.Error.Failed", "Could not register app ID: Connection already associated with an application ID")
+                    # that's fine; it just means 'hey there was no .desktop file in your like ~/.local/share/applications that actually agreed with this, so idk about icons and so on bro'
+                    # maybe there's a better way of handling this, but I don't want to scan the users applications folder tbh
+                    # maybe we just suppress the warning
+                    self.setDesktopFileName( desktop_name )
+                    
+                
+            except Exception as e:
+                
+                HydrusData.Print( f'Hey, while trying to determine if you have {desktop_name}.desktop file in your Applications dir, I ran into an error, which follows. This is not a huge deal, but hydev would like to see it.' )
+                
+                HydrusData.PrintException( e )
+                
         
         self.setApplicationVersion( str( HC.SOFTWARE_VERSION ) )
         
@@ -1235,6 +1250,10 @@ class Controller( HydrusController.HydrusController ):
     
     def ReinitGlobalSettings( self ):
         
+        from hydrus.core.files import HydrusFileHandling
+        
+        HydrusFileHandling.ALLOW_COMIC_BOOK_ARCHIVE_INSPECTION = self.new_options.GetBoolean( 'allow_comic_book_archive_detection' )
+        
         from hydrus.core.files.images import HydrusImageHandling
         from hydrus.core.files.images import HydrusImageNormalisation
         from hydrus.core.files.images import HydrusImageColours
@@ -1264,6 +1283,10 @@ class Controller( HydrusController.HydrusController ):
         HydrusFFMPEG.HYDRUS_BIN_FFMPEG_EXISTS = False
         HydrusFFMPEG.PREFER_SYSTEM_FFMPEG = self.new_options.GetBoolean( 'use_system_ffmpeg' )
         HydrusFFMPEG.FFMPEG_SUBPROCESS_TIMEOUT = self.new_options.GetInteger( 'ffmpeg_subprocess_timeout' )
+        
+        from hydrus.client.gui import ClientGUIText
+        
+        ClientGUIText.engage_locale_hook( self.new_options.GetBoolean( 'use_qt_locale_for_human_int' ) )
         
     
     def InitModel( self ):

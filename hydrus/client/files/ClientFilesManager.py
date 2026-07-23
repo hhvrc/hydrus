@@ -102,6 +102,8 @@ class ClientFilesManager( object ):
             raise Exception( message ) from e
             
         
+        HydrusPaths.TryToGiveFileNicePermissionBits( dest_path )
+        
     
     def _AddThumbnailFromBytes( self, hash, thumbnail_bytes, silent = False ):
         
@@ -933,12 +935,17 @@ class ClientFilesManager( object ):
             HydrusData.ShowText( 'Adding file from string: ' + str( ( len( file_bytes ), dest_path ) ) )
             
         
-        HydrusPaths.TryToGiveFileNicePermissionBits( dest_path )
+        if os.path.exists( dest_path ):
+            
+            HydrusPaths.TryToGiveFileNicePermissionBits( dest_path )
+            
         
         with open( dest_path, 'wb' ) as f:
             
             f.write( file_bytes )
             
+        
+        HydrusPaths.TryToGiveFileNicePermissionBits( dest_path )
         
     
     def AddFile( self, hash, mime, source_path, thumbnail_bytes = None ):

@@ -2,6 +2,7 @@ from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 from qtpy import QtGui as QG
 
+from hydrus.client.gui.pages import ClientGUIPagesTreeModel
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusTime
 
@@ -657,6 +658,7 @@ class TabWidgetWithDnD( QW.QTabWidget ):
         
     
 
+# TODO: THIS WHOLE THING IS A MESS OF FIVE DIFFERENT REWRITES, it needs a good look and cleanup and perhaps pulling into different pieces
 # Base tree view that uses a PagesNotebookTreeModel( QC.QAbstractItemModel ) to allow more control over pages/notebooks
 class TreeViewWithDnD( QW.QTreeView ):
     
@@ -696,7 +698,12 @@ class TreeViewWithDnD( QW.QTreeView ):
         self.doubleClicked.connect( self._OnTreeActivated )
         
     
-    def setModel( self, model ):
+    def model( self ) -> ClientGUIPagesTreeModel.PagesNotebookTreeModel:
+        
+        return super().model()
+        
+    
+    def setModel( self, model: ClientGUIPagesTreeModel.PagesNotebookTreeModel ):
         
         old_model = self.model()
         
@@ -718,139 +725,6 @@ class TreeViewWithDnD( QW.QTreeView ):
             
             model.modelReset.connect( self._ModelResetReapplyFilter )
             
-        
-    
-    def _ShouldAnimateCurrentNode( self ) -> bool:
-        
-        return CG.client_controller.new_options.GetBoolean( 'treeview_animate_current_node' )
-        
-    
-    def _ShowContextMenu( self, point ):
-        
-        index = self.indexAt( point )
-        
-        if not index.isValid():
-            
-            return
-            
-        
-        model = self.model()
-        
-        kind = model.GetKindFromIndex( index )
-        
-        if kind not in ( 'page', 'notebook' ):
-            
-            return
-            
-        
-        page_key = model.GetPageKeyFromIndex( index )
-        notebook = model.GetParentNotebookFromIndex( index )
-        
-        menu = QW.QMenu( self )
-        
-        menu.addAction( 'activate', lambda: self._ActivatePage( page_key ) )
-        menu.addAction( 'rename', lambda: self._RenamePage( notebook, index ) )
-        menu.addAction( 'duplicate', lambda: self._DuplicatePage( notebook, index ) )
-        
-        menu.addSeparator()
-        
-        if kind == 'notebook':
-            
-            num_pages = f' ({notebook.GetNumPagesHeld( only_my_level = False )}p)'
-            menu.addAction( 'refresh all child pages', lambda: self._RefreshAllPages( notebook ) )
-            
-        elif kind == 'page':
-            
-            num_pages = ''
-            menu.addAction( 'refresh this page', lambda: self._RefreshPage( notebook, page_key ) )
-            
-        
-        menu.addSeparator()
-        
-        menu.addAction( 'new page here', lambda: self._CreateNewPage( notebook, index ) )
-        menu.addAction( f'close{num_pages}', lambda: self._ClosePage( notebook, index ) )
-        
-        menu.exec_( self.viewport().mapToGlobal( point ) )
-        
-    
-    def _ActivatePage( self, page_key ):
-        
-        CG.client_controller.gui.ShowPage( page_key )
-        
-    
-    def _RenamePage( self, notebook, index ):
-        
-        notebook.RenamePage( index.row() )
-        
-    
-    def _DuplicatePage( self, notebook, index ):
-        
-        notebook.DuplicatePage( index.row() )
-        
-    
-    def _RefreshAllPages( self, notebook ):
-        
-        notebook.RefreshAllPages()
-        
-    
-    def _RefreshPage( self, notebook, page_key ):
-        
-        page = notebook.GetPageFromPageKey( page_key )
-        
-        if page is not None:
-            
-            page.RefreshQuery()
-            
-        
-    
-    def _CreateNewPage( self, notebook, index ):
-        
-        notebook.ChooseNewPage( index.row() )
-        
-    
-    def _ClosePage( self, notebook, index):
-        
-        notebook.ClosePage( index.row() )
-        
-    
-    def _ExpandAncestors( self, index: QC.QModelIndex ):
-        
-        parents = []
-        parent = index.parent()
-        
-        while parent.isValid():
-            
-            parents.append( parent )
-            parent = parent.parent()
-            
-        
-        for parent in reversed( parents ):
-            
-            self.expand( parent )
-            
-        
-    
-    def _SetCurrentIndex( self, index: QC.QModelIndex, scroll = True ):
-        
-        if not index.isValid():
-            
-            return
-            
-        
-        self._ExpandAncestors( index )
-        self.setCurrentIndex( index )
-        
-        selection_model = self.selectionModel()
-        
-        if selection_model is not None:
-            
-            selection_model.select(
-                index,
-                QC.QItemSelectionModel.SelectionFlag.ClearAndSelect |
-                QC.QItemSelectionModel.SelectionFlag.Rows
-            )
-            
-        self._EmitCurrentIndexText( index )
         
     
     def _EmitCurrentIndexText( self, index: QC.QModelIndex ):
@@ -878,28 +752,50 @@ class TreeViewWithDnD( QW.QTreeView ):
         self.currentPageNameChanged.emit( page_name, tooltip )
         
     
-    def _SelectIndex( self, index: QC.QModelIndex, scroll = True, pulse = False ):
+    def _ActivatePage( self, page_key ):
         
-        if not index.isValid():
-            
-            return
-            
-        
-        self._ExpandAncestors( index )
-        self._SetCurrentIndex( index )
-        
-        if scroll:
-            
-            self.scrollTo( index, QW.QAbstractItemView.ScrollHint.PositionAtCenter )
-            
-        
-        if pulse and 1==2:
-            
-            self._PulseCurrentSelection()
-            
+        CG.client_controller.gui.ShowPage( page_key )
         
     
-    def _EmitCurrentPageText( self, index: QC.QModelIndex ):
+    def _ApplyFilterToParent( self, parent: QC.QModelIndex ) -> bool:
+        
+        model = self.model()
+        
+        if model is None:
+            
+            return False
+            
+        
+        any_visible = False
+        
+        for row in range( model.rowCount( parent ) ):
+            
+            index = model.index( row, 0, parent )
+            
+            if not index.isValid():
+                
+                continue
+                
+            
+            child_visible = self._ApplyFilterToParent( index )
+            
+            text = model.data( index, QC.Qt.ItemDataRole.DisplayRole )
+            text_matches = self._filter_text == '' or self._filter_text in str( text or '' ).casefold()
+            
+            visible = text_matches or child_visible
+            
+            self.setRowHidden( row, parent, not visible )
+            
+            if visible:
+                
+                any_visible = True
+                
+            
+        
+        return any_visible
+        
+    
+    def _CollapseAllChildren( self, parent: QC.QModelIndex ):
         
         model = self.model()
         
@@ -908,93 +804,18 @@ class TreeViewWithDnD( QW.QTreeView ):
             return
             
         
-        full_name = ''
-        page_name = ''
-        tooltip = ''
-        
-        if hasattr( model, 'GetFullNameFromIndex' ):
+        for row in range( model.rowCount( parent ) ):
             
-            full_name = model.GetFullNameFromIndex( index )
+            child = model.index( row, 0, parent )
             
-        
-        if hasattr( model, 'GetPageNameAndTooltipFromIndex' ):
+            if not child.isValid():
+                
+                continue
+                
             
-            page_name, tooltip = model.GetPageNameAndTooltipFromIndex( index )
+            self._CollapseAllChildren( child )
+            self.collapse( child )
             
-        else:
-            
-            page_name = full_name
-            tooltip = full_name
-            
-        
-        self.currentPagePathChanged.emit( full_name )
-        self.currentPageNameChanged.emit( page_name, tooltip )
-        
-    
-    def _OnTreeActivated( self, index: QC.QModelIndex ):
-        
-        model = self.model()
-        
-        if model is None:
-            
-            return
-            
-        
-        page_key = model.GetPageKeyFromIndex( index )
-        
-        if page_key is not None:
-            
-            CG.client_controller.gui.ShowPage( page_key )
-            
-        
-    
-    def SelectLeafFromNotebookPage( self, notebook, tab_index ):
-        
-        model = self.model()
-        
-        if model is None:
-            
-            return
-            
-        
-        parent_index = model._FindNotebookIndex( notebook )
-        index = model.index( tab_index, 0, parent_index )
-        
-        if index.isValid():
-            
-            self._SetCurrentIndex( index )
-            
-        
-    
-    def RevealCurrentSelection( self, pulse = False ):
-        
-        current_page_index = self.model().FindIndexForPageKey( CG.client_controller.gui.GetCurrentPage().GetPageKey() )
-        
-        if current_page_index.isValid():
-            
-            self._SelectIndex( current_page_index, scroll = True, pulse = pulse )
-            
-        
-    
-    def _PulseCurrentSelection( self ):
-        
-        if not self._ShouldAnimateCurrentNode():
-            
-            return
-            
-        
-        model = self.model()
-        index = self.currentIndex()
-        
-        if model is None or not index.isValid() or not hasattr( model, 'GetNodeKeyFromIndex' ):
-            
-            return
-            
-        
-        self._pulse_node_key = model.GetNodeKeyFromIndex( index )
-        self._pulse_step = 0
-        
-        self._DoPulseCurrentSelection()
         
     
     def _DoPulseCurrentSelection( self ):
@@ -1053,15 +874,22 @@ class TreeViewWithDnD( QW.QTreeView ):
             
         
     
-    def _OnTreeCollapsed( self, index: QC.QModelIndex ):
+    def _DuplicatePage( self, notebook, index ):
         
-        if CG.client_controller.new_options.GetBoolean( 'treeview_collapse_all_children_upon_parent_closed' ):
-            
-            self._CollapseAllChildren( index )
-            
+        notebook.DuplicatePage( index.row() )
         
     
-    def _CollapseAllChildren( self, parent: QC.QModelIndex ):
+    def _CreateNewPage( self, notebook, index ):
+        
+        notebook.ChooseNewPage( index.row() )
+        
+    
+    def _ClosePage( self, notebook, index):
+        
+        notebook.ClosePage( index.row() )
+        
+    
+    def _EmitCurrentPageText( self, index: QC.QModelIndex ):
         
         model = self.model()
         
@@ -1070,17 +898,242 @@ class TreeViewWithDnD( QW.QTreeView ):
             return
             
         
-        for row in range( model.rowCount( parent ) ):
+        full_name = ''
+        page_name = ''
+        tooltip = ''
+        
+        if hasattr( model, 'GetFullNameFromIndex' ):
             
-            child = model.index( row, 0, parent )
+            full_name = model.GetFullNameFromIndex( index )
             
-            if not child.isValid():
-                
-                continue
-                
+        
+        if hasattr( model, 'GetPageNameAndTooltipFromIndex' ):
             
-            self._CollapseAllChildren( child )
-            self.collapse( child )
+            page_name, tooltip = model.GetPageNameAndTooltipFromIndex( index )
+            
+        else:
+            
+            page_name = full_name
+            tooltip = full_name
+            
+        
+        self.currentPagePathChanged.emit( full_name )
+        self.currentPageNameChanged.emit( page_name, tooltip )
+        
+    
+    def _ExpandAncestors( self, index: QC.QModelIndex ):
+        
+        parents = []
+        parent = index.parent()
+        
+        while parent.isValid():
+            
+            parents.append( parent )
+            parent = parent.parent()
+            
+        
+        for parent in reversed( parents ):
+            
+            self.expand( parent )
+            
+        
+    
+    def _ModelResetReapplyFilter( self ):
+        
+        QC.QTimer.singleShot( 0, self.ReapplyFilter )
+        
+    
+    def _OnTreeActivated( self, index: QC.QModelIndex ):
+        
+        model = self.model()
+        
+        if model is None:
+            
+            return
+            
+        
+        page_key = model.GetPageKeyFromIndex( index )
+        
+        if page_key is not None:
+            
+            CG.client_controller.gui.ShowPage( page_key )
+            
+        
+    
+    def _OnTreeCollapsed( self, index: QC.QModelIndex ):
+        
+        if CG.client_controller.new_options.GetBoolean( 'treeview_collapse_all_children_upon_parent_closed' ):
+            
+            self._CollapseAllChildren( index )
+            
+        
+    
+    def _PulseCurrentSelection( self ):
+        
+        if not self._ShouldAnimateCurrentNode():
+            
+            return
+            
+        
+        model = self.model()
+        index = self.currentIndex()
+        
+        if model is None or not index.isValid() or not hasattr( model, 'GetNodeKeyFromIndex' ):
+            
+            return
+            
+        
+        self._pulse_node_key = model.GetNodeKeyFromIndex( index )
+        self._pulse_step = 0
+        
+        self._DoPulseCurrentSelection()
+        
+    
+    def _RefreshAllPages( self, notebook ):
+        
+        notebook.RefreshAllPages()
+        
+    
+    def _RefreshPage( self, notebook, page_key ):
+        
+        page = notebook.GetPageFromPageKey( page_key )
+        
+        if page is not None:
+            
+            page.RefreshQuery()
+            
+        
+    
+    def _RenamePage( self, notebook, index ):
+        
+        notebook.RenamePage( index.row() )
+        
+    
+    def _SetCurrentIndex( self, index: QC.QModelIndex, scroll = True ):
+        
+        if not index.isValid():
+            
+            return
+            
+        
+        self._ExpandAncestors( index )
+        self.setCurrentIndex( index )
+        
+        selection_model = self.selectionModel()
+        
+        if selection_model is not None:
+            
+            selection_model.select(
+                index,
+                QC.QItemSelectionModel.SelectionFlag.ClearAndSelect |
+                QC.QItemSelectionModel.SelectionFlag.Rows
+            )
+            
+        
+        self._EmitCurrentIndexText( index )
+        
+    
+    def _SelectIndex( self, index: QC.QModelIndex, scroll = True, pulse = False ):
+        
+        if not index.isValid():
+            
+            return
+            
+        
+        self._ExpandAncestors( index )
+        self._SetCurrentIndex( index )
+        
+        if scroll:
+            
+            self.scrollTo( index, QW.QAbstractItemView.ScrollHint.PositionAtCenter )
+            
+        
+        if pulse and 1==2:
+            
+            self._PulseCurrentSelection()
+            
+        
+    
+    def _ShouldAnimateCurrentNode( self ) -> bool:
+        
+        return CG.client_controller.new_options.GetBoolean( 'treeview_animate_current_node' )
+        
+    
+    def _ShowContextMenu( self, point ):
+        
+        index = self.indexAt( point )
+        
+        if not index.isValid():
+            
+            return
+            
+        
+        model = self.model()
+        
+        kind = model.GetKindFromIndex( index )
+        
+        if kind not in ( 'page', 'notebook' ):
+            
+            return
+            
+        
+        page_key = model.GetPageKeyFromIndex( index )
+        notebook = model.GetParentNotebookFromIndex( index )
+        
+        # TODO: Convert this to a normal hydrus menu
+        
+        menu = QW.QMenu( self )
+        
+        menu.addAction( 'activate', lambda: self._ActivatePage( page_key ) )
+        menu.addAction( 'rename', lambda: self._RenamePage( notebook, index ) )
+        menu.addAction( 'duplicate', lambda: self._DuplicatePage( notebook, index ) )
+        
+        menu.addSeparator()
+        
+        if kind == 'notebook':
+            
+            num_pages = f' ({notebook.GetNumPagesHeld( only_my_level = False )}p)'
+            menu.addAction( 'refresh all child pages', lambda: self._RefreshAllPages( notebook ) )
+            
+        elif kind == 'page':
+            
+            num_pages = ''
+            menu.addAction( 'refresh this page', lambda: self._RefreshPage( notebook, page_key ) )
+            
+        
+        menu.addSeparator()
+        
+        menu.addAction( 'new page here', lambda: self._CreateNewPage( notebook, index ) )
+        menu.addAction( f'close{num_pages}', lambda: self._ClosePage( notebook, index ) )
+        
+        menu.exec_( self.viewport().mapToGlobal( point ) )
+        
+    
+    def SelectLeafFromNotebookPage( self, notebook, tab_index ):
+        
+        model = self.model()
+        
+        if model is None:
+            
+            return
+            
+        
+        parent_index = model._FindNotebookIndex( notebook )
+        index = model.index( tab_index, 0, parent_index )
+        
+        if index.isValid():
+            
+            self._SetCurrentIndex( index )
+            
+        
+    
+    def RevealCurrentSelection( self, pulse = False ):
+        
+        current_page_index = self.model().FindIndexForPageKey( CG.client_controller.gui.GetCurrentPage().GetPageKey() )
+        
+        if current_page_index.isValid():
+            
+            self._SelectIndex( current_page_index, scroll = True, pulse = pulse )
             
         
     
@@ -1216,50 +1269,304 @@ class TreeViewWithDnD( QW.QTreeView ):
         self._ApplyFilterToParent( QC.QModelIndex() )
         
     
-    def _ApplyFilterToParent( self, parent: QC.QModelIndex ) -> bool:
+
+# TODO: rename this stuff now it is decoupled. '_filter_expand_button' -> '_expand_button' and such
+class FilterPanel( QW.QWidget ):
+    
+    iWantToClose = QC.Signal()
+    clearFilter = QC.Signal()
+    setFilterText = QC.Signal( str )
+    expandVisibleFilterResults = QC.Signal()
+    
+    def __init__( self, parent: QW.QWidget ):
         
-        model = self.model()
+        super().__init__( parent, QC.Qt.WindowType.Tool | QC.Qt.WindowType.FramelessWindowHint )
+        self.setObjectName( 'HydrusTreeViewFilterPanel' )
+        self.hide()
         
-        if model is None:
-            
-            return False
-            
+        hbox = QW.QHBoxLayout( self )
+        hbox.setContentsMargins( 4, 4, 4, 4 )
+        hbox.setSpacing( 2 )
         
-        any_visible = False
+        self._filter_text = QW.QLineEdit( self )
+        self._filter_text.setPlaceholderText( 'filter pages' )
+        self._filter_text.textChanged.connect( self._FilterTextChanged )
         
-        for row in range( model.rowCount( parent ) ):
-            
-            index = model.index( row, 0, parent )
-            
-            if not index.isValid():
-                
-                continue
-                
-            
-            child_visible = self._ApplyFilterToParent( index )
-            
-            text = model.data( index, QC.Qt.ItemDataRole.DisplayRole )
-            text_matches = self._filter_text == '' or self._filter_text in str( text or '' ).casefold()
-            
-            visible = text_matches or child_visible
-            
-            self.setRowHidden( row, parent, not visible )
-            
-            if visible:
-                
-                any_visible = True
-                
-            
+        self._filter_expand_button = QW.QPushButton( '+', self )
+        self._filter_expand_button.setEnabled( False )
+        self._filter_expand_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand all currently visible matches' ) )
+        self._filter_expand_button.clicked.connect( self.expandVisibleFilterResults )
         
-        return any_visible
+        self._filter_clear_button = QW.QPushButton( 'X', self )
+        self._filter_clear_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Clear filter' ) )
+        self._filter_clear_button.clicked.connect( self._ClearFilter )
+        
+        hbox.addWidget( self._filter_text )
+        hbox.addWidget( self._filter_expand_button )
+        hbox.addWidget( self._filter_clear_button )
         
     
-    def _ModelResetReapplyFilter( self ):
+    def _ClearFilter( self ):
         
-        QC.QTimer.singleShot( 0, self.ReapplyFilter )
+        self._filter_text.clear()
+        
+        self.clearFilter.emit()
+        
+        self.iWantToClose.emit()
+        
+    
+    def _FilterTextChanged( self, text: str ):
+        
+        self._filter_expand_button.setEnabled( len( text ) >= 2 )
+        
+        self.setFilterText.emit( text )
+        
+    
+    def HasText( self ):
+        
+        return self._filter_text.text() != ''
+        
+    
+    def TakeFocus( self ):
+        
+        self._filter_text.setFocus( QC.Qt.FocusReason.OtherFocusReason )
         
     
 
+# TODO: rename this stuff now it is decoupled. 'history_title' -> 'title' and such
+class HistoryPanel( QW.QWidget ):
+    
+    iWantToClose = QC.Signal()
+    iNeedAReposition = QC.Signal()
+    
+    def __init__( self, parent: QW.QWidget, model: ClientGUIPagesTreeModel.PagesNotebookTreeModel ):
+        
+        super().__init__( parent, QC.Qt.WindowType.Tool | QC.Qt.WindowType.FramelessWindowHint )
+        self.setObjectName( 'HydrusTreeViewHistoryPanel' )
+        
+        self._model = model
+        
+        self.setMinimumWidth( 260 )
+        self.setMinimumHeight( 120 )
+        self.hide()
+        
+        vbox = QW.QVBoxLayout( self )
+        vbox.setContentsMargins( 4, 4, 4, 4 )
+        vbox.setSpacing( 2 )
+        
+        self._history_title = QW.QLabel( 'Tab History', self )
+        self._history_title.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
+        
+        self._history_scroll_area = QW.QScrollArea( self )
+        self._history_scroll_area.setWidgetResizable( True )
+        self._history_scroll_area.setVerticalScrollBarPolicy( QC.Qt.ScrollBarPolicy.ScrollBarAsNeeded )
+        
+        self._history_list = QW.QWidget( self._history_scroll_area )
+        self._history_list_layout = QW.QVBoxLayout( self._history_list )
+        self._history_list_layout.setContentsMargins( 0, 0, 0, 0 )
+        self._history_list_layout.setSpacing( 1 )
+        self._history_list_layout.addStretch( 1 )
+        
+        self._history_scroll_area.setWidget( self._history_list )
+        
+        self._history_button_bar = QW.QWidget( self )
+        bar = QW.QHBoxLayout( self._history_button_bar )
+        bar.setContentsMargins( 0, 0, 0, 0 )
+        bar.setSpacing( 2 )
+        
+        self._history_close = QW.QPushButton( 'X', self._history_button_bar )
+        self._history_close.setToolTip( ClientGUIFunctions.WrapToolTip( 'Close history' ) )
+        self._history_close.clicked.connect( self.iWantToClose )
+        
+        self._history_pin = QW.QPushButton( '', self._history_button_bar )
+        self._history_pin.setCheckable( True )
+        self._history_pin.setChecked( CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ) )
+        self._history_pin.setToolTip( ClientGUIFunctions.WrapToolTip( 'Keep history box open' ) )
+        self._history_pin.toggled.connect( self._HistoryPinChanged )
+        self._SetHistoryPinIcon()
+        
+        self._history_size_grip = QW.QSizeGrip( self )
+        bar.addWidget( self._history_close )
+        bar.addWidget( self._history_pin )
+        bar.addStretch( 1 )
+        bar.addWidget( self._history_size_grip )
+        
+        vbox.addWidget( self._history_title )
+        vbox.addWidget( self._history_scroll_area, 1 )
+        vbox.addWidget( self._history_button_bar )
+        
+    
+    def _ActivateHistoryPage( self, page_key ):
+        
+        CG.client_controller.gui.ShowPage( page_key )
+        
+        if not CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ):
+            
+            self.iWantToClose.emit()
+            
+        
+    
+    def _ClearHistoryList( self ):
+        
+        while self._history_list_layout.count() > 0:
+            
+            item = self._history_list_layout.takeAt( 0 )
+            
+            widget = item.widget()
+            
+            if widget is not None:
+                
+                widget.deleteLater()
+                
+            
+        
+    
+    def _CreateHistoryRow( self, history_index: int, page_key ):
+        
+        ( page_name, tooltip ) = self._model.GetPageNameAndTooltipFromPageKey( page_key )
+        
+        row = QW.QWidget( self._history_list )
+        hbox = QW.QHBoxLayout( row )
+        hbox.setContentsMargins( 0, 0, 0, 0 )
+        hbox.setSpacing( 2 )
+        
+        number = QW.QLabel( f'{history_index + 1}.', row )
+        number.setToolTip( tooltip )
+        
+        button = QW.QPushButton( page_name, row )
+        button.setToolTip( tooltip )
+        button.setFlat( True )
+        button.clicked.connect( lambda checked = False, page_key = page_key: self._ActivateHistoryPage( page_key ) )
+        
+        remove = QW.QPushButton( 'X', row )
+        remove.setToolTip( ClientGUIFunctions.WrapToolTip( 'Remove this page from history' ) )
+        remove.clicked.connect( lambda checked = False, page_key = page_key: self._RemoveHistoryPage( page_key ) )
+        
+        hbox.addWidget( number )
+        hbox.addWidget( button, 1 )
+        hbox.addWidget( remove )
+        
+        return row
+        
+    
+    def _HistoryPinChanged( self, value: bool ):
+        
+        CG.client_controller.new_options.SetBoolean( 'treeview_history_box_pinned', value )
+        
+        self._SetHistoryPinIcon()
+        
+    
+    def _RemoveHistoryPage( self, page_key ):
+        
+        CG.client_controller.gui.page_nav_history.RemovePageKey( page_key )
+        
+        self.Repopulate()
+        
+        self.iNeedAReposition.emit()
+        
+    
+    def _ResizeHistoryPanelToRows( self, num_rows: int ):
+        
+        num_rows = max( 1, num_rows )
+        visible_rows = min( 10, num_rows )
+        
+        row_height = 24
+        
+        for i in range( self._history_list_layout.count() ):
+            
+            item = self._history_list_layout.itemAt( i )
+            widget = item.widget()
+            
+            if widget is not None:
+                
+                row_height = max( row_height, widget.sizeHint().height() )
+                
+            
+        
+        margins = self.layout().contentsMargins()
+        spacing = self.layout().spacing()
+        
+        title_height = self._history_title.sizeHint().height()
+        bar_height = self._history_button_bar.sizeHint().height()
+        scroll_height = ( row_height * visible_rows ) + 8
+        
+        self._history_scroll_area.setMinimumHeight( scroll_height )
+        
+        target_height = (
+            margins.top() +
+            margins.bottom() +
+            title_height +
+            bar_height +
+            scroll_height +
+            ( spacing * 2 )
+        )
+        
+        self.resize( max( self.width(), 260 ), target_height )
+        
+        self.iNeedAReposition.emit()
+        
+    
+    def _SetHistoryPinIcon( self ):
+        
+        if self._history_pin.isChecked():
+            
+            self._history_pin.setIcon( CC.global_icons().lock )
+            
+        else:
+            
+            self._history_pin.setIcon( CC.global_icons().lock_open )
+            
+        
+    
+    def IsPinned( self ):
+        
+        return self._history_pin.isChecked()
+        
+    
+    def Repopulate( self ):
+        
+        self._ClearHistoryList()
+        
+        self._history_pin.setChecked( CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ) )
+        
+        history = CG.client_controller.gui.GetPagesHistory()
+        
+        if len( history ) == 0:
+            
+            label = QW.QLabel( 'no page history', self._history_list )
+            label.setWordWrap( True )
+            self._history_list_layout.addWidget( label )
+            self._history_list_layout.addStretch( 1 )
+            self._ResizeHistoryPanelToRows( 1 )
+            return
+            
+        
+        self._history_title.setText( f'Tab History ({len(history)} pages)' )
+        
+        row_count = 0
+        
+        for history_index, ( page_key, page_name ) in enumerate( reversed( history ) ):
+            
+            row = self._CreateHistoryRow( history_index, page_key )
+            
+            if row is not None:
+                
+                row_count += 1
+                self._history_list_layout.addWidget( row )
+                
+            
+        
+        self._history_list_layout.addStretch( 1 )
+        self._ResizeHistoryPanelToRows( row_count )
+        
+    
+
+# TODO: Although this guy adds some neat features, it ultimately increases the coupling problem
+# If we want a modular future, we want to drag the splitters out of the panels to a LayoutOverseer and all subcomponents need to be their own clear thing
+
+# TODO: when you go through an options cycle, this guy shrinks in width width, so some layout flag is missing maybe?
+
+# TODO: when this boots up, the focus seems to go to the first deepest item rather than the actual selected page. maybe an artifact of session load
 class TreeViewWithControls( QW.QWidget ):
     
     widgetAlignmentChanged = QC.Signal()
@@ -1267,7 +1574,7 @@ class TreeViewWithControls( QW.QWidget ):
     tabBarVisibilityChanged = QC.Signal()
     treeSidebarCollapsibilityChanged = QC.Signal()
     
-    def __init__( self, tree: QW.QTreeView, parent = None, on_toggle_alignment = None ):
+    def __init__( self, tree: TreeViewWithDnD, parent = None, on_toggle_alignment = None ):
         
         super().__init__( parent )
         
@@ -1278,9 +1585,6 @@ class TreeViewWithControls( QW.QWidget ):
         
         self._controls_at_top = CG.client_controller.new_options.GetBoolean( 'treeview_controls_at_top' )
         self._panel_at_top = CG.client_controller.new_options.GetBoolean( 'treeview_expanding_panel_at_top' )
-        
-        self._filter_latched = False
-        self._history_seen_inside_click = False
         
         #
         
@@ -1324,6 +1628,7 @@ class TreeViewWithControls( QW.QWidget ):
         #
         
         self._current_page_path = QW.QLabel( '', self._controls )
+        self._current_page_path.setFrameStyle( QW.QFrame.Shape.Panel | QW.QFrame.Shadow.Sunken )
         self._current_page_path.setToolTip( ClientGUIFunctions.WrapToolTip( 'Current page' ) )
         self._current_page_path.setSizePolicy( QW.QSizePolicy.Policy.Ignored, QW.QSizePolicy.Policy.Preferred )
         self._current_page_path.setCursor( QC.Qt.CursorShape.PointingHandCursor )
@@ -1340,13 +1645,24 @@ class TreeViewWithControls( QW.QWidget ):
             self._tree.currentPagePathChanged.connect( self.PopulateHistoryIfOpen )
             
         
+        # TODO: change this to a cogiconbutton with the menu item stuff 
         self._controls_button = ClientGUICommon.IconButton( self._controls, CC.global_icons().cog, self._ShowCogMenu )
         self._controls_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Tree view controls' ) )
         
         #
         
-        self._filter_panel = self._CreateFilterPanel()
-        self._history_panel = self._CreateHistoryPanel()
+        self._filter_panel = FilterPanel( self )
+        
+        self._filter_panel.iWantToClose.connect( self._HideFilterPanel )
+        self._filter_panel.expandVisibleFilterResults.connect( self._tree.expandAll )
+        self._filter_panel.clearFilter.connect( self._tree.ClearFilterText )
+        self._filter_panel.setFilterText.connect( self._tree.SetFilterText )
+        
+        self._history_panel = HistoryPanel( self, self._tree.model() )
+        
+        self._history_panel.iWantToClose.connect( self._HideHistoryPanel )
+        self._history_panel.iNeedAReposition.connect( self._QueueFloatingPanelReposition )
+        
         selection_model = self._tree.selectionModel()
         
         if selection_model is not None:
@@ -1403,501 +1719,30 @@ class TreeViewWithControls( QW.QWidget ):
         
         if app is not None:
             
-            app.installEventFilter( self )
+            if isinstance( app, QG.QGuiApplication ):
+                
+                app.focusObjectChanged.connect( self.ApplicationFocusChangingUpdate )
+                
             
+        
         self._queued_floating_panel_reposition = False
         
     
-    def _CreateFilterPanel( self ):
+    def _AddBooleanMenuAction( self, menu, label: str, option_name: str, tooltip: str = None ):
         
-        panel = QW.QWidget( self, QC.Qt.WindowType.Tool | QC.Qt.WindowType.FramelessWindowHint )
-        panel.setObjectName( 'HydrusTreeViewFilterPanel' )
-        panel.hide()
+        # TODO: move this out, since it is static, and probably move it to normal menu code
         
-        hbox = QW.QHBoxLayout( panel )
-        hbox.setContentsMargins( 4, 4, 4, 4 )
-        hbox.setSpacing( 2 )
+        action = menu.addAction( label )
+        action.setCheckable( True )
+        action.setChecked( CG.client_controller.new_options.GetBoolean( option_name ) )
+        action.triggered.connect( lambda checked, option_name = option_name: CG.client_controller.new_options.SetBoolean( option_name, checked ) )
         
-        self._filter_text = QW.QLineEdit( panel )
-        self._filter_text.setPlaceholderText( 'filter pages' )
-        self._filter_text.textChanged.connect( self._FilterTextChanged )
-        
-        self._filter_expand_button = QW.QPushButton( '+', panel )
-        self._filter_expand_button.setEnabled( False )
-        self._filter_expand_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Expand all currently visible matches' ) )
-        self._filter_expand_button.clicked.connect( self._ExpandVisibleFilterResults )
-        
-        self._filter_clear_button = QW.QPushButton( 'X', panel )
-        self._filter_clear_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'Clear filter' ) )
-        self._filter_clear_button.clicked.connect( self._ClearFilter )
-        
-        hbox.addWidget( self._filter_text )
-        hbox.addWidget( self._filter_expand_button )
-        hbox.addWidget( self._filter_clear_button )
-        
-        return panel
-        
-    
-    def _CreateHistoryPanel( self ):
-        
-        panel = QW.QWidget( self, QC.Qt.WindowType.Tool | QC.Qt.WindowType.FramelessWindowHint )
-        panel.setObjectName( 'HydrusTreeViewHistoryPanel' )
-        
-        panel.setMinimumWidth( 260 )
-        panel.setMinimumHeight( 120 )
-        panel.hide()
-        
-        vbox = QW.QVBoxLayout( panel )
-        vbox.setContentsMargins( 4, 4, 4, 4 )
-        vbox.setSpacing( 2 )
-        
-        self._history_title = QW.QLabel( 'Tab History', panel )
-        self._history_title.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
-        
-        self._history_scroll_area = QW.QScrollArea( panel )
-        self._history_scroll_area.setWidgetResizable( True )
-        self._history_scroll_area.setVerticalScrollBarPolicy( QC.Qt.ScrollBarPolicy.ScrollBarAsNeeded )
-        
-        self._history_list = QW.QWidget( self._history_scroll_area )
-        self._history_list_layout = QW.QVBoxLayout( self._history_list )
-        self._history_list_layout.setContentsMargins( 0, 0, 0, 0 )
-        self._history_list_layout.setSpacing( 1 )
-        self._history_list_layout.addStretch( 1 )
-        
-        self._history_scroll_area.setWidget( self._history_list )
-        
-        self._history_button_bar = QW.QWidget( panel )
-        bar = QW.QHBoxLayout( self._history_button_bar )
-        bar.setContentsMargins( 0, 0, 0, 0 )
-        bar.setSpacing( 2 )
-        
-        self._history_close = QW.QPushButton( 'X', self._history_button_bar )
-        self._history_close.setToolTip( ClientGUIFunctions.WrapToolTip( 'Close history' ) )
-        self._history_close.clicked.connect( self._HideHistoryPanel )
-        
-        self._history_pin = QW.QPushButton( '', self._history_button_bar )
-        self._history_pin.setCheckable( True )
-        self._history_pin.setChecked( CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ) )
-        self._history_pin.setToolTip( ClientGUIFunctions.WrapToolTip( 'Keep history box open' ) )
-        self._history_pin.toggled.connect( self._HistoryPinChanged )
-        self._SetHistoryPinIcon()
-        
-        self._history_size_grip = QW.QSizeGrip( panel )
-        bar.addWidget( self._history_close )
-        bar.addWidget( self._history_pin )
-        bar.addStretch( 1 )
-        bar.addWidget( self._history_size_grip )
-        
-        vbox.addWidget( self._history_title )
-        vbox.addWidget( self._history_scroll_area, 1 )
-        vbox.addWidget( self._history_button_bar )
-        
-        return panel
-        
-    
-    def _ResizeHistoryPanelToRows( self, num_rows: int ):
-        
-        num_rows = max( 1, num_rows )
-        visible_rows = min( 10, num_rows )
-        
-        row_height = 24
-        
-        for i in range( self._history_list_layout.count() ):
-            
-            item = self._history_list_layout.itemAt( i )
-            widget = item.widget()
-            
-            if widget is not None:
-                
-                row_height = max( row_height, widget.sizeHint().height() )
-                
-            
-        
-        margins = self._history_panel.layout().contentsMargins()
-        spacing = self._history_panel.layout().spacing()
-        
-        title_height = self._history_title.sizeHint().height()
-        bar_height = self._history_button_bar.sizeHint().height()
-        scroll_height = ( row_height * visible_rows ) + 8
-        
-        self._history_scroll_area.setMinimumHeight( scroll_height )
-        
-        target_height = (
-            margins.top() +
-            margins.bottom() +
-            title_height +
-            bar_height +
-            scroll_height +
-            ( spacing * 2 )
-        )
-        
-        self._history_panel.resize( max( self._history_panel.width(), 260 ), target_height )
-        self._QueueFloatingPanelReposition()
-        
-    
-    def _HideFilterPanel( self ):
-        
-        self._filter_panel.hide()
-        self._QueueFloatingPanelReposition()
-        
-    
-    def _HideHistoryPanel( self ):
-        
-        self._history_panel.hide()
-        self._QueueFloatingPanelReposition()
-        
-    
-    def _QueueFloatingPanelReposition( self ):
-        
-        if self._queued_floating_panel_reposition:
-            
-            return
-            
-        
-        self._queued_floating_panel_reposition = True
-        
-        QC.QTimer.singleShot( 0, self._RepositionFloatingPanels )
-        
-    
-    def _RepositionFloatingPanels( self ):
-        
-        self._queued_floating_panel_reposition = False
-        
-        if self._history_panel.isVisible():
-            
-            self._PositionPanelNearWidget( self._history_panel, self._history_button, [ self._filter_panel ] )
-            
-        
-        if self._filter_panel.isVisible():
-            
-            self._PositionPanelNearWidget( self._filter_panel, self._filter_button, [ self._history_panel ] )
-            
-        
-    
-    def currentChanged( self, current: QC.QModelIndex, previous: QC.QModelIndex ):
-        
-        super().currentChanged( current, previous )
-        
-        if current.isValid():
-            
-            self._EmitCurrentIndexText( current )
-            
-        
-    
-    def eventFilter( self, watched, event ):
-        
-        if event.type() in (
-            QC.QEvent.Type.Move,
-            QC.QEvent.Type.Resize,
-            QC.QEvent.Type.WindowStateChange
-        ):
-            
-            if watched is self.window() or watched is self._controls:
-                
-                self._QueueFloatingPanelReposition()
-                
-            
-        elif event.type() == QC.QEvent.Type.MouseButtonPress:
-            
-            global_pos = self._GetEventGlobalPos( event )
-            
-            if self._filter_panel.isVisible() and not self._filter_latched:
-                
-                if not self._GlobalPointInsideWidget( global_pos, self._filter_panel ) and not self._GlobalPointInsideWidget( global_pos, self._filter_button ):
-                    
-                    self._HideFilterPanel()
-                    
-                
-            
-            if self._history_panel.isVisible() and not self._history_pin.isChecked():
-                
-                if self._GlobalPointInsideWidget( global_pos, self._history_panel ):
-                    
-                    self._history_seen_inside_click = True
-                    
-                elif not self._GlobalPointInsideWidget( global_pos, self._history_button ):
-                    
-                    self._HideHistoryPanel()
-                    
-                
-            
-        
-        return super().eventFilter( watched, event )
-        
-    
-    def _GetEventGlobalPos( self, event ):
-        
-        if hasattr( event, 'globalPosition' ):
-            
-            return event.globalPosition().toPoint()
-            
-        
-        return event.globalPos()
-        
-    
-    def _GlobalPointInsideWidget( self, global_pos, widget ) -> bool:
-        
-        if widget is None or not widget.isVisible():
-            
-            return False
-            
-        
-        top_left = widget.mapToGlobal( widget.rect().topLeft() )
-        rect = QC.QRect( top_left, widget.rect().size() )
-        
-        return rect.contains( global_pos )
-        
-    
-    def _PositionPanelNearWidget( self, panel, widget, avoid_widgets = None ):
-        
-        panel.adjustSize()
-        
-        if avoid_widgets is None:
-            
-            avoid_widgets = []
-            
-        
-        widget_top_left = widget.mapToGlobal( widget.rect().topLeft() )
-        widget_rect = QC.QRect( widget_top_left, widget.rect().size() )
-        
-        x = widget_rect.left()
-        
-        if self._controls_at_top:
-            
-            y = widget_rect.bottom() + 2
-            
-        else:
-            
-            y = widget_rect.top() - panel.height() - 2
-            
-        
-        panel_rect = QC.QRect( x, y, panel.width(), panel.height() )
-        
-        for avoid_widget in avoid_widgets:
-            
-            if avoid_widget is None or not avoid_widget.isVisible():
-                
-                continue
-                
-            
-            avoid_rect = avoid_widget.frameGeometry()
-            
-            if not panel_rect.intersects( avoid_rect ):
-                
-                continue
-                
-            
-            if self._controls_at_top:
-                
-                y = avoid_rect.bottom() + 2
-                
-            else:
-                
-                y = avoid_rect.top() - panel.height() - 2
-                
-            
-            panel_rect = QC.QRect( x, y, panel.width(), panel.height() )
-            
-        
-        panel.move( x, y )
-        
-    
-    def _ToggleFilterPanel( self ):
-        
-        if self._filter_text.text() != '':
-            
-            return
-            
-        
-        if self._filter_panel.isVisible():
-            
-            self._HideFilterPanel()
-            return
-            
-        
-        self._PositionPanelNearWidget( self._filter_panel, self._filter_button, [ self._history_panel ] )
-        self._filter_panel.show()
-        self._filter_text.setFocus( QC.Qt.FocusReason.OtherFocusReason )
-        self._filter_text.selectAll()
-        
-    
-    def _FilterTextChanged( self, text: str ):
-        
-        self._filter_latched = len( text ) > 0
-        self._filter_expand_button.setEnabled( len( text ) >= 2 )
-        
-        if hasattr( self._tree, 'SetFilterText' ):
-            
-            self._tree.SetFilterText( text )
-            
-        
-    
-    def _ExpandVisibleFilterResults( self ):
-        
-        if len( self._filter_text.text() ) >= 2:
-            
-            self._tree.expandAll()
-            
-        
-    
-    def _ClearFilter( self ):
-        
-        self._filter_text.clear()
-        self._filter_latched = False
-        
-        if hasattr( self._tree, 'ClearFilterText' ):
-            
-            self._tree.ClearFilterText()
-            
-        
-        self._HideFilterPanel()
-        
-    
-    def _ToggleHistoryPanel( self ):
-        
-        if self._history_panel.isVisible():
-            
-            self._HideHistoryPanel()
-            return
-            
-        
-        self._PopulateHistoryPanel()
-        self._PositionPanelNearWidget( self._history_panel, self._history_button, [ self._filter_panel ] )
-        self._history_seen_inside_click = False
-        self._history_panel.show()
-        
-    
-    def _HistoryPinChanged( self, value: bool ):
-        
-        CG.client_controller.new_options.SetBoolean( 'treeview_history_box_pinned', value )
-        self._SetHistoryPinIcon()
-        
-    
-    def _SetHistoryPinIcon( self ):
-        
-        if self._history_pin.isChecked():
-            
-            self._history_pin.setIcon( CC.global_icons().lock )
-            
-        else:
-            
-            self._history_pin.setIcon( CC.global_icons().lock_open )
+        if tooltip is not None:
             
-        
-    def _ClearHistoryList( self ):
-        
-        while self._history_list_layout.count() > 0:
-            
-            item = self._history_list_layout.takeAt( 0 )
-            
-            widget = item.widget()
-            
-            if widget is not None:
-                
-                widget.deleteLater()
-                
-            
-        
-    
-    def _PopulateHistoryPanel( self ):
-        
-        self._ClearHistoryList()
-        
-        self._history_pin.setChecked( CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ) )
-        
-        history = CG.client_controller.gui.GetPagesHistory()
-        
-        if len( history ) == 0:
-            
-            label = QW.QLabel( 'no page history', self._history_list )
-            label.setWordWrap( True )
-            self._history_list_layout.addWidget( label )
-            self._history_list_layout.addStretch( 1 )
-            self._ResizeHistoryPanelToRows( 1 )
-            return
-            
-        
-        self._history_title.setText( f'Tab History ({len(history)} pages)' )
-        
-        row_count = 0
-        
-        for history_index, ( page_key, page_name ) in enumerate( reversed( history ) ):
-            
-            row = self._CreateHistoryRow( history_index, page_key )
-            
-            if row is not None:
-                
-                row_count += 1
-                self._history_list_layout.addWidget( row )
-                
-            
-        
-        self._history_list_layout.addStretch( 1 )
-        self._ResizeHistoryPanelToRows( row_count )
-        
-    
-    def _CreateHistoryRow( self, history_index: int, page_key ):
-        
-        model = self._tree.model()
-        
-        page_name = str( page_key )
-        tooltip = page_name
-        
-        if model is not None and hasattr( model, 'GetPageNameAndTooltipFromPageKey' ):
-            
-            page_name, tooltip = model.GetPageNameAndTooltipFromPageKey( page_key )
-            
-        
-        row = QW.QWidget( self._history_list )
-        hbox = QW.QHBoxLayout( row )
-        hbox.setContentsMargins( 0, 0, 0, 0 )
-        hbox.setSpacing( 2 )
-        
-        number = QW.QLabel( f'{history_index + 1}.', row )
-        number.setToolTip( tooltip )
-        
-        button = QW.QPushButton( page_name, row )
-        button.setToolTip( tooltip )
-        button.setFlat( True )
-        button.clicked.connect( lambda checked = False, page_key = page_key: self._ActivateHistoryPage( page_key ) )
-        
-        remove = QW.QPushButton( 'X', row )
-        remove.setToolTip( ClientGUIFunctions.WrapToolTip( 'Remove this page from history' ) )
-        remove.clicked.connect( lambda checked = False, page_key = page_key: self._RemoveHistoryPage( page_key ) )
-        
-        hbox.addWidget( number )
-        hbox.addWidget( button, 1 )
-        hbox.addWidget( remove )
-        
-        return row
-        
-    
-    def _ActivateHistoryPage( self, page_key ):
-        
-        CG.client_controller.gui.ShowPage( page_key )
-        
-        if not CG.client_controller.new_options.GetBoolean( 'treeview_history_box_pinned' ):
-            
-            self._HideHistoryPanel()
-            
-        
-    
-    def _RemoveHistoryPage( self, page_key ):
-        
-        CG.client_controller.gui.page_nav_history.RemovePageKey( page_key )
-        
-        self._PopulateHistoryPanel()
-        
-        if self._history_panel.isVisible():
+            action.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) )
             
-            self._PositionPanelNearWidget( self._history_panel, self._history_button, [ self._filter_panel ] )
-            
-        
-    
-    def _SetCurrentPagePathText( self, page_name: str, tooltip: str ):
         
-        self._current_page_path.setText( page_name )
-        self._current_page_path.setToolTip( tooltip )
+        return action
         
     
     def _CurrentPagePathClicked( self, event ):
@@ -1927,21 +1772,77 @@ class TreeViewWithControls( QW.QWidget ):
         event.ignore()
         
     
-    def GetTreeView( self ) -> QW.QTreeView:
+    def _EmitAlignmentToggle( self, direction: int ):
         
-        return self._tree
+        CG.client_controller.new_options.SetNoneableInteger( 'treeview_alignment', direction )
+        
+        self.widgetAlignmentChanged.emit()
+        
+        if self._on_toggle_alignment is not None:
+            
+            self._on_toggle_alignment( direction )
+            
         
     
-    def GetControlWidget( self ) -> QW.QWidget:
+    def _EmitTagViewAlignmentToggle( self, direction: int ):
         
-        return self._controls
+        CG.client_controller.new_options.SetInteger( 'page_sidebar_alignment', direction )
+        
+        self.tagBarAlignmentChanged.emit()
         
     
-    def _SplitterSizeChanged( self ):
+    def _GetDepthFromIndex( self, index: QC.QModelIndex ) -> int:
         
-        sizes = self._expanding_panel_splitter.sizes()
+        if not index.isValid():
+            
+            return -1
+            
         
-        CG.client_controller.new_options.SetIntegerList( 'treeview_expanding_panel_splitter_size', sizes )
+        depth = 0
+        parent = index.parent()
+        
+        while parent.isValid():
+            
+            depth += 1
+            parent = parent.parent()
+            
+        
+        return depth
+        
+    
+    def _GetEventGlobalPos( self, event ):
+        
+        if hasattr( event, 'globalPosition' ):
+            
+            return event.globalPosition().toPoint()
+            
+        
+        return event.globalPos()
+        
+    
+    def _GlobalPointInsideWidget( self, global_pos, widget ) -> bool:
+        
+        if widget is None or not widget.isVisible():
+            
+            return False
+            
+        
+        top_left = widget.mapToGlobal( widget.rect().topLeft() )
+        rect = QC.QRect( top_left, widget.rect().size() )
+        
+        return rect.contains( global_pos )
+        
+    
+    def _HideFilterPanel( self ):
+        
+        self._filter_panel.hide()
+        self._QueueFloatingPanelReposition()
+        
+    
+    def _HideHistoryPanel( self ):
+        
+        self._history_panel.hide()
+        self._QueueFloatingPanelReposition()
         
     
     def _MoveControlBarUp( self ):
@@ -1996,37 +1897,110 @@ class TreeViewWithControls( QW.QWidget ):
         CG.client_controller.new_options.SetBoolean( 'treeview_expanding_panel_at_top', False )
         
     
-    def _EmitAlignmentToggle( self, direction: int ):
+    def _PositionPanelNearWidget( self, panel: QW.QWidget, widget: QW.QWidget, avoid_widgets = None ):
         
-        CG.client_controller.new_options.SetNoneableInteger( 'treeview_alignment', direction )
+        panel.adjustSize()
         
-        self.widgetAlignmentChanged.emit()
-        
-        if self._on_toggle_alignment is not None:
+        if avoid_widgets is None:
             
-            self._on_toggle_alignment( direction )
+            avoid_widgets = []
             
         
-    def _EmitTagViewAlignmentToggle( self, direction: int ):
+        widget_top_left = widget.mapToGlobal( widget.rect().topLeft() )
+        widget_rect = QC.QRect( widget_top_left, widget.rect().size() )
         
-        CG.client_controller.new_options.SetInteger( 'page_sidebar_alignment', direction )
+        x = widget_rect.left()
         
-        self.tagBarAlignmentChanged.emit()
+        if self._controls_at_top:
+            
+            y = widget_rect.bottom() + 2
+            
+        else:
+            
+            y = widget_rect.top() - panel.height() - 2
+            
+        
+        panel_rect = QC.QRect( x, y, panel.width(), panel.height() )
+        
+        for avoid_widget in avoid_widgets:
+            
+            if avoid_widget is None or not avoid_widget.isVisible():
+                
+                continue
+                
+            
+            avoid_rect = avoid_widget.frameGeometry()
+            
+            if not panel_rect.intersects( avoid_rect ):
+                
+                continue
+                
+            
+            if self._controls_at_top:
+                
+                y = avoid_rect.bottom() + 2
+                
+            else:
+                
+                y = avoid_rect.top() - panel.height() - 2
+                
+            
+            panel_rect = QC.QRect( x, y, panel.width(), panel.height() )
+            
+        
+        panel.move( x, y )
         
     
-    def _AddBooleanMenuAction( self, menu, label: str, option_name: str, tooltip: str = None ):
+    def _QueueFloatingPanelReposition( self ):
         
-        action = menu.addAction( label )
-        action.setCheckable( True )
-        action.setChecked( CG.client_controller.new_options.GetBoolean( option_name ) )
-        action.triggered.connect( lambda checked, option_name = option_name: CG.client_controller.new_options.SetBoolean( option_name, checked ) )
-        
-        if tooltip is not None:
+        if self._queued_floating_panel_reposition:
             
-            action.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) )
+            return
             
         
-        return action
+        self._queued_floating_panel_reposition = True
+        
+        QC.QTimer.singleShot( 0, self._RepositionFloatingPanels )
+        
+    
+    def _RepositionFloatingPanels( self ):
+        
+        self._queued_floating_panel_reposition = False
+        
+        if self._history_panel.isVisible():
+            
+            self._PositionPanelNearWidget( self._history_panel, self._history_button, [ self._filter_panel ] )
+            
+        
+        if self._filter_panel.isVisible():
+            
+            self._PositionPanelNearWidget( self._filter_panel, self._filter_button, [ self._history_panel ] )
+            
+        
+    
+    def _SetCurrentDepth( self, depth: int ):
+        
+        model = self._tree.model()
+        
+        if model is None:
+            
+            return
+            
+        
+        max_depth = model.GetViewDepth() - 1
+        
+        self._current_depth = max( -1, min( depth, max_depth ) )
+        
+        self.depth_decrement.setEnabled( self._current_depth > -1 )
+        self.depth_increment.setEnabled( self._current_depth < max_depth )
+        self.collapse_all.setEnabled( self._current_depth > -1 )
+        self.expand_all.setEnabled( self._current_depth < max_depth )
+        
+    
+    def _SetCurrentPagePathText( self, page_name: str, tooltip: str ):
+        
+        self._current_page_path.setText( page_name )
+        self._current_page_path.setToolTip( tooltip )
         
     
     def _ShowCogMenu( self ):
@@ -2034,7 +2008,6 @@ class TreeViewWithControls( QW.QWidget ):
         # if CG.client_controller.gui is not None:
         #     self.placeholder_long_text = str( CG.client_controller.gui.GetTotalPageCounts() ) + str( CG.client_controller.gui.GetPagesHistory() ) + self.placeholder_long_text
         #     self._expanding_panel.widget().setText( f'blah blah blah {self.placeholder_long_text}' )
-                
         
         from hydrus.client.gui import ClientGUIMenus
         
@@ -2106,6 +2079,49 @@ class TreeViewWithControls( QW.QWidget ):
         menu.exec_( QG.QCursor.pos() )
         
     
+    def _SplitterSizeChanged( self ):
+        
+        sizes = self._expanding_panel_splitter.sizes()
+        
+        CG.client_controller.new_options.SetIntegerList( 'treeview_expanding_panel_splitter_size', sizes )
+        
+    
+    def _ToggleFilterPanel( self ):
+        
+        if self._filter_panel.HasText():
+            
+            return
+            
+        
+        if self._filter_panel.isVisible():
+            
+            self._HideFilterPanel()
+            
+            return
+            
+        
+        self._PositionPanelNearWidget( self._filter_panel, self._filter_button, [ self._history_panel ] )
+        
+        self._filter_panel.show()
+        
+        self._filter_panel.activateWindow()
+        self._filter_panel.TakeFocus()
+        
+    
+    def _ToggleHistoryPanel( self ):
+        
+        if self._history_panel.isVisible():
+            
+            self._HideHistoryPanel()
+            
+            return
+            
+        
+        self._history_panel.Repopulate()
+        self._PositionPanelNearWidget( self._history_panel, self._history_button, [ self._filter_panel ] )
+        self._history_panel.show()
+        
+    
     def _ToggleTabBarVisibility( self ):
         
         CG.client_controller.new_options.FlipBoolean( 'treeview_hides_tabs' )
@@ -2120,47 +2136,34 @@ class TreeViewWithControls( QW.QWidget ):
         self.treeSidebarCollapsibilityChanged.emit()
         
     
-    def _GetDepthFromIndex( self, index: QC.QModelIndex ) -> int:
-        
-        if not index.isValid():
-            
-            return -1
-            
-        
-        depth = 0
-        parent = index.parent()
-        
-        while parent.isValid():
-            
-            depth += 1
-            parent = parent.parent()
-            
-        
-        return depth
-        
-    
-    def _SetCurrentDepth( self, depth: int ):
-        
-        model = self._tree.model()
-        
-        if model is None:
-            
-            return
-            
-        
-        max_depth = model.GetViewDepth() - 1
-        
-        self._current_depth = max( -1, min( depth, max_depth ) )
-        
-        self.depth_decrement.setEnabled( self._current_depth > -1 )
-        self.depth_increment.setEnabled( self._current_depth < max_depth )
-        self.collapse_all.setEnabled( self._current_depth > -1 )
-        self.expand_all.setEnabled( self._current_depth < max_depth )
-        
-    
     def _TreeCurrentChanged( self, current: QC.QModelIndex, previous: QC.QModelIndex ):
         
         self._SetCurrentDepth( self._GetDepthFromIndex( current ) )
+        
+    
+    def ApplicationFocusChangingUpdate( self, new_focus_widget ):
+        
+        if self._filter_panel.isVisible() and not self._filter_panel.HasText():
+            
+            focus_is_on_button = new_focus_widget == self._filter_button
+            focus_is_on_panel = ClientGUIFunctions.WidgetOrAnyTLWChildHasFocus( self._filter_panel )
+            
+            if not ( focus_is_on_button or focus_is_on_panel ):
+                
+                self._HideFilterPanel()
+                
+            
+        
+        if self._history_panel.isVisible() and not self._history_panel.IsPinned():
+            
+            focus_is_on_button = new_focus_widget == self._history_button
+            focus_is_on_panel = ClientGUIFunctions.WidgetOrAnyTLWChildHasFocus( self._history_panel )
+            
+            if not ( focus_is_on_button or focus_is_on_panel ):
+                
+                self._HideHistoryPanel()
+                
+            
         
     
     def expandToDepth( self, depth ):
@@ -2205,11 +2208,26 @@ class TreeViewWithControls( QW.QWidget ):
             
         
     
+    def GetTreeView( self ) -> QW.QTreeView:
+        
+        return self._tree
+        
+    
+    def GetControlWidget( self ) -> QW.QWidget:
+        
+        return self._controls
+        
+    
+    def NotifyWindowGeometryOrStateChange( self ):
+        
+        self._QueueFloatingPanelReposition()
+        
+    
     def PopulateHistoryIfOpen( self ):
         
         if self._history_panel.isVisible():
             
-            self._PopulateHistoryPanel()
+            self._history_panel.Repopulate()
             
         
     

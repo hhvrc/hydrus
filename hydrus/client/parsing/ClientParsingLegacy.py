@@ -1,3 +1,4 @@
+import threading
 import time
 import urllib.parse
 
@@ -212,6 +213,52 @@ file_identifier_string_lookup[ FILE_IDENTIFIER_TYPE_SHA1 ] = 'sha1 hash'
 file_identifier_string_lookup[ FILE_IDENTIFIER_TYPE_SHA256 ] = 'sha256 hash'
 file_identifier_string_lookup[ FILE_IDENTIFIER_TYPE_SHA512 ] = 'sha512 hash'
 file_identifier_string_lookup[ FILE_IDENTIFIER_TYPE_USER_INPUT ] = 'custom user input'
+
+class LookupScriptsCache( object ):
+    
+    my_instance = None
+    
+    def __init__( self ):
+        
+        self._need_to_refresh = threading.Event()
+        self._need_to_refresh.set()
+        
+        self._scripts = []
+        
+        self._lock = threading.Lock()
+        
+    
+    @staticmethod
+    def instance() -> 'LookupScriptsCache':
+        
+        if LookupScriptsCache.my_instance is None:
+            
+            LookupScriptsCache.my_instance = LookupScriptsCache()
+            
+        
+        return LookupScriptsCache.my_instance
+        
+    
+    def NotifyNewScripts( self ):
+        
+        self._need_to_refresh.set()
+        
+    
+    def GetScripts( self ):
+        
+        with self._lock:
+            
+            if self._need_to_refresh.is_set():
+                
+                self._need_to_refresh.clear()
+                
+                self._scripts = CG.client_controller.Read( 'serialisable_named', HydrusSerialisable.SERIALISABLE_TYPE_PARSE_ROOT_FILE_LOOKUP )
+                
+            
+            return list( self._scripts )
+            
+        
+    
 
 # eventually transition this to be a flat 'generate page/gallery urls'
 # the rest of the parsing system can pick those up automatically

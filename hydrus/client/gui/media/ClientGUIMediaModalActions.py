@@ -5,6 +5,7 @@ import time
 from qtpy import QtWidgets as QW
 
 from hydrus.core import HydrusConstants as HC
+from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusLists
 from hydrus.core import HydrusNumbers
@@ -1289,6 +1290,19 @@ def SetFilesForcedFiletypes( win: QW.QWidget, medias: collections.abc.Collection
         
     
 
+def render_dpi_tuple( dpi_tuple ):
+    
+    if isinstance( dpi_tuple, tuple ):
+        
+        if len( dpi_tuple ) == 2 and dpi_tuple[0] == dpi_tuple[1]:
+            
+            return str( dpi_tuple[0] )
+            
+        
+    
+    return str( dpi_tuple )
+    
+
 def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSingle ):
     
     info_lines = ClientMediaResultPrettyInfo.GetPrettyMediaResultInfoLines( media.GetMediaResult() )
@@ -1320,30 +1334,174 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
             
             path = CG.client_controller.client_files_manager.GetFilePath( hash, mime )
             
-            raw_pil_image = HydrusImageOpening.RawOpenPILImage( path )
-            
             try:
                 
-                if mime in HC.FILES_THAT_CAN_HAVE_EXIF:
+                raw_pil_image = HydrusImageOpening.RawOpenPILImage( path )
+                
+                try:
                     
-                    exif_dict = HydrusImageMetadata.GetEXIFDict( raw_pil_image )
+                    if mime in HC.FILES_THAT_CAN_HAVE_EXIF:
+                        
+                        exif_dict = HydrusImageMetadata.GetEXIFDict( raw_pil_image )
+                        
+                    
+                    if mime in HC.FILES_THAT_CAN_HAVE_HUMAN_READABLE_EMBEDDED_METADATA:
+                        
+                        file_text = HydrusImageMetadata.GetEmbeddedFileText( raw_pil_image )
+                        
+                    
+                    talked_about_icc_profile = False
+                    
+                    if mime == HC.IMAGE_JPEG:
+                        
+                        extra_rows.append( ( 'subsampling', HydrusImageMetadata.subsampling_str_lookup[ HydrusImageMetadata.GetJpegSubsamplingRaw( raw_pil_image ) ] ) )
+                        
+                        extra_rows.append( ( 'progressive', 'yes' if 'progression' in raw_pil_image.info else 'no' ) )
+                        
+                    
+                    if 'srgb' in raw_pil_image.info:
+                        
+                        extra_rows.append( ( 'colour', 'sRGB' ) )
+                        
+                    elif 'gamma' in raw_pil_image.info:
+                        
+                        if 'chromaticity' in raw_pil_image.info:
+                            
+                            extra_rows.append( ( 'colour', 'gamma + chromaticity' ) )
+                            
+                        else:
+                            
+                            extra_rows.append( ( 'colour', 'gamma' ) )
+                            
+                        
+                    elif media.GetFileInfoManager().has_icc_profile:
+                        
+                        talked_about_icc_profile = True
+                        
+                        extra_rows.append( ( 'colour', 'icc profile' ) )
+                        
+                    
+                    if not talked_about_icc_profile and media.GetFileInfoManager().has_icc_profile:
+                        
+                        extra_rows.append( ( 'icc profile', 'yes' ) )
+                        
+                    
+                    stated_a_dpi = False
+                    
+                    if 'dpi' in raw_pil_image.info:
+                        
+                        value = raw_pil_image.info[ 'dpi' ]
+                        
+                        str_value = render_dpi_tuple( value )
+                        
+                        if str_value != '1':
+                            
+                            extra_rows.append( ( 'dpi', str_value ) )
+                            
+                            stated_a_dpi = True
+                            
+                        
+                    
+                    # there's surplus 'jfif_version' too, like (1, 1), which we will ignore here
+                    jfif_gubbins_in_nice_order = [ 'jfif', 'jfif_unit', 'jfif_density' ]
+                    
+                    if True in ( jfif_tag in raw_pil_image.info for jfif_tag in jfif_gubbins_in_nice_order ):
+                        
+                        jfif_components = []
+                        
+                        if 'jfif' in raw_pil_image.info:
+                            
+                            value = raw_pil_image.info[ 'jfif' ]
+                            
+                            if value == 257:
+                                
+                                jfif_components.append( 'v1.01' )
+                                
+                            elif value == 258:
+                                
+                                jfif_components.append( 'v1.02' )
+                                
+                            else:
+                                
+                                jfif_components.append( 'unknown version' )
+                                
+                            
+                        
+                        if 'jfif_density' in raw_pil_image.info and raw_pil_image.info[ 'jfif_density' ] == ( 1, 1 ) and 'jfif_unit' in raw_pil_image.info and raw_pil_image.info[ 'jfif_unit' ] == 0:
+                            
+                            # no defined DPI
+                            
+                            pass
+                            
+                        else:
+                            
+                            if 'jfif_density' in raw_pil_image.info and 'dpi' not in raw_pil_image.info:
+                                
+                                value = raw_pil_image.info[ 'jfif_density' ]
+                                
+                                str_value = render_dpi_tuple( value )
+                                
+                                if str_value != '1':
+                                    
+                                    jfif_components.append( str( value ) + ' DPI' )
+                                    
+                                    stated_a_dpi = True
+                                    
+                                
+                            
+                            if stated_a_dpi and 'jfif_unit' in raw_pil_image.info:
+                                
+                                value = raw_pil_image.info[ 'jfif_unit' ]
+                                
+                                if value == 0:
+                                    
+                                    jfif_components.append( 'unitless DPI' )
+                                    
+                                elif value == 1:
+                                    
+                                    jfif_components.append( 'dots per inch' )
+                                    
+                                elif value == 2:
+                                    
+                                    jfif_components.append( 'dots per centimetre' )
+                                    
+                                else:
+                                    
+                                    jfif_components.append( 'unknown DPI unit' )
+                                    
+                                
+                            
+                        
+                        extra_rows.append( ( 'jfif', ', '.join( jfif_components ) ) )
+                        
+                    
+                    if 'compression' in raw_pil_image.info:
+                        
+                        extra_rows.append( ( 'compression', str( raw_pil_image.info[ 'compression' ] ) ) )
+                        
+                    
+                    if media.GetMime() == HC.IMAGE_TIFF and 'resolution' in raw_pil_image.info and 'dpi' not in raw_pil_image.info:
+                        
+                        value = raw_pil_image.info[ 'resolution' ]
+                        
+                        str_value = render_dpi_tuple( value )
+                        
+                        if str_value != '1':
+                            
+                            extra_rows.append( ( 'TIFF DPI', str( value ) ) )
+                            
+                        
+                    
+                    
+                finally:
+                    
+                    raw_pil_image.close()
                     
                 
-                if mime in HC.FILES_THAT_CAN_HAVE_HUMAN_READABLE_EMBEDDED_METADATA:
-                    
-                    file_text = HydrusImageMetadata.GetEmbeddedFileText( raw_pil_image )
-                    
+            except Exception as e:
                 
-                if mime == HC.IMAGE_JPEG:
-                    
-                    extra_rows.append( ( 'progressive', 'yes' if 'progression' in raw_pil_image.info else 'no' ) )
-                    
-                    extra_rows.append( ( 'subsampling', HydrusImageMetadata.subsampling_str_lookup[ HydrusImageMetadata.GetJpegSubsamplingRaw( raw_pil_image ) ] ) )
-                    
-                
-            finally:
-                
-                raw_pil_image.close()
+                HydrusData.Print( f'Hey, when preparing the "show metadata" frame for file "{hash.hex()}", I tried to load it in PIL but it failed. The error follows, please let hydev know:' )
+                HydrusData.PrintException( e, do_wait = False )
                 
             
         

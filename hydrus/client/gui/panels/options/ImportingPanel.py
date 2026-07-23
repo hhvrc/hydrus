@@ -27,6 +27,13 @@ class ImportingPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         #
         
+        filetypes = ClientGUICommon.StaticBox( self, 'filetypes' )
+        
+        self._allow_comic_book_archive_detection = QW.QCheckBox( filetypes )
+        self._allow_comic_book_archive_detection.setToolTip( ClientGUIFunctions.WrapToolTip( 'When importing/rescanning a zip file, should we inspect its contents for numbered images, and, if it looks like a cbz, call it a cbz instead of a zip? If you find .cbz detection annoying or inaccurate, uncheck this.' ) )
+        
+        #
+        
         drag_and_drop = ClientGUICommon.StaticBox( self, 'drag and drop' )
         
         self._show_destination_page_when_dnd_url = QW.QCheckBox( drag_and_drop )
@@ -39,6 +46,10 @@ class ImportingPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._thread_slots_gallery_search.setValue( self._new_options.GetInteger( 'thread_slots_gallery_search' ) )
         self._thread_slots_watcher_files.setValue( self._new_options.GetInteger( 'thread_slots_watcher_files' ) )
         self._thread_slots_watcher_check.setValue( self._new_options.GetInteger( 'thread_slots_watcher_check' ) )
+        
+        #
+        
+        self._allow_comic_book_archive_detection.setChecked( self._new_options.GetBoolean( 'allow_comic_book_archive_detection' ) )
         
         #
         
@@ -75,7 +86,17 @@ class ImportingPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         rows = []
         
-        rows.append( ( 'When DnDing a URL onto the program, switch to the download page:', self._show_destination_page_when_dnd_url ) )
+        rows.append( ( 'Inspect for .cbz properties when importing/rescanning .zip files:', self._allow_comic_book_archive_detection ) )
+        
+        gridbox = ClientGUICommon.WrapInGrid( filetypes, rows )
+        
+        filetypes.Add( gridbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
+        
+        #
+        
+        rows = []
+        
+        rows.append( ( 'When DnDing a URL onto the program, switch to the page where it lands:', self._show_destination_page_when_dnd_url ) )
         
         gridbox = ClientGUICommon.WrapInGrid( drag_and_drop, rows )
         
@@ -85,8 +106,9 @@ class ImportingPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         vbox = QP.VBoxLayout()
         
-        QP.AddToLayout( vbox, work_slots_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, filetypes, CC.FLAGS_EXPAND_PERPENDICULAR )
         QP.AddToLayout( vbox, drag_and_drop, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, work_slots_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
         vbox.addStretch( 0 )
         
         self.setLayout( vbox )
@@ -94,6 +116,7 @@ class ImportingPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
     
     def UpdateOptions( self ):
         
+        self._new_options.SetBoolean( 'allow_comic_book_archive_detection', self._allow_comic_book_archive_detection.isChecked() )
         self._new_options.SetBoolean( 'show_destination_page_when_dnd_url', self._show_destination_page_when_dnd_url.isChecked() )
         
         self._new_options.SetInteger( 'thread_slots_misc', self._thread_slots_misc.value() )

@@ -87,6 +87,11 @@ class ClientDBFilesMaintenanceQueue( ClientDBModule.ClientDBModule ):
         self._Execute( 'DELETE FROM file_maintenance_jobs WHERE job_type = ?;', ( job_type, ) )
         
     
+    def ClearJobs( self, hash_id, job_types_to_delete ):
+        
+        self._ExecuteMany( 'DELETE FROM file_maintenance_jobs WHERE hash_id = ? AND job_type = ?;', ( ( hash_id, job_type_to_delete ) for job_type_to_delete in job_types_to_delete ) )
+        
+    
     def GetJobs( self, job_types = None ):
         
         if job_types is None:

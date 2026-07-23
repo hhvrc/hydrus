@@ -20,11 +20,13 @@ Which gives you a full listing of all below arguments, however this will not wor
 
 ##**`-d DB_DIR, --db_dir DB_DIR`**
 
-Lets you customise where hydrus should use for its base database directory. This is install_dir/db by default, but many advanced deployments will move this around, as described [here](database_migration.md). When an argument takes a complicated value like a path that could itself include whitespace, you should wrap it in quote marks, like this:
+Lets you customise where hydrus should use for its database directory. This is install_dir/db by default, but many advanced deployments will move this around, as described [here](database_migration.md). When an argument takes a complicated value like a path that could itself include whitespace, you should wrap it in quote marks, like this:
 
 ```
 -d="E:\my hydrus\hydrus db"
 ```
+
+You can set `~/hydrus_db` and it will expand to your userdir correctly.
 
 ##**`--temp_dir TEMP_DIR`**
 
@@ -36,6 +38,8 @@ C:\Users\You\AppData\Local\Temp
 ```
 
 But you can also check it in _help->about_. A handful of database operations (PTR tag processing, vacuums) require a lot of free space, so if your system drive is very full, or you have unusual ramdisk-based temp storage limits, you may want to relocate to another location or drive.
+
+You can set `~/hydrus_temp` and it will expand to your userdir correctly. You can also specify a relative path, like `db/temp` and it will expand relative to your install dir, giving you something like `/home/you/hydrus_install_dir/db/temp`.
 
 ##**`--db_journal_mode {WAL,TRUNCATE,PERSIST,MEMORY}`**
 

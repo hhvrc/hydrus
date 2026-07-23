@@ -376,9 +376,13 @@ class ClientDBFilesDuplicatesUpdates( ClientDBModule.ClientDBModule ):
             return 0
             
         
-        self._ExecuteMany( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ? OR larger_alternates_group_id = ?;', ( ( alternates_group_id, alternates_group_id ) for alternates_group_id in alternates_group_ids ) )
+        self._ExecuteMany( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ?;', ( ( alternates_group_id, ) for alternates_group_id in alternates_group_ids ) )
         
         num_cleared = self._GetRowCount()
+        
+        self._ExecuteMany( 'DELETE FROM duplicate_false_positives WHERE larger_alternates_group_id = ?;', ( ( alternates_group_id, ) for alternates_group_id in alternates_group_ids ) )
+        
+        num_cleared += self._GetRowCount()
         
         self.modules_similar_files.ResetSearch( hash_ids )
         
@@ -459,12 +463,18 @@ class ClientDBFilesDuplicatesUpdates( ClientDBModule.ClientDBModule ):
     
     def DeletePotentialDuplicatesForMediaId( self, media_id: int ):
         
-        self._Execute( 'DELETE FROM potential_duplicate_pairs WHERE smaller_media_id = ? OR larger_media_id = ?;', ( media_id, media_id ) )
+        self._Execute( 'DELETE FROM potential_duplicate_pairs WHERE smaller_media_id = ?;', ( media_id, ) )
+        
+        num_cleared = self._GetRowCount()
+        
+        self._Execute( 'DELETE FROM potential_duplicate_pairs WHERE larger_media_id = ?;', ( media_id, ) )
+        
+        num_cleared += self._GetRowCount()
         
         # no location context here yet, unlike the add/delete calls
         self._cursor_transaction_wrapper.pub_after_job( 'potential_duplicate_pairs_update', ClientPotentialDuplicatesSearchContext.PAIRS_UPDATE_DELETE_PAIRS_BY_MEDIA_ID, media_id )
         
-        if self._GetRowCount() > 0:
+        if num_cleared > 0:
             
             for ( location_context, potential_duplicate_id_pairs_and_distances ) in self._location_contexts_to_potential_duplicate_id_pairs_and_distances.items():
                 
@@ -485,7 +495,8 @@ class ClientDBFilesDuplicatesUpdates( ClientDBModule.ClientDBModule ):
             
         
         self._Execute( 'DELETE FROM alternate_file_groups WHERE alternates_group_id = ?;', ( alternates_group_id, ) )
-        self._Execute( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ? OR larger_alternates_group_id = ?;', ( alternates_group_id, alternates_group_id ) )
+        self._Execute( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ?;', ( alternates_group_id, ) )
+        self._Execute( 'DELETE FROM duplicate_false_positives WHERE larger_alternates_group_id = ?;', ( alternates_group_id, ) )
         
     
     def DissolveAlternatesGroupIdFromHashes( self, hashes ):
@@ -562,6 +573,8 @@ class ClientDBFilesDuplicatesUpdates( ClientDBModule.ClientDBModule ):
                     
                     files_table_name = file_table_names[0]
                     
+                    # hey, you may revisit this line sometime because a query profile shows it does a SCAN on potential_duplicate_pairs. don't worry about it
+                    # there isn't an easy better way to query this and the self._location_contexts_to_potential_duplicate_id_pairs_and_distances cache is solid. this only happens once
                     table_join = f'potential_duplicate_pairs, {files_table_name} AS files_smaller, {files_table_name} AS files_larger, duplicate_files AS duplicate_files_smaller, duplicate_files AS duplicate_files_larger ON ( potential_duplicate_pairs.smaller_media_id = duplicate_files_smaller.media_id AND duplicate_files_smaller.king_hash_id = files_smaller.hash_id AND potential_duplicate_pairs.larger_media_id = duplicate_files_larger.media_id AND duplicate_files_larger.king_hash_id = files_larger.hash_id )'
                     
                     query = f'SELECT smaller_media_id, larger_media_id, distance FROM {table_join};'
@@ -731,13 +744,15 @@ class ClientDBFilesDuplicatesUpdates( ClientDBModule.ClientDBModule ):
             
             self._Execute( 'DELETE FROM alternate_file_group_members WHERE media_id = ?;', ( media_id, ) )
             
-            self._Execute( 'DELETE FROM confirmed_alternate_pairs WHERE smaller_media_id = ? OR larger_media_id = ?;', ( media_id, media_id ) )
+            self._Execute( 'DELETE FROM confirmed_alternate_pairs WHERE smaller_media_id = ?;', ( media_id, ) )
+            self._Execute( 'DELETE FROM confirmed_alternate_pairs WHERE larger_media_id = ?;', ( media_id, ) )
             
             if len( alternates_media_ids ) == 1: # i.e. what we just removed was the last of the group
                 
                 self._Execute( 'DELETE FROM alternate_file_groups WHERE alternates_group_id = ?;', ( alternates_group_id, ) )
                 
-                self._Execute( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ? OR larger_alternates_group_id = ?;', ( alternates_group_id, alternates_group_id ) )
+                self._Execute( 'DELETE FROM duplicate_false_positives WHERE smaller_alternates_group_id = ?;', ( alternates_group_id, ) )
+                self._Execute( 'DELETE FROM duplicate_false_positives WHERE larger_alternates_group_id = ?;', ( alternates_group_id, ) )
                 
             
             hash_ids = self.modules_files_duplicates_storage.GetDuplicateHashIds( media_id )

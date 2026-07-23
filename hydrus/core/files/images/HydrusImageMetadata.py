@@ -136,21 +136,38 @@ def render_key_value( indent_depth, key, value, keys_to_put_at_the_top = None ) 
     return row_text
     
 
-# we parse exif, icc profile, and jpeg progressive separately
+# we parse and display this stuff in other places
 PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF = {
     'exif',
     'icc_profile',
     'progression',
-    'progressive'
+    'progressive',
+    'srgb',
+    'gamma',
+    'chromaticity',
+    'dpi',
+    'jfif',
+    'jfif_unit',
+    'jfif_density',
+    'jfif_version',
+    'compression',
+    'resolution',
 }
 
 def GetEmbeddedFileText( pil_image: PILImage.Image ) -> str | None:
+    
+    # OK WE DISCOVERED AN IMAGE THAT DID NOT FLESH OUT ITS info DICT UNTIL IT WAS LOADED
+    # I guess sometimes that stuff lives in the frame rather than header data
+    # this guy is apparently idempotent so we'll call it here to ensure we are getting a more decent shot
+    pil_image.load()
     
     if hasattr( pil_image, 'info' ):
         
         try:
             
-            return render_dict( pil_image.info, indent_depth = 0, ignore_these_keys = PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF )
+            info_dict = pil_image.info.copy()
+            
+            return render_dict( info_dict, indent_depth = 0, ignore_these_keys = PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF )
             
         except Exception as e:
             
