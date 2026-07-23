@@ -39,14 +39,22 @@ _sha_cache: dict[tuple[str, str], str] = {}
 _latest_cache: dict[str, str | None] = {}
 
 
+def repo_of( action: str ) -> str:
+
+    # GitHub API calls address the owner/repo; drop any subpath so subpath
+    # actions like `github/codeql-action/init` resolve against `github/codeql-action`.
+    return '/'.join( action.split( '/' )[ :2 ] )
+
+
 def resolve_sha( action: str, tag: str ) -> str:
 
-    key = ( action, tag )
+    repo = repo_of( action )
+    key = ( repo, tag )
 
     if key not in _sha_cache:
 
         _sha_cache[ key ] = subprocess.check_output(
-            [ 'gh', 'api', f'repos/{action}/commits/{tag}', '--jq', '.sha' ],
+            [ 'gh', 'api', f'repos/{repo}/commits/{tag}', '--jq', '.sha' ],
             text = True
         ).strip()
 
@@ -56,25 +64,27 @@ def resolve_sha( action: str, tag: str ) -> str:
 
 def latest_tag( action: str ) -> str | None:
 
-    if action not in _latest_cache:
+    repo = repo_of( action )
+
+    if repo not in _latest_cache:
 
         try:
 
             tag = subprocess.run(
-                [ 'gh', 'api', f'repos/{action}/releases/latest', '--jq', '.tag_name' ],
+                [ 'gh', 'api', f'repos/{repo}/releases/latest', '--jq', '.tag_name' ],
                 capture_output = True, text = True, check = True
             ).stdout.strip()
 
-            _latest_cache[ action ] = tag or None
+            _latest_cache[ repo ] = tag or None
 
         except subprocess.CalledProcessError:
 
             # no published releases (or no access); caller falls back to the existing tag
-            _latest_cache[ action ] = None
+            _latest_cache[ repo ] = None
 
 
 
-    return _latest_cache[ action ]
+    return _latest_cache[ repo ]
 
 
 def pin_line( line: str, use_latest: bool ) -> str:
@@ -121,7 +131,7 @@ def pin_line( line: str, use_latest: bool ) -> str:
 
     print( f'{action}@{tag} -> {sha}' )
 
-    return f'{m[ "pre" ]}{action}@{sha} # {tag}'
+    return f'{m[ "pre" ]}{action}@{sha}  # {tag}'
 
 
 def main() -> int:
