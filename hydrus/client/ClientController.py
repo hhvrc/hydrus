@@ -987,7 +987,7 @@ class Controller( HydrusController.HydrusController ):
                 
             
         
-        def save_objects():
+        def save_objects_and_exit():
             
             try:
                 
@@ -1023,8 +1023,6 @@ class Controller( HydrusController.HydrusController ):
             finally:
                 
                 qapp = QW.QApplication.instance()
-                
-                qapp.setProperty( 'exit_complete', True )
                 
                 self._DestroySplash()
                 
@@ -1062,11 +1060,11 @@ class Controller( HydrusController.HydrusController ):
             
             HydrusData.DebugPrint( 'doing fast shutdown' + HC.UNICODE_ELLIPSIS )
             
-            save_objects()
+            save_objects_and_exit()
             
         else:
             
-            self.CallToThreadLongRunning( save_objects )
+            self.CallToThreadLongRunning( save_objects_and_exit )
             
         
     
@@ -1313,6 +1311,8 @@ class Controller( HydrusController.HydrusController ):
         self.images_cache = ClientCaches.ImageRendererCache( self )
         self.image_tiles_cache = ClientCaches.ImageTileCache( self )
         self.thumbnails_cache = ClientCaches.ThumbnailCache( self )
+        # TODO: When you move this guy to being the only thumb cache, and when you clean up the thumbs rendering pipeline...
+        # if this guy still has a mainloop, move him to being a DAEMON and formalise it all as a manager. atm he calls his own loop start argh
         self.thumbnails_cache_graphics_view_test = ClientCaches.ThumbnailCacheGraphicsViewTest( self )
         
         self.frame_splash_status.SetText( 'initialising managers' )
@@ -2349,6 +2349,16 @@ class Controller( HydrusController.HydrusController ):
     def ShutdownModel( self ):
         
         self.frame_splash_status.SetText( 'saving and exiting objects' )
+        
+        if self.thumbnails_cache is not None:
+            
+            self.thumbnails_cache.shutdown()
+            
+        
+        if self.thumbnails_cache_graphics_view_test is not None:
+            
+            self.thumbnails_cache_graphics_view_test.shutdown()
+            
         
         if self._is_booted:
             

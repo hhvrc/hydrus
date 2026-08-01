@@ -93,14 +93,12 @@ class ThumbnailWaitingToBeDrawnAnimated( ThumbnailWaitingToBeDrawn ):
         
         self.alpha_bmp = QP.AdjustOpacity( self.bitmap, opacity_factor )
         
-        self.animation_started_precise = HydrusTime.GetNowPrecise()
+        self.animation_started_time_float = HydrusTime.GetNowFloat()
         
     
     def _GetNumFramesOutstanding( self ):
         
-        now_precise = HydrusTime.GetNowPrecise()
-        
-        num_frames_to_now = int( ( now_precise - self.animation_started_precise ) // FRAME_DURATION_60FPS )
+        num_frames_to_now = int( ( HydrusTime.GetNowFloat() - self.animation_started_time_float ) // FRAME_DURATION_60FPS )
         
         return min( num_frames_to_now, self.num_frames_to_draw - self.num_frames_drawn )
         
@@ -386,8 +384,6 @@ class MediaResultsPanelThumbnails( ClientGUIMediaResultsPanel.MediaResultsPanel 
             
             return
             
-        
-        now_precise = HydrusTime.GetNowPrecise()
         
         for thumbnail in thumbnails:
             
@@ -1907,7 +1903,7 @@ class MediaResultsPanelThumbnails( ClientGUIMediaResultsPanel.MediaResultsPanel 
     
     def TIMERAnimationUpdate( self ):
         
-        loop_should_break_time = HydrusTime.GetNowPrecise() + ( FRAME_DURATION_60FPS / 2 )
+        loop_should_break_time_float = HydrusTime.GetNowFloat() + ( FRAME_DURATION_60FPS / 2 )
         
         ( thumbnail_span_width, thumbnail_span_height ) = self._GetThumbnailSpanDimensions()
         
@@ -1984,7 +1980,7 @@ class MediaResultsPanelThumbnails( ClientGUIMediaResultsPanel.MediaResultsPanel 
                 del self._hashes_to_thumbnails_waiting_to_be_drawn[ hash ]
                 
             
-            if HydrusTime.TimeHasPassedPrecise( loop_should_break_time ):
+            if HydrusTime.TimeHasPassedFloat( loop_should_break_time_float ):
                 
                 break
                 
@@ -2856,7 +2852,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         #self._thumbnail_layout: ClientGUIThumbnailLayouts.ThumbnailLayout = ClientGUIThumbnailLayouts.MasonryLayout( ClientGUIThumbnailLayouts.MasonryLayout.VariableDimension.WIDTH )
         self._thumbnail_layout: ClientGUIThumbnailLayouts.ThumbnailLayout = ClientGUIThumbnailLayouts.RegularGridLayout()
         
-        self._last_animation_update_time = HydrusTime.GetNowPrecise()
+        self._last_animation_update_time_float = HydrusTime.GetNowFloat()
         
         super().__init__( parent, page_key, page_manager, media_results )
         
@@ -2950,13 +2946,20 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         for m in media:
             
+            thumb = self._media_to_thumbnails.get( m, None )
+            
+            if thumb is None:
+                
+                return
+                
+            
             if fade_thumbnails:
                 
-                self._media_to_thumbnails[ m ].StartFadeIn()
+                thumb.StartFadeIn()
                 
             else:
                 
-                self._media_to_thumbnails[ m ].update()
+                thumb.update()
                 
             
         
@@ -3173,6 +3176,20 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         CG.client_controller.pub( 'notify_new_pages_count' )
         
     
+    def _ResetThumbnailScrollSingleStep( self ):
+        
+        # No idea what to do if thumbnail height and/or width isn't constant.
+        # For now, use the "generic"/"average" thumbnail size for this purpose.
+        # This is probably fine...
+        ( thumbnail_span_width, thumbnail_span_height ) = self._thumbnail_layout.ThumbnailSpanDimensions( None )
+        
+        thumbnail_scroll_rate = float( CG.client_controller.new_options.GetString( 'thumbnail_scroll_rate' ) )
+        
+        self.verticalScrollBar().setSingleStep( int( round( thumbnail_span_height * thumbnail_scroll_rate ) ) )
+        
+        self.horizontalScrollBar().setSingleStep( int( round( thumbnail_span_width * thumbnail_scroll_rate ) ) )
+        
+    
     def _ScrollEnd( self, shift = False ):
         
         if len( self._sorted_media ) > 0:
@@ -3300,291 +3317,6 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         super().CleanBeforeDestroy()
         
     
-    def MaintainPageCache( self ):
-        
-        if not CG.client_controller.gui.IsCurrentPage( self._page_key ):
-            
-            # TODO
-            # I'm really not sure this is a good idea - fiddling with QGraphicsView's internal caching mechanism might hurt more than help...
-            # On the other hand, it CAN consume quite a bit of memory, but when exactly to clean caches is probably important for performance.
-            # Should decide based on real-world usage experience and a more through reading of the QGraphicsView docs, I leave it commented out for now.
-            # There are also some cache-related APIs on QGraphicsView (e.g. setCacheMode) that might be worth taking a look at in the future. 
-            # self.resetCachedContent()
-            pass
-            
-        
-    
-    def mouseDoubleClickEvent( self, event: QG.QMouseEvent ) -> None:
-        
-        event_media = self._GetMouseEventMedia( event )
-        
-        if event.button() == QC.Qt.MouseButton.LeftButton and event_media is not None:
-            
-            self.ShowMediaFullScreen( event_media )
-            
-        
-    
-    def mouseMoveEvent( self, event: QG.QMouseEvent ):
-        
-        if event.buttons() & QC.Qt.MouseButton.LeftButton:
-            
-            we_started_dragging_on_this_panel = self._drag_init_coordinates is not None
-            
-            if we_started_dragging_on_this_panel:
-                
-                old_drag_pos = self._drag_init_coordinates
-                
-                global_mouse_pos = ClientGUIFunctions.GetMousePos()
-                
-                delta_pos = global_mouse_pos - old_drag_pos
-                
-                total_absolute_pixels_moved = delta_pos.manhattanLength()
-                
-                we_moved = total_absolute_pixels_moved > 0
-                
-                if we_moved:
-                    
-                    self._drag_prefire_event_count += 1
-                    
-                
-                # prefire deal here is mpv lags on initial click, which can cause a drag (and hence an immediate pause) event by accident when mouserelease isn't processed quick
-                # so now we'll say we can't start a drag unless we get a smooth ramp to our pixel delta threshold
-                clean_drag_started = self._drag_prefire_event_count >= 10
-                prob_not_an_accidental_click = HydrusTime.TimeHasPassedMS( self._drag_click_timestamp_ms + 100 )
-                
-                if clean_drag_started and prob_not_an_accidental_click:
-                    
-                    media = self._GetSelectedFlatMedia( discriminant = CC.DISCRIMINANT_LOCAL )
-                    
-                    if len( media ) > 0:
-                        
-                        alt_down = event.modifiers() & QC.Qt.KeyboardModifier.AltModifier
-                        
-                        self._my_current_drag_object = QG.QDrag( self )
-                        
-                        CG.client_controller.CallLaterQtSafe( self, 0.1, 'doing DnD check', self._CheckDnDIsOK, self._my_current_drag_object )
-                        
-                        result = ClientGUIDragDrop.DoFileExportDragDrop( self._my_current_drag_object, self._page_key, media, alt_down )
-                        
-                        self._my_current_drag_object = None
-                        
-                        if result not in ( QC.Qt.DropAction.IgnoreAction, ):
-                            
-                            self.focusMediaPaused.emit()
-                            
-                        
-                        event.accept()
-                        
-                        return
-                        
-                    
-                
-            
-        else:
-            
-            self._drag_init_coordinates = None
-            self._drag_prefire_event_count = 0
-            self._drag_click_timestamp_ms = 0
-            
-        
-        event.ignore()
-        
-    
-    def mousePressEvent( self, event: QG.QMouseEvent ):
-        
-        # it is tempting to have QGraphicsItems handle their own clicks, and the first version of this did so, but ultimately the GI ends up just calling us anyway
-        # we don't want a knot of references or a billion signals flying around, so we'll just do it here
-        # itemAt provides a nice way to figure out the guy, so let's do it here
-        
-        event_media = self._GetMouseEventMedia( event )
-        
-        if event.button() == QC.Qt.MouseButton.RightButton and event_media is None:
-            
-            # this is a right-click on whitespace, which should not do any selection-altering behaviour
-            
-            QW.QGraphicsView.mousePressEvent( self, event )
-            
-        else:
-            
-            # ok this is a selecting-click; either a normal left/middle somewhere or a menu event on a thumb
-            
-            ctrl = event.modifiers() & QC.Qt.KeyboardModifier.ControlModifier
-            shift = event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
-            
-            if event_media is None:
-                
-                # middle-click on whitespace is a no-op
-                if event.buttons() != QC.Qt.MouseButton.MiddleButton:
-                    
-                    self._HitMedia( None, ctrl, shift )
-                    
-                
-            else:
-                
-                if event.buttons() == QC.Qt.MouseButton.MiddleButton:
-                    
-                    self.ShowMediaFullScreen( event_media )
-                    
-                else:
-                    
-                    self._drag_init_coordinates = QG.QCursor.pos()
-                    self._drag_click_timestamp_ms = HydrusTime.GetNowMS()
-                    
-                    # this specifically does not scroll to media, as for clicking (esp. double-clicking attempts), the scroll can be jarring
-                    self._HitMedia( event_media, ctrl, shift )
-                    
-                
-            
-        
-    
-    def MoveMedia( self, medias: list[ ClientMedia.Media ], insertion_index: int ):
-        
-        if len( medias ) == 0:
-            
-            return
-            
-        
-        super().MoveMedia( medias, insertion_index )
-        
-        self._NotifyThumbnailsHaveMoved()
-        
-        self._ScrollToMedia( medias[0] )
-        
-    
-    def NewThumbnails( self, hashes ):
-        
-        affected_thumbnails = self._GetMedia( hashes )
-        
-        if len( affected_thumbnails ) > 0:
-            
-            self._RedrawMedia( affected_thumbnails )
-            
-        
-    
-    def NotifyFilesNeedRedraw( self, hashes ):
-        
-        affected_media = self._GetMedia( hashes )
-        
-        for m in affected_media:
-            
-            self._media_to_thumbnails[ m ].Invalidate()
-            
-        
-        self._RedrawMedia( affected_media )
-        
-    
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
-        
-        command_processed = True
-        
-        if command.IsSimpleCommand():
-            
-            action = command.GetSimpleAction()
-            
-            if action == CAC.SIMPLE_MOVE_THUMBNAIL_FOCUS:
-                
-                ( move_direction, selection_status ) = command.GetSimpleData()
-                
-                shift = selection_status == CAC.SELECTION_STATUS_SHIFT
-                
-                if move_direction in ( CAC.MOVE_HOME, CAC.MOVE_END ):
-                    
-                    if move_direction == CAC.MOVE_HOME:
-                        
-                        self._ScrollHome( shift )
-                        
-                    else: # MOVE_END
-                        
-                        self._ScrollEnd( shift )
-                        
-                    
-                elif move_direction in ( CAC.MOVE_PAGE_UP, CAC.MOVE_PAGE_DOWN ):
-                    
-                    if move_direction == CAC.MOVE_PAGE_UP:
-                        
-                        direction = -1
-                        
-                    else: # MOVE_PAGE_DOWN
-                        
-                        direction = 1
-                        
-                    focus_media, _ = self._MediaToUseWhenMovingFocus()
-                    
-                    if focus_media:
-                        
-                        scene_rect = self.mapToScene( self.viewport().rect() ).boundingRect()
-                        media_index = self._sorted_media.index( focus_media )
-                        percent_visible = CG.client_controller.new_options.GetInteger( 'thumbnail_visibility_scroll_percent' ) / 100
-                        
-                        new_index = self._thumbnail_layout.JumpPage( scene_rect, media_index, direction, percent_visible )
-                        
-                        self._MoveThumbnailFocus( new_index, shift )
-                    
-                else:
-                    
-                    focus_media, is_next_best = self._MediaToUseWhenMovingFocus()
-                    
-                    if focus_media:
-                        
-                        # TODO
-                        # I expanded this check so rows & columns behave symmetrically (previously there was only an equivalent condition for columns i.e. the MOVE_LEFT case inside _MoveThumbnailFocus).
-                        # Symmetric behavior will be important when we have non-uniform grids or grids scrolling horizontally,
-                        # but honestly even after playing around with the original implementation, I still don't fully understand what this is supposed to achieve.
-                        # If this logic weren't needed we could remove this ugly is_next_best return value when determining the focus media...
-                        if is_next_best and ( move_direction == CAC.MOVE_LEFT or move_direction == CAC.MOVE_UP ): # treat it as if the focused area is between this and the next
-                            
-                            pass
-                            
-                        else:
-                            
-                            focus_media_index = self._sorted_media.index( focus_media )
-                            
-                            self._MoveThumbnailFocus( self._thumbnail_layout.MoveFromIndex( focus_media_index, move_direction ), shift )
-                            
-                        
-                    
-                
-            elif action == CAC.SIMPLE_SELECT_FILES:
-                
-                file_filter = command.GetSimpleData()
-                
-                self._Select( file_filter )
-                
-            else:
-                
-                command_processed = False
-                
-            
-        else:
-            
-            command_processed = False
-            
-        
-        if not command_processed:
-            
-            return super().ProcessApplicationCommand( command )
-            
-        else:
-            
-            return command_processed
-            
-        
-    
-    def RedrawAllThumbnails( self ):
-        
-        for m in self._collected_media:
-            
-            m.RecalcInternals()
-            
-        
-        for media in self._sorted_media:
-            
-            self._media_to_thumbnails[ media ].ClearCachesAndInvalidate()
-            
-        
-        self.scene().update()
-        
-    
     def contextMenuEvent( self, event ) -> None:
         
         super().contextMenuEvent( event )
@@ -3604,38 +3336,6 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         if event.type() == QC.QEvent.Type.ContextMenu:
             
             self.ShowMenu()
-            
-        
-    
-    def resizeEvent( self, event: QG.QResizeEvent ) -> None:
-        
-        super().resizeEvent( event )
-        
-        self._ArrangeThumbnails()
-        
-    
-    def SetFocusedMedia( self, media ):
-        
-        super().SetFocusedMedia( media )
-        
-        if media is None:
-            
-            self._SetFocusedMedia( None )
-            
-        else:
-            
-            try:
-                
-                my_media = self._GetMedia( media.GetHashes() )[0]
-                
-                self._HitMedia( my_media, False, False )
-                
-                self._ScrollToMedia( self._focused_media )
-                
-            except Exception as e:
-                
-                pass
-                
             
         
     
@@ -4268,6 +3968,323 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         return sum( ( m.GetSize() for m in self._sorted_media ) )
         
     
+    def MaintainPageCache( self ):
+        
+        if not CG.client_controller.gui.IsCurrentPage( self._page_key ):
+            
+            # TODO
+            # I'm really not sure this is a good idea - fiddling with QGraphicsView's internal caching mechanism might hurt more than help...
+            # On the other hand, it CAN consume quite a bit of memory, but when exactly to clean caches is probably important for performance.
+            # Should decide based on real-world usage experience and a more through reading of the QGraphicsView docs, I leave it commented out for now.
+            # There are also some cache-related APIs on QGraphicsView (e.g. setCacheMode) that might be worth taking a look at in the future. 
+            # self.resetCachedContent()
+            pass
+            
+        
+    
+    def mouseDoubleClickEvent( self, event: QG.QMouseEvent ) -> None:
+        
+        event_media = self._GetMouseEventMedia( event )
+        
+        if event.button() == QC.Qt.MouseButton.LeftButton and event_media is not None:
+            
+            self.ShowMediaFullScreen( event_media )
+            
+        
+    
+    def mouseMoveEvent( self, event: QG.QMouseEvent ):
+        
+        if event.buttons() & QC.Qt.MouseButton.LeftButton:
+            
+            we_started_dragging_on_this_panel = self._drag_init_coordinates is not None
+            
+            if we_started_dragging_on_this_panel:
+                
+                old_drag_pos = self._drag_init_coordinates
+                
+                global_mouse_pos = ClientGUIFunctions.GetMousePos()
+                
+                delta_pos = global_mouse_pos - old_drag_pos
+                
+                total_absolute_pixels_moved = delta_pos.manhattanLength()
+                
+                we_moved = total_absolute_pixels_moved > 0
+                
+                if we_moved:
+                    
+                    self._drag_prefire_event_count += 1
+                    
+                
+                # prefire deal here is mpv lags on initial click, which can cause a drag (and hence an immediate pause) event by accident when mouserelease isn't processed quick
+                # so now we'll say we can't start a drag unless we get a smooth ramp to our pixel delta threshold
+                clean_drag_started = self._drag_prefire_event_count >= 10
+                prob_not_an_accidental_click = HydrusTime.TimeHasPassedMS( self._drag_click_timestamp_ms + 100 )
+                
+                if clean_drag_started and prob_not_an_accidental_click:
+                    
+                    media = self._GetSelectedFlatMedia( discriminant = CC.DISCRIMINANT_LOCAL )
+                    
+                    if len( media ) > 0:
+                        
+                        alt_down = event.modifiers() & QC.Qt.KeyboardModifier.AltModifier
+                        
+                        self._my_current_drag_object = QG.QDrag( self )
+                        
+                        CG.client_controller.CallLaterQtSafe( self, 0.1, 'doing DnD check', self._CheckDnDIsOK, self._my_current_drag_object )
+                        
+                        result = ClientGUIDragDrop.DoFileExportDragDrop( self._my_current_drag_object, self._page_key, media, alt_down )
+                        
+                        self._my_current_drag_object = None
+                        
+                        if result not in ( QC.Qt.DropAction.IgnoreAction, ):
+                            
+                            self.focusMediaPaused.emit()
+                            
+                        
+                        event.accept()
+                        
+                        return
+                        
+                    
+                
+            
+        else:
+            
+            self._drag_init_coordinates = None
+            self._drag_prefire_event_count = 0
+            self._drag_click_timestamp_ms = 0
+            
+        
+        event.ignore()
+        
+    
+    def mousePressEvent( self, event: QG.QMouseEvent ):
+        
+        # it is tempting to have QGraphicsItems handle their own clicks, and the first version of this did so, but ultimately the GI ends up just calling us anyway
+        # we don't want a knot of references or a billion signals flying around, so we'll just do it here
+        # itemAt provides a nice way to figure out the guy, so let's do it here
+        
+        event_media = self._GetMouseEventMedia( event )
+        
+        if event.button() == QC.Qt.MouseButton.RightButton and event_media is None:
+            
+            # this is a right-click on whitespace, which should not do any selection-altering behaviour
+            
+            QW.QGraphicsView.mousePressEvent( self, event )
+            
+        else:
+            
+            # ok this is a selecting-click; either a normal left/middle somewhere or a menu event on a thumb
+            
+            ctrl = event.modifiers() & QC.Qt.KeyboardModifier.ControlModifier
+            shift = event.modifiers() & QC.Qt.KeyboardModifier.ShiftModifier
+            
+            if event_media is None:
+                
+                # middle-click on whitespace is a no-op
+                if event.buttons() != QC.Qt.MouseButton.MiddleButton:
+                    
+                    self._HitMedia( None, ctrl, shift )
+                    
+                
+            else:
+                
+                if event.buttons() == QC.Qt.MouseButton.MiddleButton:
+                    
+                    self.ShowMediaFullScreen( event_media )
+                    
+                else:
+                    
+                    self._drag_init_coordinates = QG.QCursor.pos()
+                    self._drag_click_timestamp_ms = HydrusTime.GetNowMS()
+                    
+                    # this specifically does not scroll to media, as for clicking (esp. double-clicking attempts), the scroll can be jarring
+                    self._HitMedia( event_media, ctrl, shift )
+                    
+                
+            
+        
+    
+    def MoveMedia( self, medias: list[ ClientMedia.Media ], insertion_index: int ):
+        
+        if len( medias ) == 0:
+            
+            return
+            
+        
+        super().MoveMedia( medias, insertion_index )
+        
+        self._NotifyThumbnailsHaveMoved()
+        
+        self._ScrollToMedia( medias[0] )
+        
+    
+    def NewThumbnails( self, hashes ):
+        
+        affected_thumbnails = self._GetMedia( hashes )
+        
+        if len( affected_thumbnails ) > 0:
+            
+            self._RedrawMedia( affected_thumbnails )
+            
+        
+    
+    def NotifyFilesNeedRedraw( self, hashes ):
+        
+        affected_media = self._GetMedia( hashes )
+        
+        for m in affected_media:
+            
+            self._media_to_thumbnails[ m ].Invalidate()
+            
+        
+        self._RedrawMedia( affected_media )
+        
+    
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+        
+        command_processed = True
+        
+        if command.IsSimpleCommand():
+            
+            action = command.GetSimpleAction()
+            
+            if action == CAC.SIMPLE_MOVE_THUMBNAIL_FOCUS:
+                
+                ( move_direction, selection_status ) = command.GetSimpleData()
+                
+                shift = selection_status == CAC.SELECTION_STATUS_SHIFT
+                
+                if move_direction in ( CAC.MOVE_HOME, CAC.MOVE_END ):
+                    
+                    if move_direction == CAC.MOVE_HOME:
+                        
+                        self._ScrollHome( shift )
+                        
+                    else: # MOVE_END
+                        
+                        self._ScrollEnd( shift )
+                        
+                    
+                elif move_direction in ( CAC.MOVE_PAGE_UP, CAC.MOVE_PAGE_DOWN ):
+                    
+                    if move_direction == CAC.MOVE_PAGE_UP:
+                        
+                        direction = -1
+                        
+                    else: # MOVE_PAGE_DOWN
+                        
+                        direction = 1
+                        
+                    focus_media, _ = self._MediaToUseWhenMovingFocus()
+                    
+                    if focus_media:
+                        
+                        scene_rect = self.mapToScene( self.viewport().rect() ).boundingRect()
+                        media_index = self._sorted_media.index( focus_media )
+                        percent_visible = CG.client_controller.new_options.GetInteger( 'thumbnail_visibility_scroll_percent' ) / 100
+                        
+                        new_index = self._thumbnail_layout.JumpPage( scene_rect, media_index, direction, percent_visible )
+                        
+                        self._MoveThumbnailFocus( new_index, shift )
+                    
+                else:
+                    
+                    focus_media, is_next_best = self._MediaToUseWhenMovingFocus()
+                    
+                    if focus_media:
+                        
+                        # TODO
+                        # I expanded this check so rows & columns behave symmetrically (previously there was only an equivalent condition for columns i.e. the MOVE_LEFT case inside _MoveThumbnailFocus).
+                        # Symmetric behavior will be important when we have non-uniform grids or grids scrolling horizontally,
+                        # but honestly even after playing around with the original implementation, I still don't fully understand what this is supposed to achieve.
+                        # If this logic weren't needed we could remove this ugly is_next_best return value when determining the focus media...
+                        if is_next_best and ( move_direction == CAC.MOVE_LEFT or move_direction == CAC.MOVE_UP ): # treat it as if the focused area is between this and the next
+                            
+                            pass
+                            
+                        else:
+                            
+                            focus_media_index = self._sorted_media.index( focus_media )
+                            
+                            self._MoveThumbnailFocus( self._thumbnail_layout.MoveFromIndex( focus_media_index, move_direction ), shift )
+                            
+                        
+                    
+                
+            elif action == CAC.SIMPLE_SELECT_FILES:
+                
+                file_filter = command.GetSimpleData()
+                
+                self._Select( file_filter )
+                
+            else:
+                
+                command_processed = False
+                
+            
+        else:
+            
+            command_processed = False
+            
+        
+        if not command_processed:
+            
+            return super().ProcessApplicationCommand( command )
+            
+        else:
+            
+            return command_processed
+            
+        
+    
+    def RedrawAllThumbnails( self ):
+        
+        for m in self._collected_media:
+            
+            m.RecalcInternals()
+            
+        
+        for media in self._sorted_media:
+            
+            self._media_to_thumbnails[ media ].ClearCachesAndInvalidate()
+            
+        
+        self.scene().update()
+        
+    
+    def resizeEvent( self, event: QG.QResizeEvent ) -> None:
+        
+        super().resizeEvent( event )
+        
+        self._ArrangeThumbnails()
+        
+    
+    def SetFocusedMedia( self, media ):
+        
+        super().SetFocusedMedia( media )
+        
+        if media is None:
+            
+            self._SetFocusedMedia( None )
+            
+        else:
+            
+            try:
+                
+                my_media = self._GetMedia( media.GetHashes() )[0]
+                
+                self._HitMedia( my_media, False, False )
+                
+                self._ScrollToMedia( self._focused_media )
+                
+            except Exception as e:
+                
+                pass
+                
+            
+        
+    
     def ShowMenu( self ):
         
         menu = self.GetMenu()
@@ -4279,21 +4296,12 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         super().Sort( media_sort )
         
+        for m in self._collected_media:
+            
+            self._media_to_thumbnails[ m ].ClearCachesAndInvalidate()
+            
+        
         self._NotifyThumbnailsHaveMoved()
-        
-    
-    def _ResetThumbnailScrollSingleStep( self ):
-        
-        # No idea what to do if thumbnail height and/or width isn't constant.
-        # For now, use the "generic"/"average" thumbnail size for this purpose.
-        # This is probably fine...
-        ( thumbnail_span_width, thumbnail_span_height ) = self._thumbnail_layout.ThumbnailSpanDimensions( None )
-        
-        thumbnail_scroll_rate = float( CG.client_controller.new_options.GetString( 'thumbnail_scroll_rate' ) )
-        
-        self.verticalScrollBar().setSingleStep( int( round( thumbnail_span_height * thumbnail_scroll_rate ) ) )
-        
-        self.horizontalScrollBar().setSingleStep( int( round( thumbnail_span_width * thumbnail_scroll_rate ) ) )
         
     
     def ThumbnailsReset( self ):
@@ -4317,7 +4325,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
     
     def TIMERAnimationUpdate( self ):
         
-        if HydrusTime.GetNowPrecise() - self._last_animation_update_time < FRAME_DURATION_60FPS:
+        if HydrusTime.GetNowFloat() - self._last_animation_update_time_float < FRAME_DURATION_60FPS:
             
             return
             
@@ -4330,7 +4338,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                 
             
         
-        self._last_animation_update_time = HydrusTime.GetNowPrecise()
+        self._last_animation_update_time_float = HydrusTime.GetNowFloat()
         
     
     def WaterfallThumbnails( self, page_key, medias ):
@@ -4344,7 +4352,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
 
 class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
     
-    FADE_DURATION_S = 0.5
+    FADE_DURATION_S = 13/60
     
     def __init__( self, media: ClientMedia.Media, panel: MediaResultsPanelThumbnailsGraphicsViewTest, page_key: bytes ):
         
@@ -4401,7 +4409,7 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         self._last_upper_summary = None
         self._last_lower_summary = None
         
-        self._fade_in_started_at = None
+        self._fade_in_started_time_float = None
         
         # Yes, this is another level of caching but I find it helps with performance, although investigating how big is the performance (vs. memory) hit really would be worth it.
         # In addition to the image in the ThumbnailCache this already has the borders, tags, etc. drawn on it too and also it already in QPixmap format for fast painting!
@@ -4415,170 +4423,31 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
         self._cached_old_pixmap_for_fade = None
         
     
-    def AnimationUpdate( self ):
+    def _GetContentSize( self ) -> tuple[int, int]:
+        # this guy is going to see some changes as we move to size-agnostic thumb pipeline, but just a note, this is device pixels, not device-independant pixels
+        # we won't want to scale a thumb to this size but rather scale to true-DPI size and then draw as if it were in this coordinate space _or something_
         
-        if not self.possibly_visible or not self.is_animating:
-            
-            return
-            
+        thumbnail_border = CG.client_controller.new_options.GetInteger( 'thumbnail_border' )
         
-        self.update()
-        
-    
-    def boundingRect( self ) -> QC.QRectF:
-        
-        return QC.QRectF( 0, 0, self.width, self.height )
+        # now if self.width/height haven't been set (by the layouting code) by this time we will be in for a lot of pain when this returns negative values,
+        # but since that happens in the layouting code at the same place where we make this thumb visible,
+        # before that the thumb should be hidden so none of the painting-related functions that need this should be called at all
+        # maybe return None or something in that case here? at least that would be easier to catch if it somehow happens anyway
+        return ( self.width - thumbnail_border * 2, self.height - thumbnail_border * 2 )
         
     
-    def ClearCachesAndInvalidate( self ):
+    def _GetFadeInOpacity( self ) -> float:
         
-        self._last_tags = None
-        
-        self._last_upper_summary = None
-        self._last_lower_summary = None
-        
-        self.Invalidate()
-        
-    
-    def hoverEnterEvent( self, event: QW.QGraphicsSceneHoverEvent ) -> None:
-        
-        self._is_hovered = True
-        
-        super().hoverEnterEvent( event )
-        
-    
-    def hoverLeaveEvent( self, event: QW.QGraphicsSceneHoverEvent ) -> None:
-        
-        self._is_hovered = False
-        
-        super().hoverLeaveEvent( event )
-        
-    
-    def Invalidate( self ) -> None:
-        
-        if self.media.HasUsefulResolution():
-            
-            ( self.res_x, self.res_y ) = self.media.GetResolution()
-            
-        else:
-            
-            ( self.res_x, self.res_y ) = HC.options[ 'thumbnail_dimensions' ]
-            
-        
-        self._cached_pixmap = None
-        self._cached_old_pixmap_for_fade = None
-        
-    
-    def paint( self, painter: QG.QPainter, option: QW.QStyleOptionGraphicsItem, widget: QW.QWidget | None = None ) -> None:
-        
-        try:
-            
-            thumbnails_cache = CG.client_controller.thumbnails_cache_graphics_view_test
-            
-            if not self._cached_pixmap or self.width != self._cached_pixmap.width() or self.height != self._cached_pixmap.height():
-                
-                if not thumbnails_cache.HasThumbnailCached( self.media, self._GetContentSize() ):
-                    
-                    painter.fillRect( self.boundingRect(), QC.Qt.GlobalColor.transparent )
-                    
-                    # non-blocking reminder to the cache to get going on us if it isn't already
-                    # TODO: I moved to this guy knowing the page key, rather than asking the GV for it, but this whole waterfall cascade is obviously a knot
-                    # it'd be nice to rework how this guy gets informed of or otherwise pulls his thumb
-                    # similarly, it would be nice to draw a placeholder here rather than just like blank or an old pixmap fallback, and then update with the actual guy once it is loaded
-                    # so yeah maybe we go to something like:
-                        # if thumb ready, use it
-                        # else, grab the placeholder and remind the cache to schedule an update
-                        # if the GV is the one catching all this, then we could just pass the bitmap along that route, in the pubsub, tbh
-                        # perhaps all responsibility for thumb load could actually be handled at the GV level. a bunch of it is, and this guy just draws what he has and otherwise takes updates
-                    # ANYWAY, just consider the waterfall ''''''pipeline'''''' in its entirety and consider untying it significantly
-                    thumbnails_cache.Waterfall( self._page_key, ( self.media, ) )
-                    
-                    # TODO what if fade is not enabled? I think we don't need to check here for that since then StartFadeIn would never be called and
-                    #_ cached_old_pixmap_for_fade would be None. Right??
-                    if self._cached_old_pixmap_for_fade: # fade-in in progress, draw the old image first if available
-                        
-                        # if the size of the thumb changed in the meantime then probably don't want to draw
-                        if self.width == self._cached_old_pixmap_for_fade.width() and self.height == self._cached_old_pixmap_for_fade.height():
-                            
-                            painter.drawPixmap( 0, 0, self._cached_old_pixmap_for_fade )
-                            
-                        
-                    
-                    return
-                    
-                
-                cached_image = QG.QImage( self.width, self.height, QG.QImage.Format.Format_ARGB32_Premultiplied )
-                
-                cached_image.setDevicePixelRatio( painter.device().devicePixelRatio() )
-                
-                cached_image.fill( QC.Qt.GlobalColor.transparent )
-                
-                image_painter = QG.QPainter( cached_image )
-                
-                self._PaintThumbnailContent( image_painter, self.media, self._view )
-                
-                image_painter.end()
-                
-                self._cached_pixmap = QG.QPixmap.fromImage( cached_image )
-                
-            
-            fade_opacity = self.GetFadeInOpacity()
-            
-            if fade_opacity < 1.0 and self._cached_old_pixmap_for_fade: # fade-in in progress, draw the old image first if available
-                
-                # if the size of the thumb changed in the meantime then probably don't want to draw
-                if self.width == self._cached_old_pixmap_for_fade.width() and self.height == self._cached_old_pixmap_for_fade.height():
-                    
-                    painter.drawPixmap( 0, 0, self._cached_old_pixmap_for_fade )
-                    
-                
-            
-            painter.setOpacity( fade_opacity )
-            
-            painter.drawPixmap( 0, 0, self._cached_pixmap )
-            
-        except Exception as e:
-            
-            ClientGUIExceptionHandling.HandlePaintEventException( self._view, e )
-            
-        
-    
-    def StartFadeIn( self ):
-        
-        # Instead of managing the opacity ourselves here and in paint(),
-        # we could just use QGraphicsItem::setOpacity and update that value in AnimationUpdate().
-        # However, that would cause the opacity value to get stuck when the item leaves the visible area,
-        # since we stop calling AnimationUpdate() then.
-        # So when it re-enters the visible area, it would still have the previous opacity value
-        # until the next AnimationUpdate().
-        # Could work around by revising the 'possibly visible' thumbnail tracking logic a bit,
-        # but other animations will most likely not have such nice corresponding properties anyway so
-        # if we want more animations in the future we won't be able to avoid having to roll our own logic.
-        # Nevermind actually I'm not sure about that, the scene/view stuff does have a whole system for animations afterall,
-        # so maybe we should take a harder look at that for future animations before rolling our own.
-        
-        self._fade_in_started_at = HydrusTime.GetNowPrecise()
-        
-        self._cached_old_pixmap_for_fade = self._cached_pixmap
-        self._cached_pixmap = None
-        
-        self.is_animating = True
-        
-        self.update()
-        
-    
-    def GetFadeInOpacity( self ) -> float:
-        
-        if self._fade_in_started_at is None:
+        if self._fade_in_started_time_float is None or self._cached_old_pixmap_for_fade is None:
             
             return 1.0
             
         
-        passed = HydrusTime.GetNowPrecise() - self._fade_in_started_at
+        passed = HydrusTime.GetNowFloat() - self._fade_in_started_time_float
         
         if passed >= self.FADE_DURATION_S:
             
-            self._fade_in_started_at = None
+            self._fade_in_started_time_float = None
             
             self._cached_old_pixmap_for_fade = None
             
@@ -4590,17 +4459,6 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
             return passed / self.FADE_DURATION_S # linear transition from 0 to 1 opacity, maybe some other easing curve would look better?
             
-        
-    
-    def _GetContentSize( self ) -> tuple[int, int]:
-        
-        thumbnail_border = CG.client_controller.new_options.GetInteger( 'thumbnail_border' )
-        
-        # now if self.width/height haven't been set (by the layouting code) by this time we will be in for a lot of pain when this returns negative values,
-        # but since that happens in the layouting code at the same place where we make this thumb visible,
-        # before that the thumb should be hidden so none of the painting-related functions that need this should be called at all
-        # maybe return None or something in that case here? at least that would be easier to catch if it somehow happens anyway
-        return ( self.width - thumbnail_border * 2, self.height - thumbnail_border * 2 )
         
     
     def _PaintThumbnailContent( self, painter: QG.QPainter, media: ClientMedia.Media, media_panel: ClientGUIMediaResultsPanel.MediaResultsPanelGraphicsViewTest ) -> None:
@@ -5175,5 +5033,162 @@ class ThumbnailGraphicsViewTest( QW.QGraphicsItem ):
             
             top_left_x += icon_to_draw.width() + ( ICON_MARGIN * 2 )
             
+        
+    
+    def AnimationUpdate( self ):
+        
+        if not self.possibly_visible or not self.is_animating:
+            
+            return
+            
+        
+        self.update()
+        
+    
+    def boundingRect( self ) -> QC.QRectF:
+        
+        return QC.QRectF( 0, 0, self.width, self.height )
+        
+    
+    def ClearCachesAndInvalidate( self ):
+        
+        self._last_tags = None
+        
+        self._last_upper_summary = None
+        self._last_lower_summary = None
+        
+        self.Invalidate()
+        
+    
+    def hoverEnterEvent( self, event: QW.QGraphicsSceneHoverEvent ) -> None:
+        
+        self._is_hovered = True
+        
+        super().hoverEnterEvent( event )
+        
+    
+    def hoverLeaveEvent( self, event: QW.QGraphicsSceneHoverEvent ) -> None:
+        
+        self._is_hovered = False
+        
+        super().hoverLeaveEvent( event )
+        
+    
+    def Invalidate( self ) -> None:
+        
+        if self.media.HasUsefulResolution():
+            
+            ( self.res_x, self.res_y ) = self.media.GetResolution()
+            
+        else:
+            
+            ( self.res_x, self.res_y ) = HC.options[ 'thumbnail_dimensions' ]
+            
+        
+        self._cached_pixmap = None
+        self._cached_old_pixmap_for_fade = None
+        
+    
+    def paint( self, painter: QG.QPainter, option: QW.QStyleOptionGraphicsItem, widget: QW.QWidget | None = None ) -> None:
+        
+        try:
+            
+            thumbnails_cache = CG.client_controller.thumbnails_cache_graphics_view_test
+            
+            dpr = painter.device().devicePixelRatio()
+            
+            true_cached_image_width = int( self.width * dpr )
+            true_cached_image_height = int( self.height * dpr )
+            
+            true_cached_image_size = QC.QSize( true_cached_image_width, true_cached_image_height )
+            
+            if self._cached_old_pixmap_for_fade is not None and self._cached_old_pixmap_for_fade.size() != true_cached_image_size:
+                
+                self._cached_old_pixmap_for_fade = None
+                
+            
+            if not self._cached_pixmap or self._cached_pixmap.size() != true_cached_image_size:
+                
+                if not thumbnails_cache.HasThumbnailCached( self.media, self._GetContentSize() ):
+                    
+                    painter.fillRect( self.boundingRect(), QC.Qt.GlobalColor.transparent )
+                    
+                    # non-blocking reminder to the cache to get going on us if it isn't already
+                    # TODO: I moved to this guy knowing the page key, rather than asking the GV for it, but this whole waterfall cascade is obviously a knot
+                    # it'd be nice to rework how this guy gets informed of or otherwise pulls his thumb
+                    # similarly, it would be nice to draw a placeholder here rather than just like blank or an old pixmap fallback, and then update with the actual guy once it is loaded
+                    # so yeah maybe we go to something like:
+                        # if thumb ready, use it
+                        # else, grab the placeholder and remind the cache to schedule an update
+                        # placeholder can be blurhash of course!
+                        # if the GV is the one catching all this, then we could just pass the bitmap along that route, in the pubsub, tbh
+                        # perhaps all responsibility for thumb load could actually be handled at the GV level. a bunch of it is, and this guy just draws what he has and otherwise takes updates
+                    # ANYWAY, just consider the waterfall ''''''pipeline'''''' in its entirety and consider untying it significantly
+                    thumbnails_cache.Waterfall( self._page_key, ( self.media, ) )
+                    
+                    # TODO what if fade is not enabled? I think we don't need to check here for that since then StartFadeIn would never be called and
+                    #_ cached_old_pixmap_for_fade would be None. Right??
+                    if self._cached_old_pixmap_for_fade is not None: # fade-in in progress, draw the old image first if available
+                        
+                        painter.drawPixmap( 0, 0, self._cached_old_pixmap_for_fade )
+                        
+                    
+                    return
+                    
+                
+                cached_image = QG.QImage( true_cached_image_width, true_cached_image_height, QG.QImage.Format.Format_ARGB32_Premultiplied )
+                
+                cached_image.setDevicePixelRatio( dpr )
+                
+                cached_image.fill( QC.Qt.GlobalColor.transparent )
+                
+                image_painter = QG.QPainter( cached_image )
+                
+                self._PaintThumbnailContent( image_painter, self.media, self._view )
+                
+                image_painter.end()
+                
+                self._cached_pixmap = QG.QPixmap.fromImage( cached_image )
+                
+            
+            fade_opacity = self._GetFadeInOpacity()
+            
+            if fade_opacity < 1.0 and self._cached_old_pixmap_for_fade is not None: # fade-in in progress, draw the old image first if available
+                
+                painter.drawPixmap( 0, 0, self._cached_old_pixmap_for_fade )
+                
+                painter.setOpacity( fade_opacity )
+                
+            
+            painter.drawPixmap( 0, 0, self._cached_pixmap )
+            
+        except Exception as e:
+            
+            ClientGUIExceptionHandling.HandlePaintEventException( self._view, e )
+            
+        
+    
+    def StartFadeIn( self ):
+        
+        # Instead of managing the opacity ourselves here and in paint(),
+        # we could just use QGraphicsItem::setOpacity and update that value in AnimationUpdate().
+        # However, that would cause the opacity value to get stuck when the item leaves the visible area,
+        # since we stop calling AnimationUpdate() then.
+        # So when it re-enters the visible area, it would still have the previous opacity value
+        # until the next AnimationUpdate().
+        # Could work around by revising the 'possibly visible' thumbnail tracking logic a bit,
+        # but other animations will most likely not have such nice corresponding properties anyway so
+        # if we want more animations in the future we won't be able to avoid having to roll our own logic.
+        # Nevermind actually I'm not sure about that, the scene/view stuff does have a whole system for animations afterall,
+        # so maybe we should take a harder look at that for future animations before rolling our own.
+        
+        self._fade_in_started_time_float = HydrusTime.GetNowFloat()
+        
+        self._cached_old_pixmap_for_fade = self._cached_pixmap
+        self._cached_pixmap = None
+        
+        self.is_animating = True
+        
+        self.update()
         
     

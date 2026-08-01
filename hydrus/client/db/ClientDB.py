@@ -9,13 +9,9 @@ import time
 import traceback
 import typing
 
-from qtpy import QtCore as QC
-from qtpy import QtWidgets as QW
-
 from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusDB
-from hydrus.core import HydrusDBBase
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusLists
@@ -220,22 +216,6 @@ def report_speed_to_log( precise_timestamp, num_rows, row_name ):
     summary = 'processed ' + HydrusNumbers.ToHumanInt( num_rows ) + ' ' + row_name + ' at ' + rows_s + ' rows/s'
     
     HydrusData.Print( summary )
-    
-
-class JobDatabaseClient( HydrusDBBase.JobDatabase ):
-    
-    def _DoDelayedResultRelief( self ):
-        
-        if HG.db_ui_hang_relief_mode:
-            
-            if QC.QThread.currentThread() == CG.client_controller.main_qt_thread:
-                
-                HydrusData.Print( 'ui-hang event processing: begin' )
-                QW.QApplication.instance().processEvents()
-                HydrusData.Print( 'ui-hang event processing: end' )
-                
-            
-        
     
 
 class DB( HydrusDB.HydrusDB ):
@@ -1668,11 +1648,6 @@ class DB( HydrusDB.HydrusDB ):
             
         
         self.modules_media_results.ForceRefreshFileInfoManagers( hash_ids_to_hashes )
-        
-    
-    def _GenerateDBJob( self, job_type, synchronous, action, *args, **kwargs ):
-        
-        return JobDatabaseClient( job_type, synchronous, action, *args, **kwargs )
         
     
     def _GetBonedStats( self, file_search_context: ClientSearchFileSearchContext.FileSearchContext = None, job_status = None ):
@@ -7596,13 +7571,14 @@ class DB( HydrusDB.HydrusDB ):
         
         if version == 643:
             
-            def ask_what_to_do_transparency_recheck_644( num_transparent_files ):
+            def ask_what_to_do_transparency_recheck_644( num_transparent_files: int ):
                 
                 message = f'Hey, I have changed how I detect transparency in files. Files that only have a barely-noticeable handful of 98% opaque pixels are now considered non-transparent. You have {HydrusNumbers.ToHumanInt(num_transparent_files)} images and animations that are currently considered as having transparency. Do you want to schedule a transparency-rescan for all of them to clear out the previous false positives?'
                 message += '\n' * 2
                 message += 'I recommend you say yes unless the number here is truly huge and you do not want hydrus to be eventually loading all those files (e.g. if your files are stored in the cloud and you need to keep bandwidth usage down).'
                 
                 from hydrus.client.gui import ClientGUIDialogsQuick
+                from qtpy import QtWidgets as QW
                 
                 result = ClientGUIDialogsQuick.GetYesNo( CG.client_controller.GetMainTLW(), message, title = 'Re-do transparency check?', yes_label = 'yes, re-scan these files', no_label = 'no, do not do it' )
                 
@@ -8233,7 +8209,7 @@ class DB( HydrusDB.HydrusDB ):
         
         self._Execute( 'UPDATE version SET version = ?;', ( current_version, ) )
         
-        versions_that_could_do_with_a_new_venv = { 670 }
+        versions_that_could_do_with_a_new_venv = { 670, 681 }
         
         if HC.RUNNING_FROM_SOURCE and HC.GOT_A_NORMAL_LOOKING_VENV and current_version in versions_that_could_do_with_a_new_venv:
             

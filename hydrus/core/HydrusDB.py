@@ -297,6 +297,9 @@ def VacuumDBInto( db_path: str ):
     HydrusData.ShowText( f'Vacuumed {db_path} in {HydrusTime.TimeDeltaToPrettyTimeDelta( time_took )} ({HydrusData.ToHumanBytes(bytes_per_sec)}/s). It went from {HydrusData.ToHumanBytes( original_size )} to {HydrusData.ToHumanBytes( vacuum_size )}' )
     
 
+SHUTDOWN_SENTINEL = object()
+COMMIT_CHECK_TOKEN_SENTINEL = object()
+
 class HydrusDB( HydrusDBBase.DBBase ):
     
     READ_WRITE_ACTIONS = []
@@ -325,7 +328,6 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         self._we_have_connected_to_the_database_at_least_once = False
         
-        self._finished_job_event = threading.Event()
         self._i_am_idle = threading.Event()
         self._i_am_idle.set()
         
@@ -375,7 +377,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
         self._ready_to_serve_requests = False
         self._could_not_initialise = False
         
-        self._jobs = queue.Queue()
+        self._jobs_queue = queue.Queue()
         
         self._currently_doing_job = False
         self._current_status = ''
@@ -953,7 +955,12 @@ class HydrusDB( HydrusDBBase.DBBase ):
     
     def _PutJob( self, job ):
         
-        self._jobs.put( job )
+        if self._loop_finished:
+            
+            raise HydrusExceptions.ShutdownException()
+            
+        
+        self._jobs_queue.put( job )
         
         self._i_am_idle.clear()
         
@@ -1020,6 +1027,17 @@ class HydrusDB( HydrusDBBase.DBBase ):
             if os.path.exists( sqlite_exe_path ) and os.path.isfile( sqlite_exe_path ):
                 
                 dest_path = os.path.join( self._db_dir, 'sqlite3.exe' )
+                
+                HydrusPaths.MirrorFile( sqlite_exe_path, dest_path )
+                
+            
+        elif HC.PLATFORM_LINUX:
+            
+            sqlite_exe_path = os.path.join( HydrusStaticDir.INSTALL_STATIC_DIR, 'build_files', 'linux', 'sqlite3' )
+            
+            if os.path.exists( sqlite_exe_path ) and os.path.isfile( sqlite_exe_path ):
+                
+                dest_path = os.path.join( self._db_dir, 'sqlite3' )
                 
                 HydrusPaths.MirrorFile( sqlite_exe_path, dest_path )
                 
@@ -1146,7 +1164,7 @@ class HydrusDB( HydrusDBBase.DBBase ):
     
     def JobsQueueEmpty( self ):
         
-        return self._jobs.empty()
+        return self._jobs_queue.empty()
         
     
     def MainLoop( self ):
@@ -1168,77 +1186,65 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         self._ready_to_serve_requests = True
         
-        error_count = 0
-        
-        while not ( ( self._local_shutdown or HG.model_shutdown ) and self._jobs.empty() ):
+        while not ( ( self._local_shutdown or HG.model_shutdown ) and self._jobs_queue.empty() ):
             
             try:
                 
-                job = self._jobs.get( timeout = 1 )
+                result = self._jobs_queue.get()
+                
+                if result is SHUTDOWN_SENTINEL:
+                    
+                    # if there are jobs still on the queue, we actually loop and finish them off. that's probably what we want tbh
+                    continue
+                    
+                elif result is COMMIT_CHECK_TOKEN_SENTINEL:
+                    
+                    if self._cursor_transaction_wrapper.TimeToCommit():
+                        
+                        self._current_status = 'db committing'
+                        
+                        self.publish_status_update()
+                        
+                        self._cursor_transaction_wrapper.CommitAndBegin()
+                        
+                    
+                    continue
+                    
+                
+                job: HydrusDBBase.JobDatabase = result
                 
                 self._currently_doing_job = True
                 self._current_job_name = job.ToString()
                 
                 self.publish_status_update()
                 
-                try:
+                if HG.db_report_mode:
                     
-                    if HG.db_report_mode:
-                        
-                        summary = 'Running db job: ' + job.ToString()
-                        
-                        HydrusData.ShowText( summary )
-                        
+                    summary = 'Running db job: ' + job.ToString()
                     
-                    if HydrusProfiling.IsProfileMode( 'db' ):
-                        
-                        summary = 'Profiling db job: ' + job.ToString()
-                        
-                        HydrusProfiling.Profile( summary, HydrusData.Call( self._ProcessJob, job ), min_duration_ms = HG.db_profile_min_job_time_ms )
-                        
-                    else:
-                        
-                        self._ProcessJob( job )
-                        
+                    HydrusData.ShowText( summary )
                     
-                    error_count = 0
+                
+                if HydrusProfiling.IsProfileMode( 'db' ):
                     
-                except Exception as e:
+                    summary = 'Profiling db job: ' + job.ToString()
                     
-                    error_count += 1
+                    HydrusProfiling.Profile( summary, HydrusData.Call( self._ProcessJob, job ), min_duration_ms = HG.db_profile_min_job_time_ms )
                     
-                    if error_count > 5:
-                        
-                        raise
-                        
+                else:
                     
-                    self._jobs.put( job ) # couldn't lock db; put job back on queue
-                    
-                    time.sleep( 5 )
+                    self._ProcessJob( job )
                     
                 
                 self._current_job_name = ''
                 self._currently_doing_job = False
-                
-                self._finished_job_event.set()
-                
-            except queue.Empty:
-                
-                if self._cursor_transaction_wrapper.TimeToCommit():
-                    
-                    self._current_status = 'db committing'
-                    
-                    self.publish_status_update()
-                    
-                    self._cursor_transaction_wrapper.CommitAndBegin()
-                    
                 
             finally:
                 
                 self._current_status = ''
                 self.publish_status_update()
                 
-                if self._jobs.empty():
+                if self._jobs_queue.empty():
                     
                     self._i_am_idle.set()
                     
@@ -1276,6 +1282,19 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         self._loop_finished = True
         
+        self._i_am_idle.set()
+        
+        # catching jobs scheduled in the window between mainloop termination and 'loop_finished = True'
+        while not self._jobs_queue.empty():
+            
+            result = self._jobs_queue.get()
+            
+            if isinstance( result, HydrusDBBase.JobDatabase ):
+                
+                result.PutResult( HydrusExceptions.ShutdownException() )
+                
+            
+        
     
     def PauseAndDisconnect( self, pause_and_disconnect ):
         
@@ -1297,11 +1316,6 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         job = self._GenerateDBJob( job_type, synchronous, action, *args, **kwargs )
         
-        if HG.model_shutdown:
-            
-            raise HydrusExceptions.ShutdownException( 'Application has shut down!' )
-            
-        
         self._PutJob( job )
         
         return job.GetResult()
@@ -1312,29 +1326,21 @@ class HydrusDB( HydrusDBBase.DBBase ):
         return self._ready_to_serve_requests
         
     
+    def ScheduleCommitCheck( self ):
+        
+        self._jobs_queue.put( COMMIT_CHECK_TOKEN_SENTINEL )
+        
+    
     def Shutdown( self ):
         
         self._local_shutdown = True
         
+        self._jobs_queue.put( SHUTDOWN_SENTINEL )
+        
     
     def WaitUntilFree( self ):
         
-        while True:
-            
-            if HG.model_shutdown:
-                
-                raise HydrusExceptions.ShutdownException( 'Application shutting down!' )
-                
-            else:
-                
-                i_am_idle = self._i_am_idle.wait( 0.5 )
-                
-                if i_am_idle:
-                    
-                    return
-                    
-                
-            
+        self._i_am_idle.wait()
         
     
     def Write( self, action, synchronous, *args, **kwargs ):
@@ -1343,13 +1349,11 @@ class HydrusDB( HydrusDBBase.DBBase ):
         
         job = self._GenerateDBJob( job_type, synchronous, action, *args, **kwargs )
         
-        if HG.model_shutdown:
-            
-            raise HydrusExceptions.ShutdownException( 'Application has shut down!' )
-            
-        
         self._PutJob( job )
         
-        if synchronous: return job.GetResult()
+        if synchronous:
+            
+            return job.GetResult()
+            
         
     
