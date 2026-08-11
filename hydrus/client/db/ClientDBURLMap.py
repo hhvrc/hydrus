@@ -8,6 +8,7 @@ from hydrus.core import HydrusData
 
 from hydrus.client.db import ClientDBMaster
 from hydrus.client.db import ClientDBModule
+from hydrus.client.db import ClientDBPostgresOutbox
 from hydrus.client.networking import ClientNetworkingURLClass
 from hydrus.client.search import ClientNumberTest
 
@@ -43,6 +44,8 @@ class ClientDBURLMap( ClientDBModule.ClientDBModule ):
         url_id = self.modules_urls.GetURLId( url )
         
         self._Execute( 'INSERT OR IGNORE INTO url_map ( hash_id, url_id ) VALUES ( ?, ? );', ( hash_id, url_id ) )
+
+        ClientDBPostgresOutbox.RecordURL( hash_id, url, True )
         
     
     def DeleteMapping( self, hash_id: int, url: str ):
@@ -50,6 +53,8 @@ class ClientDBURLMap( ClientDBModule.ClientDBModule ):
         url_id = self.modules_urls.GetURLId( url )
         
         self._Execute( 'DELETE FROM url_map WHERE hash_id = ? AND url_id = ?;', ( hash_id, url_id ) )
+
+        ClientDBPostgresOutbox.RecordURL( hash_id, url, False )
         
     
     def GetHashIds( self, search_url: str ):

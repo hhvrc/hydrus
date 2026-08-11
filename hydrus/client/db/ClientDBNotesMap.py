@@ -7,6 +7,7 @@ from hydrus.core import HydrusData
 from hydrus.client import ClientThreading
 from hydrus.client.db import ClientDBMaster
 from hydrus.client.db import ClientDBModule
+from hydrus.client.db import ClientDBPostgresOutbox
 from hydrus.client.search import ClientNumberTest
 
 class ClientDBNotesMap( ClientDBModule.ClientDBModule ):
@@ -38,10 +39,12 @@ class ClientDBNotesMap( ClientDBModule.ClientDBModule ):
         
     
     def DeleteNote( self, hash_id: int, name: str ):
-        
+
         name_id = self.modules_texts.GetLabelId( name )
-        
+
         self._Execute( 'DELETE FROM file_notes WHERE hash_id = ? AND name_id = ?;', ( hash_id, name_id ) )
+
+        ClientDBPostgresOutbox.RecordNote( hash_id, name, None )
         
     
     def GetHashIdsFromNoteName( self, name: str, hash_ids_table_name: str, job_status: ClientThreading.JobStatus | None = None ):
@@ -177,10 +180,13 @@ class ClientDBNotesMap( ClientDBModule.ClientDBModule ):
         self._Execute( 'DELETE FROM file_notes WHERE hash_id = ? AND name_id = ?;', ( hash_id, name_id ) )
         
         if len( note ) > 0:
-            
+
             note_id = self.modules_texts.GetNoteId( note )
-            
+
             self._Execute( 'INSERT OR IGNORE INTO file_notes ( hash_id, name_id, note_id ) VALUES ( ?, ?, ? );', ( hash_id, name_id, note_id ) )
-            
-        
-    
+
+
+        # an empty note is hydrus's way of clearing one, so mirror that as a delete
+        ClientDBPostgresOutbox.RecordNote( hash_id, name, note if len( note ) > 0 else None )
+
+

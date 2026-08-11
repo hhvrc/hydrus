@@ -15,6 +15,7 @@ from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientThreading
 from hydrus.client.db import ClientDBFilesStorage
 from hydrus.client.db import ClientDBModule
+from hydrus.client.db import ClientDBPostgresOutbox
 from hydrus.client.db import ClientDBMaster
 from hydrus.client.db import ClientDBServices
 
@@ -661,9 +662,11 @@ class ClientDBSimilarFiles( ClientDBModule.ClientDBModule ):
         
     
     def AssociatePerceptualHashes( self, hash_id, perceptual_hash_ids ):
-        
+
+        perceptual_hash_ids = list( perceptual_hash_ids )
+
         self._ExecuteMany( 'INSERT OR IGNORE INTO shape_perceptual_hash_map ( phash_id, hash_id ) VALUES ( ?, ? );', ( ( perceptual_hash_id, hash_id ) for perceptual_hash_id in perceptual_hash_ids ) )
-        
+
         if self._GetRowCount() > 0:
             
             self._DeltaShapeSearchCacheNumbersRemoveFile( hash_id )
@@ -675,11 +678,15 @@ class ClientDBSimilarFiles( ClientDBModule.ClientDBModule ):
             
             # emergency backstop to ensure we do add this to the system in the case of a weird re-association gap
             self._Execute( 'INSERT OR IGNORE INTO shape_search_cache ( hash_id, searched_distance ) VALUES ( ?, ? );', ( hash_id, -1 ) )
-            
-        
+
+
         self._DeltaShapeSearchCacheNumbers( -1, 1 )
-        
-    
+
+        # must come after the _GetRowCount() branch above -- an outbox insert
+        # would otherwise be the "last statement" and clobber the row count
+        ClientDBPostgresOutbox.RecordPerceptualHashes( hash_id, perceptual_hash_ids, True )
+
+
     def ClearPixelHash( self, hash_id: int ):
         
         self._Execute( 'DELETE FROM pixel_hash_map WHERE hash_id = ?;', ( hash_id, ) )
@@ -696,8 +703,10 @@ class ClientDBSimilarFiles( ClientDBModule.ClientDBModule ):
         self._ExecuteMany( 'INSERT OR IGNORE INTO shape_maintenance_branch_regen ( phash_id ) VALUES ( ? );', ( ( perceptual_hash_id, ) for perceptual_hash_id in useless_perceptual_hash_ids ) )
         
         self._cursor_transaction_wrapper.pub_after_job( 'notify_new_shape_search_branch_maintenance_work' )
-        
-    
+
+        ClientDBPostgresOutbox.RecordPerceptualHashes( hash_id, perceptual_hash_ids, False )
+
+
     def FileIsInSystem( self, hash_id ):
         
         result = self._Execute( 'SELECT 1 FROM shape_search_cache WHERE hash_id = ?;', ( hash_id, ) ).fetchone()

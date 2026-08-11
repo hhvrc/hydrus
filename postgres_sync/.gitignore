@@ -1,0 +1,9 @@
+bin/
+obj/
+
+# Connection string, read by commands as $(cat .pgconn) so it is never echoed.
+.pgconn
+
+# Regenerate with:
+#   DOTNET_ROLL_FORWARD=Major dotnet ef migrations script -o ../generated-schema.sql
+generated-schema.sql

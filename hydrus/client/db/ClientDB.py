@@ -60,6 +60,7 @@ from hydrus.client.db import ClientDBMappingsStorage
 from hydrus.client.db import ClientDBMaster
 from hydrus.client.db import ClientDBMediaResults
 from hydrus.client.db import ClientDBNotesMap
+from hydrus.client.db import ClientDBPostgresOutbox
 from hydrus.client.db import ClientDBRatings
 from hydrus.client.db import ClientDBRepositories
 from hydrus.client.db import ClientDBSerialisable
@@ -4098,8 +4099,21 @@ class DB( HydrusDB.HydrusDB ):
     def _LoadModules( self ):
         
         self.modules_db_maintenance = ClientDBMaintenance.ClientDBMaintenance( self._c, self._db_dir, self._db_filenames, self._cursor_transaction_wrapper, self._modules )
-        
+
         self._modules.append( self.modules_db_maintenance )
+
+        # Postgres CDC outbox. Loaded first so every later module's writes are
+        # captured. Off unless HYDRUS_PG_OUTBOX=1, so an unconfigured client
+        # pays nothing but a None check per write.
+        self.modules_postgres_outbox = ClientDBPostgresOutbox.ClientDBPostgresOutbox(
+            self._c,
+            self._db_dir,
+            os.environ.get( 'HYDRUS_PG_OUTBOX', '' ) == '1'
+        )
+
+        self._modules.append( self.modules_postgres_outbox )
+
+        ClientDBPostgresOutbox.SetInstance( self.modules_postgres_outbox )
         
         self.modules_services = ClientDBServices.ClientDBMasterServices( self._c )
         

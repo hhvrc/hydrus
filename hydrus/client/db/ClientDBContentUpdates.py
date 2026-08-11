@@ -29,6 +29,7 @@ from hydrus.client.db import ClientDBMappingsCacheSpecificStorage
 from hydrus.client.db import ClientDBMaster
 from hydrus.client.db import ClientDBMediaResults
 from hydrus.client.db import ClientDBModule
+from hydrus.client.db import ClientDBPostgresOutbox
 from hydrus.client.db import ClientDBNotesMap
 from hydrus.client.db import ClientDBRatings
 from hydrus.client.db import ClientDBRepositories
@@ -248,11 +249,16 @@ class ClientDBContentUpdates( ClientDBModule.ClientDBModule ):
                 
             
             # push the service updates, done
-            
+
             self._ExecuteMany( 'UPDATE service_info SET info = info + ? WHERE service_id = ? AND info_type = ?;', service_info_updates )
-            
-        
-    
+
+            # valid_rows is ( hash_id, timestamp_ms ); only the genuinely-new ones
+            for ( import_timestamp_ms, timestamp_rows ) in HydrusData.BuildKeyToListDict( ( ( timestamp_ms, hash_id ) for ( hash_id, timestamp_ms ) in valid_rows ) ).items():
+
+                ClientDBPostgresOutbox.RecordFileStatus( service_id, timestamp_rows, HC.CONTENT_STATUS_CURRENT, import_timestamp_ms )
+
+
+
     def DeleteFiles( self, service_id, hash_ids, only_if_current = False ):
         
         local_file_service_ids = self.modules_services.GetServiceIds( ( HC.LOCAL_FILE_DOMAIN, ) )
@@ -441,13 +447,17 @@ class ClientDBContentUpdates( ClientDBModule.ClientDBModule ):
             
         
         # push the info updates
-        
+
         if len( service_info_updates ) > 0:
-            
+
             self._ExecuteMany( 'UPDATE service_info SET info = info + ? WHERE service_id = ? AND info_type = ?;', service_info_updates )
-            
-        
-    
+
+
+        # only the files that were actually present -- existing_hash_ids, not the
+        # caller's hash_ids, which may include files this service never held
+        ClientDBPostgresOutbox.RecordFileStatus( service_id, existing_hash_ids, HC.CONTENT_STATUS_DELETED, now_ms )
+
+
     def GetTablesAndColumnsThatUseDefinitions( self, content_type: int ) -> list[ tuple[ str, str ] ]:
         
         tables_and_columns = []
@@ -1346,7 +1356,18 @@ class ClientDBContentUpdates( ClientDBModule.ClientDBModule ):
         pending_rescinded_mappings_ids = self.modules_mappings_storage.FilterExistingUpdateMappings( tag_service_id, pending_rescinded_mappings_ids, HC.CONTENT_UPDATE_RESCIND_PEND )
         petitioned_mappings_ids = self.modules_mappings_storage.FilterExistingUpdateMappings( tag_service_id, petitioned_mappings_ids, HC.CONTENT_UPDATE_PETITION )
         petitioned_rescinded_mappings_ids = self.modules_mappings_storage.FilterExistingUpdateMappings( tag_service_id, petitioned_rescinded_mappings_ids, HC.CONTENT_UPDATE_RESCIND_PETITION )
-        
+
+        # Record here, after filtering: these six lists are the *actual* changes,
+        # already deduped against existing state, which is exactly what the read
+        # model wants. Safe spot -- the first _GetRowCount() is further down,
+        # after a DELETE, so an outbox insert here cannot clobber it.
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_CURRENT, mappings_ids, False )
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_DELETED, deleted_mappings_ids, False )
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_PENDING, pending_mappings_ids, False )
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_PENDING, pending_rescinded_mappings_ids, True )
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_PETITIONED, petitioned_mappings_ids, False )
+        ClientDBPostgresOutbox.RecordMappings( tag_service_id, HC.CONTENT_STATUS_PETITIONED, petitioned_rescinded_mappings_ids, True )
+
         tag_ids_to_filter_chained = { tag_id for ( tag_id, hash_ids ) in itertools.chain.from_iterable( ( mappings_ids, deleted_mappings_ids, pending_mappings_ids, pending_rescinded_mappings_ids ) ) }
         
         chained_tag_ids = self.modules_tag_display.FilterChained( ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, tag_service_id, tag_ids_to_filter_chained )

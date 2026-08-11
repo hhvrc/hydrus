@@ -5,6 +5,7 @@ from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusExceptions
 
 from hydrus.client.db import ClientDBModule
+from hydrus.client.db import ClientDBPostgresOutbox
 
 class ClientDBFilesMetadataBasic( ClientDBModule.ClientDBModule ):
     
@@ -58,7 +59,11 @@ class ClientDBFilesMetadataBasic( ClientDBModule.ClientDBModule ):
             
         
         # hash_id, size, mime, width, height, duration, num_frames, has_audio, num_words
+        rows = list( rows )
+
         self._ExecuteMany( insert_phrase + ' files_info ( hash_id, size, mime, width, height, duration, num_frames, has_audio, num_words ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ? );', rows )
+
+        ClientDBPostgresOutbox.RecordFilesInfo( rows )
         
     
     def GetBlurhash( self, hash_id: int ) -> str:
