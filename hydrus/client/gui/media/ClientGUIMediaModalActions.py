@@ -21,6 +21,7 @@ from hydrus.client import ClientPaths
 from hydrus.client import ClientPDFHandling
 from hydrus.client import ClientThreading
 from hydrus.client.files import ClientFilesMaintenance
+from hydrus.client.files.images import ClientImageMetadata
 from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUIDialogsQuick
 from hydrus.client.gui import ClientGUITopLevelWindowsPanels
@@ -1310,8 +1311,18 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
     mime = media.GetMime()
     top_line_text = ClientMediaResultPrettyInfo.ConvertInfoLinesToTextBlock( info_lines )
     exif_dict = None
+    xmp_dict = None
+    iptc_dict = None
     file_text = None
     extra_rows = []
+    
+    exif_looking_good = mime in HC.FILES_THAT_CAN_HAVE_EXIF
+    xmp_looking_good = mime in HC.FILES_THAT_CAN_HAVE_XMP
+    iptc_looking_good = mime in HC.FILES_THAT_CAN_HAVE_IPTC
+    software_source_looking_good = mime in HC.FILES_THAT_CAN_HAVE_SOFTWARE_SOURCE
+    human_readable_looking_good = mime in HC.FILES_THAT_CAN_HAVE_HUMAN_READABLE_EMBEDDED_METADATA
+    
+    looking_good_for_something = exif_looking_good or xmp_looking_good or iptc_looking_good or software_source_looking_good or human_readable_looking_good
     
     if media.GetLocationsManager().IsLocal():
         
@@ -1330,7 +1341,7 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
                 pass # leave it as None
                 
             
-        elif mime in HC.FILES_THAT_CAN_HAVE_EXIF or mime in HC.FILES_THAT_CAN_HAVE_HUMAN_READABLE_EMBEDDED_METADATA:
+        elif looking_good_for_something:
             
             path = CG.client_controller.client_files_manager.GetFilePath( hash, mime )
             
@@ -1340,23 +1351,38 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
                 
                 try:
                     
-                    if mime in HC.FILES_THAT_CAN_HAVE_EXIF:
+                    talked_about_icc_profile = False
+                    
+                    raw_pil_image.load() # yes this is generally smart to up-front err on the side of max harvest
+                    
+                    if exif_looking_good:
                         
                         exif_dict = HydrusImageMetadata.GetEXIFDict( raw_pil_image )
                         
                     
-                    if mime in HC.FILES_THAT_CAN_HAVE_HUMAN_READABLE_EMBEDDED_METADATA:
+                    if xmp_looking_good:
+                        
+                        xmp_dict = ClientImageMetadata.GetXMPDict( raw_pil_image )
+                        
+                    
+                    if iptc_looking_good:
+                        
+                        iptc_dict = ClientImageMetadata.GetIPTCDict( raw_pil_image )
+                        
+                    
+                    if human_readable_looking_good:
                         
                         file_text = HydrusImageMetadata.GetEmbeddedFileText( raw_pil_image )
                         
                     
-                    talked_about_icc_profile = False
-                    
-                    software = HydrusImageMetadata.GetSoftwareFromPilInfo( raw_pil_image )
-                    
-                    if software is not None:
+                    if software_source_looking_good:
                         
-                        extra_rows.append( ( 'source', software ) )
+                        software_source = HydrusImageMetadata.GetSoftwareSourceFromPilInfo( raw_pil_image )
+                        
+                        if software_source is not None:
+                            
+                            extra_rows.append( ( 'software/source', software_source ) )
+                            
                         
                     
                     if mime == HC.IMAGE_JPEG:
@@ -1374,6 +1400,8 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
                             extra_rows.append( ( 'subsampling', HydrusImageMetadata.subsampling_str_lookup[ result ]))
                             
                         
+                    
+                    # TODO: bundle all this to a sub-method
                     
                     if 'srgb' in raw_pil_image.info:
                         
@@ -1508,7 +1536,6 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
                             
                         
                     
-                    
                 finally:
                     
                     raw_pil_image.close()
@@ -1528,7 +1555,7 @@ def ShowFileEmbeddedMetadata( win: QW.QWidget, media: ClientMediaSingle.MediaSin
     
     frame = ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel( win, 'Detailed File Metadata' )
     
-    panel = ClientGUIScrolledPanelsReview.ReviewFileEmbeddedMetadata( frame, mime, top_line_text, exif_dict, file_text, extra_rows )
+    panel = ClientGUIScrolledPanelsReview.ReviewFileEmbeddedMetadata( frame, mime, top_line_text, exif_dict, xmp_dict, iptc_dict, file_text, extra_rows )
     
     frame.SetPanel( panel )
     

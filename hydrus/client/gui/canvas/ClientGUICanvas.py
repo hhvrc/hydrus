@@ -2308,6 +2308,7 @@ class CanvasWithHovers( Canvas ):
         self._top_hover.sendApplicationCommand.connect( self.ProcessApplicationCommand )
         
         self._media_container.zoomChanged.connect( self._top_hover.SetCurrentZoom )
+        self._media_container.sendApplicationCommand.connect( self.ProcessApplicationCommand, QC.Qt.ConnectionType.QueuedConnection )
         
         self._hovers.append( self._top_hover )
         
@@ -2356,7 +2357,7 @@ class CanvasWithHovers( Canvas ):
         self._window_always_on_top = False
         self._hide_window_frame = False # should always start with titlebar/frame (to establish taskbar gubbins?)
         
-        if CG.client_controller.new_options.GetBoolean( 'always_start_media_viewers_always_on_top' ):
+        if CG.client_controller.new_options.GetBoolean( 'always_start_media_viewers_always_on_top' ) and not self.IsAlwaysOnTopWhilePlaying():
             
             CG.client_controller.CallLaterQtSafe( self, 0.1, 'setting media viewer window on top', self._FlipWindowAlwaysOnTop )
             
@@ -2394,16 +2395,72 @@ class CanvasWithHovers( Canvas ):
         self.window().setGeometry( window_real_geom )
         
         self.window().show()
+        
+        self._DoWindowAlwaysOnTop()
+        
         self.update()
         
     
     def _DoWindowAlwaysOnTop( self ):
         
-        self.window().setWindowFlag( QC.Qt.WindowType.WindowStaysOnTopHint, self._window_always_on_top )
+        window = self.window()
         
-        self.window().show()
+        if HC.PLATFORM_WINDOWS:
+            
+            import ctypes
+            from ctypes import wintypes
+            
+            set_window_pos = ctypes.windll.user32.SetWindowPos
+            
+            set_window_pos.argtypes = (
+                wintypes.HWND,
+                wintypes.HWND,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                wintypes.UINT
+            )
+            
+            set_window_pos.restype = wintypes.BOOL
+            
+            hwnd_insert_after = wintypes.HWND( -1 if self._window_always_on_top else -2 )
+            
+            flags = 0x0001 | 0x0002 | 0x0010
+            
+            success = set_window_pos(
+                wintypes.HWND( int( window.winId() ) ),
+                hwnd_insert_after,
+                0,
+                0,
+                0,
+                0,
+                flags
+            )
+            
+            if success:
+                
+                return
+                
+            
         
-        self.update()
+        current_state = window.windowFlags() & QC.Qt.WindowType.WindowStaysOnTopHint
+        
+        if self._window_always_on_top != current_state:
+            
+            if HC.PLATFORM_LINUX and self._media_container.IsUsingMPV():
+                
+                print( 'Avoiding switching always-on-top because we are Linux + mpv!' )
+                
+                return # this fairly reliably causes a crash hooray
+                
+            
+            window.setWindowFlag( QC.Qt.WindowType.WindowStaysOnTopHint, self._window_always_on_top )
+            
+            window.show()
+            
+            self.update()
+            
         
     
     def _DrawAdditionalTopMiddleInfo( self, painter: QG.QPainter, current_y ):
@@ -3218,6 +3275,11 @@ class CanvasWithHovers( Canvas ):
         return self._hide_window_frame
         
     
+    def IsAlwaysOnTopWhilePlaying( self ):
+        
+        return self._media_container.GetTieMediaWindowOnTopToPausePlayState()
+        
+    
     def NotifyWeAreClosing( self ):
         
         pass
@@ -3261,16 +3323,16 @@ class CanvasWithHovers( Canvas ):
                 
             elif action in ( CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_FLIP, CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_ON, CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF ):
                 
-                if action == CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_ON:
+                should_flip = action == CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_FLIP or ( action == CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_ON ) != self._window_always_on_top
+                
+                if should_flip:
                     
-                    self._window_always_on_top = False
-                    
-                elif action == CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF:
-                    
-                    self._window_always_on_top = True
+                    self._FlipWindowAlwaysOnTop()
                     
                 
-                self._FlipWindowAlwaysOnTop()
+            elif action == CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_WHILE_PLAYING_FLIP:
+                
+                self._media_container.SetTieMediaWindowOnTopToPausePlayState( not self._media_container.GetTieMediaWindowOnTopToPausePlayState() )
                 
             elif action == CAC.SIMPLE_WINDOW_FRAMELESS_FLIP:
                 

@@ -1412,6 +1412,7 @@ class MediaContainer( QW.QWidget ):
     launchMediaViewer = QC.Signal()
     readyForNeighbourPrefetch = QC.Signal()
     haveDestroyedAllMediaWindows = QC.Signal()
+    sendApplicationCommand = QC.Signal( CAC.ApplicationCommand )
     
     zoomChanged = QC.Signal( int, float )
     
@@ -1436,7 +1437,7 @@ class MediaContainer( QW.QWidget ):
         self.setSizePolicy( QW.QSizePolicy.Policy.Fixed, QW.QSizePolicy.Policy.Fixed )
         
         self._media = None
-        self._deferred_set_media_call = None
+        self._deferred_set_media_call: HydrusData.Call | None = None
         self._show_action = CC.MEDIA_VIEWER_ACTION_DO_NOT_SHOW
         self._start_paused = False
         self._start_with_embed = False
@@ -1460,6 +1461,10 @@ class MediaContainer( QW.QWidget ):
         self._close_check_timer.timeout.connect( self._CheckClosingWidgets )
         
         self._media_window = None
+        self._tie_media_window_to_pauseplay_state = self._canvas_type in CC.CANVAS_MEDIA_VIEWER_TYPES and CG.client_controller.new_options.GetBoolean( 'always_start_media_windows_tied_to_pauseplay_state' )
+        self._window_always_on_top_update_timer = QC.QTimer( self )
+        self._window_always_on_top_update_timer.setSingleShot( True )
+        self._window_always_on_top_update_timer.timeout.connect( self._UpdateWindowAlwaysOnTop )
         
         self._embed_button = EmbedButton( self, self._background_colour_generator )
         self._embed_button_widget_event_filter = QP.WidgetEventFilter( self._embed_button )
@@ -1642,7 +1647,7 @@ class MediaContainer( QW.QWidget ):
             return CG.client_controller.new_options.GetInteger( 'preview_default_zoom_type_override' )
             
         
-
+    
     def _GetMaxZoomDimension( self ):
         
         if self._show_action in ( CC.MEDIA_VIEWER_ACTION_SHOW_WITH_MPV, CC.MEDIA_VIEWER_ACTION_SHOW_WITH_QTMEDIAPLAYER ) or isinstance( self._media_window, Animation ):
@@ -2100,6 +2105,43 @@ class MediaContainer( QW.QWidget ):
             
         
     
+    def _UpdateWindowAlwaysOnTop( self, wait_for_double_click = False ):
+        
+        if not self._tie_media_window_to_pauseplay_state:
+            
+            self._window_always_on_top_update_timer.stop()
+            
+            return
+            
+        
+        always_on_top = self.CurrentlyPresentingMediaWithDuration() and not self._media_window.IsPaused()
+        
+        if always_on_top == self._canvas.IsAlwaysOnTop():
+            
+            self._window_always_on_top_update_timer.stop()
+            
+            return
+            
+        
+        if wait_for_double_click:
+            
+            if not self._window_always_on_top_update_timer.isActive():
+                
+                double_click_interval = QW.QApplication.instance().doubleClickInterval()
+                
+                self._window_always_on_top_update_timer.start( double_click_interval )
+                
+            
+            return
+            
+        
+        self._window_always_on_top_update_timer.stop()
+        
+        action = CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_ON if always_on_top else CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF
+        
+        self.sendApplicationCommand.emit( CAC.ApplicationCommand.STATICCreateSimpleCommand( action ) )
+        
+    
     def AddPlayerMenus( self, menu: QW.QMenu ):
         
         player_menu = ClientGUIMenus.GenerateMenu( menu )
@@ -2136,6 +2178,8 @@ class MediaContainer( QW.QWidget ):
         
         self._media_window = None
         
+        self._UpdateWindowAlwaysOnTop()
+
         CG.client_controller.gui.UnregisterUIUpdateWindow( self )
         
         self.hide()
@@ -2301,6 +2345,11 @@ class MediaContainer( QW.QWidget ):
         return self._per_player_mute_state
         
     
+    def GetTieMediaWindowOnTopToPausePlayState( self ):
+        
+        return self._tie_media_window_to_pauseplay_state
+        
+    
     def GotoPreviousOrNextFrame( self, direction ):
         
         if self._media is not None:
@@ -2393,6 +2442,11 @@ class MediaContainer( QW.QWidget ):
         return False
         
     
+    def IsUsingMPV( self ):
+        
+        return isinstance( self._media_window, ClientGUIMPV.MPVWidget )
+        
+    
     def IsZoomable( self ):
         
         if self._media is None:
@@ -2469,7 +2523,6 @@ class MediaContainer( QW.QWidget ):
             if self.CurrentlyPresentingMediaWithDuration():
                 
                 self._media_window.PausePlay()
-                
             
         
     
@@ -2659,6 +2712,8 @@ class MediaContainer( QW.QWidget ):
         
         self.show()
         
+        self._UpdateWindowAlwaysOnTop()
+        
     
     def ShouldHaveVolumeControl( self ):
         
@@ -2683,6 +2738,24 @@ class MediaContainer( QW.QWidget ):
             
         
         self._UpdateMediaWindowMute()
+        
+    
+    def SetTieMediaWindowOnTopToPausePlayState( self, tie_media_window_to_pauseplay_state: bool ):
+        
+        self._tie_media_window_to_pauseplay_state = tie_media_window_to_pauseplay_state
+        
+        if self._tie_media_window_to_pauseplay_state:
+            
+            self._UpdateWindowAlwaysOnTop()
+            
+        else:
+            
+            always_on_top = CG.client_controller.new_options.GetBoolean( 'always_start_media_viewers_always_on_top' )
+            
+            action = CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_ON if always_on_top else CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_OFF
+            
+            self.sendApplicationCommand.emit( CAC.ApplicationCommand.STATICCreateSimpleCommand( action ) )
+            
         
     
     def sizeHint(self) -> QC.QSize:
@@ -3195,6 +3268,7 @@ class MediaContainer( QW.QWidget ):
     def TIMERUIUpdate( self ):
         
         self._ShowHideControlBar()
+        self._UpdateWindowAlwaysOnTop( wait_for_double_click = True )
         
     
 

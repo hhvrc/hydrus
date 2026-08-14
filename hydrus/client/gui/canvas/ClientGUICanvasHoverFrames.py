@@ -1040,22 +1040,35 @@ class CanvasHoverFrameTop( CanvasHoverFrame ):
                 self._undelete_button.show()
                 
             
-            has_exif = self._current_media.GetMediaResult().GetFileInfoManager().has_exif
-            has_human_readable_embedded_metadata = self._current_media.GetMediaResult().GetFileInfoManager().has_human_readable_embedded_metadata
             has_extra_rows = self._current_media.GetMime() == HC.IMAGE_JPEG
             
             tt = 'show detailed file metadata'
             
             tt_components = []
             
-            if has_exif:
+            if self._current_media.GetMediaResult().GetFileInfoManager().has_exif:
                 
                 tt_components.append( 'exif' )
                 
             
-            if has_human_readable_embedded_metadata:
+            if self._current_media.GetMediaResult().GetFileInfoManager().has_xmp:
                 
-                tt_components.append( 'non-exif embedded metadata' )
+                tt_components.append( 'xmp' )
+                
+            
+            if self._current_media.GetMediaResult().GetFileInfoManager().has_iptc:
+                
+                tt_components.append( 'iptc' )
+                
+            
+            if self._current_media.GetMediaResult().GetFileInfoManager().has_human_readable_embedded_metadata:
+                
+                tt_components.append( 'human-readable metadata' )
+                
+            
+            if self._current_media.GetMediaResult().GetFileInfoManager().has_software_source:
+                
+                tt_components.append( 'software/source metadata' )
                 
             
             if has_extra_rows:
@@ -1210,13 +1223,22 @@ class CanvasHoverFrameTop( CanvasHoverFrame ):
             window_menu = menu
             
         
+        if HC.PLATFORM_LINUX:
+            
+            ClientGUIMenus.AppendMenuLabel( window_menu, 'MAY BE BUGGY/CRASHY ON LINUX', 'Be careful with always-on-top with Linux. Switching while mpv is loaded is disabled since it proved too crashy.' )
+            
+        
         ClientGUIMenus.AppendMenuCheckItem( window_menu, 'always on top', 'Toggle whether this window is always on top.', self._my_canvas.IsAlwaysOnTop(), self.sendApplicationCommand.emit, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_FLIP ) )
+        ClientGUIMenus.AppendMenuCheckItem( window_menu, 'always on top (while playing)', 'Tie the window always on top state to the Play/Pause state of media.', self._my_canvas.IsAlwaysOnTopWhilePlaying(), self.sendApplicationCommand.emit, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_WINDOW_ALWAYS_ON_TOP_WHILE_PLAYING_FLIP ) )
         ClientGUIMenus.AppendMenuCheckItem( window_menu, 'remove titlebar/frame', 'Toggle the OS frame of this window.', self._my_canvas.IsHidingWindowFrame(), self.sendApplicationCommand.emit, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_WINDOW_FRAMELESS_FLIP ) )
         
         ClientGUIMenus.AppendSeparator( window_menu )
         
         checkbox_manager = ClientGUICommon.CheckboxManagerOptions( 'always_start_media_viewers_always_on_top' )
         ClientGUIMenus.AppendMenuCheckItem( window_menu, 'always start new media viewers always on top', 'Set whether all new media viewers should start in this state.', checkbox_manager.GetCurrentValue(), checkbox_manager.Invert )
+        
+        checkbox_manager = ClientGUICommon.CheckboxManagerOptions( 'always_start_media_windows_tied_to_pauseplay_state' )
+        ClientGUIMenus.AppendMenuCheckItem( window_menu, 'always start new media viewers on top while playing', 'Tie the window always on top state to the Play/Pause state of media, for all newly created media viewers.', checkbox_manager.GetCurrentValue(), checkbox_manager.Invert )
         
         checkbox_manager = ClientGUICommon.CheckboxManagerOptions( 'always_start_media_viewers_frameless' )
         ClientGUIMenus.AppendMenuCheckItem( window_menu, 'always start new media viewers without titlebar/frame', 'Set whether all new media viewers should start in this state.', checkbox_manager.GetCurrentValue(), checkbox_manager.Invert )
@@ -2038,6 +2060,7 @@ class NotePanel( QW.QWidget ):
         self._parent = parent
         
         self._name = name
+        self._note = note
         self._note_visible = note_visible
         
         self._note_name = ClientGUICommon.BetterStaticText( self, label = name )
@@ -2068,6 +2091,15 @@ class NotePanel( QW.QWidget ):
         self._note_name.installEventFilter( self )
         self._note_text.installEventFilter( self )
         
+        self.setToolTip( ClientGUIFunctions.WrapToolTip( 'Left-click to edit, Middle-click to copy, Right-click to hide/show.' ) )
+        
+    
+    def _CopyNote( self ):
+        
+        copy_text = self._name + '\n\n' + self._note
+        
+        CG.client_controller.pub( 'clipboard', 'text', copy_text )
+        
     
     def eventFilter( self, watched, event ):
         
@@ -2080,6 +2112,10 @@ class NotePanel( QW.QWidget ):
                 if event.button() == QC.Qt.MouseButton.LeftButton:
                     
                     self.editNote.emit( self._name )
+                    
+                elif event.button() == QC.Qt.MouseButton.MiddleButton:
+                    
+                    self._CopyNote()
                     
                 else:
                     
@@ -2494,7 +2530,7 @@ class CanvasHoverFrameRightDuplicates( CanvasHoverFrame ):
         
         QP.AddToLayout( self._comparison_statements_vbox, self._comparison_statement_score_summary, CC.FLAGS_EXPAND_PERPENDICULAR )
         
-        self._comparison_statement_names_fast = [ 'filesize', 'resolution', 'ratio', 'mime', 'num_tags', 'time_imported', 'pixel_duplicates', 'has_transparency', 'exif_data', 'embedded_metadata', 'icc_profile', 'has_audio', 'duration' ]
+        self._comparison_statement_names_fast = [ 'filesize', 'resolution', 'ratio', 'mime', 'num_tags', 'time_imported', 'pixel_duplicates', 'has_transparency', 'exif_data', 'xmp_data', 'iptc_data', 'human_readable_metadata', 'software_source_metadata', 'icc_profile', 'has_audio', 'duration' ]
         self._comparison_statement_names_slow = ['jpeg_subsampling', 'jpeg_quality', 'a_and_b_are_visual_duplicates' ]
         
         self._total_score_fast = 0
