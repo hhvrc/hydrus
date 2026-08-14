@@ -338,13 +338,13 @@ def GetJpegSubsamplingRaw( pil_image: PILImage.Image ) -> int:
     return result
     
 
-def GetSoftwareFromCommentInfoField( value ) -> str | None:
+def GetSoftwareSourceFromCommentInfoField( value ) -> str | None:
     
     if isinstance( value, str ):
         
         patterns = [
             r'^(Created|Converted|Cropped|Compressed|Edited) with (?P<software>.+)',
-            r'^... (created|converted|cropped|compressed|edited) with (?P<software>.+)',
+            r'^(created|converted|cropped|compressed|edited) with (?P<software>.+)',
         ]
         
         for pattern in patterns:
@@ -363,7 +363,7 @@ def GetSoftwareFromCommentInfoField( value ) -> str | None:
     return None
     
 
-def GetSoftwareFromPilInfo( pil_image: PILImage.Image ) -> str | None:
+def GetSoftwareSourceFromPilInfo( pil_image: PILImage.Image ) -> str | None:
     
     info_dict = pil_image.info.copy()
     
@@ -388,7 +388,7 @@ def GetSoftwareFromPilInfo( pil_image: PILImage.Image ) -> str | None:
             value = info_dict[ 'comment' ]
             
         
-        software = GetSoftwareFromCommentInfoField( value )
+        software = GetSoftwareSourceFromCommentInfoField( value )
         
         if software is not None:
             
@@ -414,6 +414,9 @@ def GetSoftwareFromPilInfo( pil_image: PILImage.Image ) -> str | None:
         components.append( info_dict[ 'Source' ] )
         
     
+    components = [ c.strip() for c in components ]
+    components = [ c for c in components if c != '' ]
+    
     if len( components ) == 0:
         
         return None
@@ -428,7 +431,14 @@ def GetSoftwareFromPilInfo( pil_image: PILImage.Image ) -> str | None:
 
 def HasEXIF( pil_image: PILImage.Image ) -> bool:
     
-    result = GetEXIFDict( pil_image )
+    try:
+        
+        result = GetEXIFDict( pil_image )
+        
+    except Exception as e:
+        
+        return False
+        
     
     return result is not None
     
@@ -494,6 +504,48 @@ def HasICCProfile( pil_image: PILImage.Image ) -> bool:
     return False
     
 
+def HasSoftwareSource( pil_image: PILImage.Image ) -> bool:
+    
+    # we do a quick search first. if it has interesting data before the forced load call, we don't have to do any load
+    if hasattr( pil_image, 'info' ):
+        
+        try:
+            
+            result = GetSoftwareSourceFromPilInfo( pil_image )
+            
+            if result is not None:
+                
+                return True
+                
+            
+        except Exception as e:
+            
+            pass
+            
+        
+    
+    # OK WE DISCOVERED AN IMAGE THAT DID NOT FLESH OUT ITS info DICT UNTIL IT WAS LOADED
+    # I guess sometimes that stuff lives in the frame rather than header data
+    # this guy is apparently idempotent so we'll call it here to ensure we are getting a more decent shot
+    pil_image.load()
+    
+    if hasattr( pil_image, 'info' ):
+        
+        try:
+            
+            result = GetSoftwareSourceFromPilInfo( pil_image )
+            
+            return result is not None
+            
+        except Exception as e:
+            
+            pass
+            
+        
+    
+    return False
+    
+
 # we parse and display this stuff in other places
 # ultimately I guess I should really find the three comment fields we want and whitelist them, rather than trying to blacklist every whack decoder field
 # but I think I do fall on the side of 'yeah let's expose and put human eyes what crazy stuff is going on' so we discover new things
@@ -534,19 +586,21 @@ PIL_INFO_KEYS_THAT_ARE_NOT_CONSIDERED_HUMAN_READABLE_STUFF = {
     'aspect',
     'xmp', # xmp stuff
     'XML:com.adobe.xmp', # xmp stuff
-    'iptc', # ye olde XMP
-    'Raw profile type iptc', # ye olde XMP
+    'iptc', # ye olde industry/enterprise XMP
+    'Raw profile type iptc', # ye olde industry/enterprise XMP
     'default_image', #png thing
+    'distortion', # some image-processing artifact
     'Creator',
     'creator',
     'Source',
     'source',
     'mpoffset',
     'Creation Time', # TODO: Woop woop, pull this for a noice modified time with like 'file metadata' as the 'domain'
-    'create-date',
+    'create-date', # TODO: Also, IPTC has some date fields! So does XMP.
     'modify-date',
     'date:create',
     'date:modify',
+    'date:timestamp',
     'Thumb::MTime', # leaving this here as a reminder for another source of modified time
 }
 
@@ -572,7 +626,7 @@ def WashPilImageInfoDictForHumanReadableMetadata( info_dict: dict ) -> dict:
             
         
         # we fetch this elsewhere
-        if key in ( 'comment', 'Comment' ) and GetSoftwareFromCommentInfoField( value ) is not None:
+        if key in ( 'comment', 'Comment' ) and GetSoftwareSourceFromCommentInfoField( value ) is not None:
             
             continue
             

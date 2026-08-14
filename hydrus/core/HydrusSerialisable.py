@@ -167,6 +167,12 @@ SERIALISABLE_TYPE_TAG_IMPORT_OPTIONS = 151
 SERIALISABLE_TYPE_DUPLICATES_AUTO_RESOLUTION_PAIR_COMPARATOR_ONE_FILE_HARDCODED = 152
 SERIALISABLE_TYPE_NOTE_IMPORT_OPTIONS = 153
 SERIALISABLE_TYPE_NETWORK_CONTEXT_RECORD = 154
+SERIALISABLE_TYPE_EXECUTABLE_MANAGER = 155
+SERIALISABLE_TYPE_EXECUTABLE_CALLABLE = 156
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_TEMPLATE = 157
+SERIALISABLE_TYPE_ID_AND_NAME = 158
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_INPUT_TEMPLATE_PARAM_PROCESSING_RULE = 159
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_WINDOWS_STARTFILE = 160
 
 SERIALISABLE_TYPES_TO_OBJECT_TYPES = {}
 
@@ -870,3 +876,62 @@ class SerialisableList( SerialisableBase, list ):
     
 
 SERIALISABLE_TYPES_TO_OBJECT_TYPES[ SERIALISABLE_TYPE_LIST ] = SerialisableList
+
+class IdAndName( SerialisableBase ):
+    
+    SERIALISABLE_TYPE = SERIALISABLE_TYPE_ID_AND_NAME
+    SERIALISABLE_NAME = 'Serialisable Object ID and Name'
+    SERIALISABLE_VERSION = 1
+    
+    def __init__( self, object_id: bytes | None = None, name: str | None = None ):
+        
+        if object_id is None:
+            
+            object_id = b'abcd'
+            
+        
+        if name is None:
+            
+            name = 'unknown'
+            
+        
+        self.object_id: bytes = object_id
+        self.name: str = name
+        
+    
+    def __eq__( self, other ):
+        
+        if isinstance( other, IdAndName ):
+            
+            return self.__hash__() == other.__hash__()
+            
+        
+        return NotImplemented
+        
+    
+    def __hash__( self ):
+        
+        return self.object_id.__hash__()
+        
+    
+    def __str__( self ):
+        
+        return f'"{self.name}" (id {self.object_id.hex()})'
+        
+    
+    def _GetSerialisableInfo( self ):
+        
+        id_serialisable = self.object_id.hex()
+        
+        return ( id_serialisable, self.name )
+        
+    
+    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+        
+        ( id_serialisable, self.name ) = serialisable_info
+        
+        self.object_id = bytes.fromhex( id_serialisable )
+        
+    
+
+SERIALISABLE_TYPES_TO_OBJECT_TYPES[ SERIALISABLE_TYPE_ID_AND_NAME ] = IdAndName

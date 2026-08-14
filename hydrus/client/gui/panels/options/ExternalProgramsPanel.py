@@ -1,210 +1,410 @@
+from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 
-from hydrus.core import HydrusConstants as HC
-from hydrus.core import HydrusExceptions
-from hydrus.core import HydrusPaths
+from hydrus.core import HydrusSerialisable
 
 from hydrus.client import ClientConstants as CC
-from hydrus.client import ClientGlobals as CG
+from hydrus.client.executables import ClientExecutableActualCall
+from hydrus.client.executables import ClientExecutableCallables
+from hydrus.client.executables import ClientExecutableDefaults
+from hydrus.client.executables import ClientExecutableManager
+from hydrus.client.executables import ClientExecutablePipelines
+from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUIDialogsQuick
+from hydrus.client.gui import ClientGUITopLevelWindowsPanels
 from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.lists import ClientGUIListConstants as CGLC
 from hydrus.client.gui.lists import ClientGUIListCtrl
+from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.panels.options import ClientGUIOptionsPanelBase
 from hydrus.client.gui.widgets import ClientGUICommon
 
-class ExternalProgramsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
+class EditClientExecutableActualCall( QW.QWidget ):
     
-    def __init__( self, parent ):
+    valueChanged = QC.Signal()
+    
+    def __init__( self, parent: QW.QWidget, actual_call: ClientExecutableActualCall.ExecutableActualCall ):
         
         super().__init__( parent )
         
-        self._new_options = CG.client_controller.new_options
+        self._call_types = ClientGUICommon.BetterChoice( self )
         
-        browser_panel = ClientGUICommon.StaticBox( self, 'web browser launch path' )
+        # TODO: It'd be cool if I had a DropdownBook tbh. does that exist?
         
-        self._web_browser_path = QW.QLineEdit( browser_panel )
-        
-        web_browser_path = self._new_options.GetNoneableString( 'web_browser_path' )
-        
-        if web_browser_path is not None:
+        for ( label, call_type ) in [
+            ( 'local process call', ClientExecutableActualCall.ExecutableLocalProcessCallTemplate ),
+            ( 'windows startfile call', ClientExecutableActualCall.ExecutableLocalProcessWindowsStartFile )
+        ]:
             
-            self._web_browser_path.setText( web_browser_path )
+            self._call_types.addItem( label, call_type )
             
+        
+        self._edit_actual_call_window = QW.QWidget( self )
+        
+        self._call_types_to_windows = {}
+        
+        # TODO: We prob want a test panel for each type!
+        # put in the 'which' name etc.., and can actually test it
+        # put in fake path or something, and actually call it and get tags back
+        
+        # edit windows for each of the call types
         
         #
         
-        mime_panel = ClientGUICommon.StaticBox( self, '\'open externally\' launch paths' )
+        # SetValue
         
-        model = ClientGUIListCtrl.HydrusListItemModel( self, CGLC.COLUMN_LIST_EXTERNAL_PROGRAMS.ID, self._ConvertMimeToDisplayTuple, self._ConvertMimeToSortTuple )
+        #
         
-        self._mime_launch_listctrl = ClientGUIListCtrl.BetterListCtrlTreeView( mime_panel, 12, model, activation_callback = self._EditMimeLaunch )
+        # hook each window's valueChanged in to us
+        # on type change, switch visible window
+        # signal on type change too
         
-        for mime in HC.SEARCHABLE_MIMES:
+    
+    def _ShowCallTypePanel( self, call_type_to_show: type ):
+        
+        for ( call_type, window ) in self._call_types_to_windows.items():
             
-            launch_path = self._new_options.GetMimeLaunch( mime )
-            
-            row = ( mime, launch_path )
-            
-            self._mime_launch_listctrl.AddData( row )
+            window.setVisible( call_type == call_type_to_show )
             
         
-        self._mime_launch_listctrl.Sort()
+    
+    def SetValue( self, actual_call: ClientExecutableActualCall.ExecutableActualCall ):
+        
+        call_type = type( actual_call )
+        
+        if call_type not in self._call_types_to_windows:
+            
+            ClientGUIDialogsMessage.ShowCritical( self, 'unknown call type!', 'Sorry, the given call for this executable is unknown to this client! It cannot show edit UI for it. Cancel out of this dialog mate.' )
+            
+            return
+            
+        
+        self._call_types.SetValue( call_type )
+        
+        self._ShowCallTypePanel( call_type )
+        
+        self._call_types_to_windows[ call_type ].SetValue( actual_call )
+        
+        self.valueChanged.emit()
+        
+    
+
+class EditClientExecutableCallablePanel( ClientGUIScrolledPanels.EditPanel ):
+    
+    def __init__( self, parent: QW.QWidget, call: ClientExecutableCallables.ClientExecutableCallable ):
+        
+        super().__init__( parent )
+        
+        self._name = QW.QLineEdit( self )
+        self._pipeline_type = ClientGUICommon.BetterChoice( self )
+        
+        for pipeline_type in [
+            ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_FILE
+        ]:
+            
+            self._pipeline_type.addItem( ClientExecutablePipelines.executable_pipeline_types_to_strs[ pipeline_type ], pipeline_type )
+            
+        
+        self._pipeline_description = ClientGUICommon.BetterStaticText( self )
+        self._pipeline_description.setWordWrap( True )
+        
+        self._validity_text = ClientGUICommon.BetterStaticText( self )
+        self._validity_text.setWordWrap( True )
+        
+        self._actual_call = EditClientExecutableActualCall( self, call.GetCall() )
+        
+        #
+        
+        self.SetValue( call )
         
         #
         
         vbox = QP.VBoxLayout()
         
-        text = 'By default, when you ask to open a URL, hydrus will send it to your OS, and that figures out what your "default" web browser is. These OS launch commands can be buggy, though, and sometimes drop #anchor components. If this happens to you, set the specific launch command for your web browser here.'
-        text += '\n' * 2
-        text += 'The command here must include a "%path%" component, normally ideally within those quote marks, which is where hydrus will place the URL when it executes the command. A good example would be:'
-        text += '\n' * 2
-        
-        if HC.PLATFORM_WINDOWS:
-            
-            text += 'C:\\program files\\firefox\\firefox.exe "%path%"'
-            
-        elif HC.PLATFORM_MACOS:
-            
-            text += 'open -a /Applications/Firefox.app -g "%path%"'
-            
-        else:
-            
-            text += 'firefox "%path%"'
-            
-        
-        st = ClientGUICommon.BetterStaticText( browser_panel, text )
-        st.setWordWrap( True )
-        
-        browser_panel.Add( st, CC.FLAGS_EXPAND_PERPENDICULAR )
+        # TODO: lay it all out
         
         rows = []
         
-        rows.append( ( 'Manual web browser launch command: ', self._web_browser_path ) )
+        rows.append( ( 'name: ', self._name ) )
+        rows.append( ( 'job: ', self._pipeline_type ) )
         
-        gridbox = ClientGUICommon.WrapInGrid( mime_panel, rows )
+        gridbox = ClientGUICommon.WrapInGrid( self, rows )
         
-        browser_panel.Add( gridbox, CC.FLAGS_EXPAND_SIZER_PERPENDICULAR )
+        QP.AddToLayout( vbox, gridbox, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._pipeline_description, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._validity_text, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._actual_call, CC.FLAGS_EXPAND_BOTH_WAYS )
+        
+        self.widget().setLayout( vbox )
+        
+        #
+        
+        self._pipeline_type.currentIndexChanged.connect( self._UpdatePipelineType )
+        self._actual_call.valueChanged.connect( self._UpdateValidity() )
+        
+    
+    def _GetValiditySummary( self ):
+        
+        # TODO: Do this
+        # if there are expected output params but the call doesn't give them, say them
+        # if there are inputs but none are used?? sounds reasonable; maybe we get clever with selectable if and when we have multivariate calls
+        
+        return ( True, 'Everything looks good!' )
+        
+    
+    def _IsValid( self ):
+        
+        return self._GetValiditySummary()[0]
+        
+    
+    def _UpdatePipelineType( self ):
+        
+        pipeline_type = self._pipeline_type.GetValue()
+        
+        pipeline_type_desc = ClientExecutablePipelines.executable_pipeline_types_to_desc_strs[ pipeline_type ]
+        pipeline_type_desc += '\n\n'
+        
+        input_parameter_types = ClientExecutablePipelines.executable_pipeline_types_to_input_params[ pipeline_type ]
+        
+        if len( input_parameter_types ) == 0:
+            
+            pipeline_type_desc += 'Is given no input parameters.'
+            
+        else:
+            
+            pipeline_type_desc += 'Available input parameters: ' + ', '.join( ( ClientExecutablePipelines.parameter_types_to_strs[ parameter_type ] for parameter_type in input_parameter_types ) )
+            
+        
+        pipeline_type_desc += '\n\n'
+        
+        output_parameter_types = ClientExecutablePipelines.executable_pipeline_types_to_output_params[ pipeline_type ]
+        
+        if len( output_parameter_types ) == 0:
+            
+            pipeline_type_desc += 'Is not expected to return any output parameters.'
+            
+        else:
+            
+            pipeline_type_desc += 'Expected output parameters: ' + ', '.join( ( ClientExecutablePipelines.parameter_types_to_strs[ parameter_type ] for parameter_type in output_parameter_types ) )
+            
+        
+        self._pipeline_description.setText( pipeline_type_desc )
+        
+        self._UpdateValidity()
+        
+    
+    def _UpdateValidity( self ):
+        
+        ( is_valid, validity_text ) = self._GetValiditySummary()
+        
+        self._validity_text.setText( validity_text )
+        
+        if is_valid:
+            
+            self._validity_text.setObjectName( 'HydrusValid' )
+            
+        else:
+            
+            self._validity_text.setObjectName( 'HydrusWarning' )
+            
+        
+        self._validity_text.style().polish( self._validity_text )
+        
+    
+    def UserIsOKToOK( self ):
+        
+        if not self._IsValid():
+            
+            message = 'Hey, it looks like something is not quite right here. Are you sure you want to save this?'
+            
+            result = ClientGUIDialogsQuick.GetYesNo( self, message )
+            
+            if result != QW.QDialog.DialogCode.Accepted:
+                
+                return False
+                
+            
+        
+        return True
+        
+    
+    def GetValue( self ):
+        
+        name = self._name.text()
+        pipeline_type = self._pipeline_type.GetValue()
+        actual_call = self._actual_call.GetValue()
+        
+        call = ClientExecutableCallables.ClientExecutableCallable(
+            name = name,
+            pipeline_type = pipeline_type,
+            actual_call = actual_call
+        )
+        
+        return call
+        
+    
+    def SetValue( self, call: ClientExecutableCallables.ClientExecutableCallable ):
+        
+        self._name.setText( call.GetName() )
+        self._pipeline_type.SetValue( call.GetPipelineType() )
+        
+        self._UpdatePipelineType()
+        
+        self._actual_call.SetValue( call.GetCall() )
+        
+        self._UpdateValidity()
+        
+    
+
+class ExternalProgramsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
+    
+    def __init__( self, parent, new_options ):
+        
+        super().__init__( parent )
+        
+        self._new_options = new_options
+        
+        self._executable_manager: ClientExecutableManager.ExecutableManager = ClientExecutableManager.ExecutableManager()
+        
+        message = 'THIS SYSTEM IS STILL IN TESTING! ONLY ADVANCED USERS SEE THIS, AND IT IS NOT PLUGGED INTO ANYTHING YET.'
+        message += '\n\n'
+        message += 'Feel free to play with it and let hydev know how you feel. Edit panel is not ready yet, so add/edit do nothing.'
+        
+        st = ClientGUICommon.BetterStaticText( self, message )
+        st.setWordWrap( True )
+        
+        external_calls_panel = ClientGUICommon.StaticBox( self, 'external calls' )
+        
+        external_calls_list_panel = ClientGUIListCtrl.BetterListCtrlPanel( external_calls_panel )
+        
+        model = ClientGUIListCtrl.HydrusListItemModel( self, CGLC.COLUMN_LIST_EXTERNAL_PROGRAMS.ID, self._ConvertCallableToDisplayTuple, self._ConvertCallableToSortTuple )
+        
+        self._external_calls = ClientGUIListCtrl.BetterListCtrlTreeView( external_calls_list_panel, 12, model, activation_callback = self._EditCallable, use_simple_delete = True )
+        
+        external_calls_list_panel.SetListCtrl( self._external_calls )
+        
+        external_calls_list_panel.AddButton( 'add', self._AddCallableBrandNew )
+        external_calls_list_panel.AddButton( 'edit', self._EditCallable, enabled_only_on_single_selection = True )
+        external_calls_list_panel.AddDeleteButton()
+        external_calls_list_panel.AddSeparator()
+        external_calls_list_panel.AddImportExportButtons( ( ClientExecutableCallables.ClientExecutableCallable, ), self._AddCallableFullyFormed )
+        external_calls_list_panel.AddDefaultsButton( self._GetDefaultCallables, self._AddCallableFullyFormed )
+        
+        #
+        
+        external_calls_panel.Add( external_calls_list_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
         
         #
         
         vbox = QP.VBoxLayout()
         
-        text = 'Similarly, when you ask to open a file "externally", hydrus will send it to your OS, and that figures out your "default" program. This may fail or direct to a program you do not want for several reasons, so you can set a specific override here.'
-        text += '\n' * 2
-        text += 'Again, make sure you include the "%path%" component. Most programs are going to be like \'program_exe "%path%"\', but some may need a profile switch or "-o" open command or similar.'
-        
-        st = ClientGUICommon.BetterStaticText( mime_panel, text )
-        st.setWordWrap( True )
-        
-        mime_panel.Add( st, CC.FLAGS_EXPAND_PERPENDICULAR )
-        
-        mime_panel.Add( self._mime_launch_listctrl, CC.FLAGS_EXPAND_BOTH_WAYS )
+        QP.AddToLayout( vbox, st, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, external_calls_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
         
         #
-        
-        QP.AddToLayout( vbox, browser_panel, CC.FLAGS_EXPAND_PERPENDICULAR )
-        QP.AddToLayout( vbox, mime_panel, CC.FLAGS_EXPAND_BOTH_WAYS )
         
         self.setLayout( vbox )
         
     
-    def _ConvertMimeToDisplayTuple( self, data ):
+    def _AddCallableBrandNew( self ):
         
-        ( mime, launch_path ) = data
+        return
         
-        pretty_mime = HC.mime_string_lookup[ mime ]
+        call = ClientExecutableCallables.ClientExecutableCallable( 'new call' )
         
-        if launch_path is None:
+        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit external program call' ) as dlg:
             
-            pretty_launch_path = 'default: {}'.format( HydrusPaths.GetDefaultLaunchPath() )
+            panel = EditClientExecutableCallablePanel( dlg, call )
             
-        else:
+            dlg.SetPanel( panel )
             
-            pretty_launch_path = launch_path
+            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
+                
+                edited_call = panel.GetValue()
+                
+                self._AddCallableFullyFormed( edited_call )
+                
             
         
-        display_tuple = ( pretty_mime, pretty_launch_path )
+    
+    def _AddCallableFullyFormed( self, call: ClientExecutableCallables.ClientExecutableCallable ):
+        
+        HydrusSerialisable.SetNonDupeName( call, self._GetExistingNames() )
+        
+        call.GenerateNewCallableKey()
+        
+        self._external_calls.AddData( call )
+        
+    
+    def _ConvertCallableToDisplayTuple( self, call: ClientExecutableCallables.ClientExecutableCallable ):
+        
+        name = call.GetName()
+        pipeline_type = call.GetPipelineType()
+        desc = call.GetCall().GetCommandDescription()
+        
+        pretty_pipeline_type = ClientExecutablePipelines.executable_pipeline_types_to_strs[ pipeline_type ]
+        
+        display_tuple = ( name, pretty_pipeline_type, desc )
         
         return display_tuple
         
     
-    _ConvertMimeToSortTuple = _ConvertMimeToDisplayTuple
+    _ConvertCallableToSortTuple = _ConvertCallableToDisplayTuple
     
-    def _EditMimeLaunch( self ):
+    def _EditCallable( self ):
         
-        row = self._mime_launch_listctrl.GetTopSelectedData()
+        return
         
-        if row is None:
+        data = self._external_calls.GetTopSelectedData()
+        
+        if data is None:
             
             return
             
         
-        ( mime, launch_path ) = row
+        call: ClientExecutableCallables.ClientExecutableCallable = data
         
-        message = 'Enter the new launch path for {}'.format( HC.mime_string_lookup[ mime ] )
-        message += '\n' * 2
-        message += 'Hydrus will insert the file\'s full path wherever you put %path%, even multiple times!'
-        message += '\n' * 2
-        message += 'Set as blank to reset to default.'
-        
-        if launch_path is None:
+        with ClientGUITopLevelWindowsPanels.DialogEdit( self, 'edit external program call' ) as dlg:
             
-            default = 'program "%path%"'
+            panel = EditClientExecutableCallablePanel( dlg, call )
             
-        else:
+            dlg.SetPanel( panel )
             
-            default = launch_path
-            
-        
-        try:
-            
-            new_launch_path = ClientGUIDialogsQuick.EnterText( self, message, default = default, allow_blank = True )
-            
-        except HydrusExceptions.CancelledException:
-            
-            return
-            
-        
-        if new_launch_path == '':
-            
-            new_launch_path = None
-            
-        
-        if new_launch_path not in ( launch_path, default ):
-            
-            if new_launch_path is not None and '%path%' not in new_launch_path:
+            if dlg.exec() == QW.QDialog.DialogCode.Accepted:
                 
-                message = f'Hey, your command "{new_launch_path}" did not include %path%--it probably is not going to work! Are you sure this is ok?'
+                existing_names = self._GetExistingNames()
+                existing_names.discard( call.GetName() )
                 
-                result = ClientGUIDialogsQuick.GetYesNo( self, message )
+                edited_call = panel.GetValue()
                 
-                if result != QW.QDialog.DialogCode.Accepted:
-                    
-                    return
-                    
+                HydrusSerialisable.SetNonDupeName( edited_call, existing_names )
+                
+                self._external_calls.ReplaceData( call, edited_call, sort_and_scroll = True )
                 
             
-            edited_row = ( mime, new_launch_path )
-            
-            self._mime_launch_listctrl.ReplaceData( row, edited_row, sort_and_scroll = True )
-            
+        
+    
+    def _GetDefaultCallables( self ) -> list[ ClientExecutableCallables.ClientExecutableCallable ]:
+        
+        external_callables = list( ClientExecutableDefaults.GetDefaultOpenExternally() )
+        external_callables.extend( ClientExecutableDefaults.GetDefaultOpenURL() )
+        
+        return external_callables
+        
+    
+    def _GetExistingNames( self ) -> set[ str ]:
+        
+        calls = self._external_calls.GetData()
+        
+        names = { call.GetName() for call in calls }
+        
+        return names
         
     
     def UpdateOptions( self ):
         
-        web_browser_path = self._web_browser_path.text()
-        
-        if web_browser_path == '':
-            
-            web_browser_path = None
-            
-        
-        self._new_options.SetNoneableString( 'web_browser_path', web_browser_path )
-        
-        for ( mime, launch_path ) in self._mime_launch_listctrl.GetData():
-            
-            self._new_options.SetMimeLaunch( mime, launch_path )
-            
+        # TODO: save this guy on an ok. should it be a manager as held by the controller, or just an options entry? think about it
+        # leaning towards its own thing, but w/e
+        pass
         
     

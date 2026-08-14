@@ -355,6 +355,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'archive_delete_commit_panel_delays_multiple_delete_choices' : True,
             'always_start_media_viewers_always_on_top' : False,
             'always_start_media_viewers_frameless' : False,
+            'always_start_media_windows_tied_to_pauseplay_state' : False,
             'qt_media_player_opengl_test' : False,
             'persist_media_window_qt_media_player' : False,
             'persist_media_window_mpv' : False,
@@ -373,12 +374,15 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'treeview_sidebar_can_collapse' : False,
             'treeview_always_expand_to_current_tab_after_reset' : False,
             'treeview_collapse_all_children_upon_parent_closed' : False,
+            'treeview_alternating_row_colours' : False,
             'treeview_animate_current_node' : True,
             'treeview_history_box_pinned' : False,
             'allow_comic_book_archive_detection' : True,
             'minimise_client_to_system_tray_bugfix_deferred_state_set' : False,
             'minimise_client_to_system_tray_bugfix_restore_after_show' : False,
             'use_qt_locale_for_human_int' : False,
+            'copy_notes_dialog_copy_all' : True,
+            'copy_notes_dialog_copy_json' : True,
         }
         
         #
@@ -607,6 +611,8 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'media_viewer_tags_scrolling_behaviour' : CC.MEDIA_VIEWER_TAGS_SCROLLING_BEHAVIOUR_ONLY_PROPAGATE_AFTER_DELAY,
             'zoom_switch_command' : CAC.SIMPLE_SWITCH_BETWEEN_100_PERCENT_AND_CANVAS_ZOOM,
             'page_sidebar_alignment' : CC.DIRECTION_LEFT,
+            'treeview_indentation' : 20,
+            'treeview_row_height' : 20,
         }
         
         self._dictionary[ 'floats' ] = {
