@@ -1984,6 +1984,8 @@ class BetterListCtrlPanel( QW.QWidget ):
         
         self._UpdateButtons()
         
+        return button
+        
     
     def AddButton( self, label, clicked_func, enabled_only_on_selection = False, enabled_only_on_single_selection = False, enabled_check_func = None, tooltip = None ):
         
@@ -2086,6 +2088,8 @@ class BetterListCtrlPanel( QW.QWidget ):
         self._AddButton( button, enabled_only_on_selection = enabled_only_on_selection, enabled_check_func = enabled_check_func )
         
         self._UpdateButtons()
+        
+        return button
         
     
     def AddSeparator( self, pixels = 12 ):

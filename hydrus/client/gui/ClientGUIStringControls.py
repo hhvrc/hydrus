@@ -244,6 +244,8 @@ class StringProcessorWidget( QW.QWidget ):
         
         CG.client_controller.pub( 'clipboard', 'text', text )
         
+        self._copy_button.ShowMicroNotification( 'Copied!' )
+        
     
     def _ImportObject( self, obj ):
         
@@ -277,6 +279,8 @@ class StringProcessorWidget( QW.QWidget ):
             obj = HydrusSerialisable.CreateFromString( raw_text )
             
             self._ImportObject( obj )
+            
+            self._paste_button.ShowMicroNotification( f'Pasted!' )
             
         except Exception as e:
             

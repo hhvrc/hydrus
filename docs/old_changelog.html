@@ -35,6 +35,78 @@
             <h1 id="changelog"><a href="#changelog">changelog</a></h1>
             <ul>
                 <li>
+                    <h2 id="version_685"><a href="#version_685">version 685</a></h2>
+                    <ul>
+                        <li><h3>misc</h3></li>
+                        <li>the 3-second tooltip micro-notification experiment on the 'edit notes' 'copy urls' button worked out, so I wrote the code up properly and made it so all 20+ copy icon buttons across the program say something like 'Copied!' or 'Copied x ratings!' on click, all 23+ paste icon buttons similarly do 'Pasted!' or 'Pasted x texts!'. I'll slowly integrate this into other buttons that do a thing that isn't immediately obvious</li>
+                        <li>the media viewer right-click menu's 'volume' submenu now has a volume slider rather than the list of checkboxes</li>
+                        <li>fixed a recent regression that was stopping the media viewer from finding and activating an already-existing manage tags window when you did 'manage tags' from the media viewer--it was instead creating multiple windows, which is not desired (#2085)</li>
+                        <li>if you have very large or very small thumbnails, the thumbnail pair lists in auto-resolution now size better, setting saner min/max sizes for the thumbnail item cells and scaling thumbs to that size when a min/max limit applies (#2079)</li>
+                        <li>added a 'show anything with specific bandwidth rules' checkbox to 'review bandwidth usage'. if you import a downloader and it comes with bandwidth rules, you can now find those without having to actually use the site</li>
+                        <li>added a 'can you run the client headless? (not yet)' to the FAQ page, and then added a test line to it from a user who found a possible way</li>
+                        <li><h3>alternate software</h3></li>
+                        <li>expanded and formalised the 'if you like hydrus, maybe you will like this software too/instead' section in the help here: https://hydrusnetwork.github.io/hydrus/getting_started_files.html#other_software</li>
+                        <li>as part of this, I am listing three hydrus-adjacent projects that are coming into public this month, same way as I list stuff in the Client API page. feel free to check them out! they are--</li>
+                        <li>IDHAN (https://github.com/KJNeko/IDHAN) -  A high-performance hydrus-like media manager meant for Docker with a web UI. Very sophisticated.</li>
+                        <li>Naiad (https://github.com/scoopscoop/naiad-net) - A hydrus-like media manager with its own PTR-style tag-sharing solution.</li>
+                        <li>refr (https://github.com/therandomlance/refr) - An Immich-like with a focus on managing art reference images.</li>
+                        <li>if you create your own hydrus-like or similar tech that hydrus users may like, please link me and I'll list it there!</li>
+                        <li><h3>executable manager</h3></li>
+                        <li>I invite advanced users to play with this again (`options-&gt;external programs`). there's a little change in the call we were playing with last week</li>
+                        <li>after talking it out with people, I realised it would be better not to have two 'local process calls' for 'one template string' vs 'command + list of params', and updated the current prototype object, which was the former, to be the latter. thus the current terminal call is updated to have an exe and a list of params with replacement strings, rather than just one template string. it calls the process directly with the params all nice and separate rather than a raw string to your shell, so no quotespam needed. although editing separate params is more of a pain than just a text box, it is neater and more secure to only do it like this, saving us several headaches, and the only blocking cost of eliminating the worse yet easier option is writing some good UI to make editing the better option easier</li>
+                        <li>I've therefore tried to make some decent edit UI. nice and simple exe and param list, and copy/paste buttons so you can just paste a raw template if you have a nice simple one</li>
+                        <li>the 'availability call' and 'which availability call' settings are gone; we now just do a `which` on the given exe. this breaks the macOS 'open "Google Chrome" blah' calls, but we'll revisit this if it ever proves a big problem</li>
+                        <li>the 'open externally' job now provides 'file hash (sha256)' and 'file id' input parameters</li>
+                        <li>some stuff is renamed from, say, 'local terminal call' to 'local process call' and so on to reflect the changes around here</li>
+                        <li>improved some labels and update signals in the ui--stuff like updating the example templates on a string processor change</li>
+                        <li><h3>new thumbnail grid test</h3></li>
+                        <li>advanced users are encouraged to play with this more (`options-&gt;thumbnails-&gt;New Rendering Tech Test`). I think we have it pretty much nailed down now and so I'm mostly just optimising and cleaning in prep for switching everyone over, and I'd like to see if there are any more visual bugs lurking</li>
+                        <li>a bug in the new thumbnail grid test where thumbnails would not redraw is fixed. it turned out there was some duff redraw logic when the 'fade thumbnails' option was off</li>
+                        <li>set it so the new thumbnail grid only registers with the animation timer while it has thumbs animating--as soon as there is no more work, it delists itself</li>
+                        <li>the new thumbnail grid no longer attempts to animate thumbs if it is not currently on a visible page; it just schedules them for instant draw</li>
+                        <li>a thumbnail now correctly understands it is no longer animating if its paint errors out or its fade-in time or backing pixmap are invalidated, which triggers the above delisting</li>
+                        <li>added `help-&gt;debug-&gt;report modes-&gt;graphics view thumbnail update report mode`, which spams a bunch of decisions about the new painting tech to log</li>
+                        <li><h3>boring cleanup</h3></li>
+                        <li>did some MainLoop Daemon refactoring, just getting over a hump to move some responsibility to the superclass</li>
+                        <li>moved to nicer ui-cleanup calls in a bunch of my async code</li>
+                    </ul>
+                </li>
+                <li>
+                    <h2 id="version_684"><a href="#version_684">version 684</a></h2>
+                    <ul>
+                        <li><h3>misc</h3></li>
+                        <li>every thumb/viewer media menu now has 'show detailed embedded file metadata' in the top-row flyout; this is the same window that opens with the media viewer top hover, to which I've been adding EXIF and stuff</li>
+                        <li>there's a new shortcut command to spawn this window under the 'media' set, `open detailed embedded file metadata window`</li>
+                        <li>I finally got around to figuring out and adding a `Force that hitting Enter/Return on radio button lists triggers a dialog ok` checkbox to `options-&gt;gui`. On Windows, an Enter/Return on a radio button list triggers a dialog ok, but on other OSes, it does not. it is one of those platform policy things and Qt is being good and obeying. this casually annoyed me for years, particularly when doing advanced file delete dialogs where rather than a simple yes/no it has a couple of radio button lists, and since moving to Linux full time I finally got my finger out and figured it out. it is default off so I don't mess with anyone's muscle memory etc.., but if this was annoying you, try it out</li>
+                        <li>added `TEST: Set tool flag to child windows` to `options-&gt;gui`. this test sets a different flag and hopefully improves some window behaviour--specifically, stuff like "review services" should stay on top of the parent, not get a taskbar/alt+tab entry, but still look ok. let me know how it goes, and if no problems, I'll set everyone to it</li>
+                        <li>I gave the 'my auto-resolution rule says it has x pairs to search/resolve but it cannot clear them' issue another push. thanks to a user, we figured out an interesting orphaned pair situation. I fixed the logical hole in the maintenance code and updated the new error handling to A) indefinitely pause a rule that hits this, to stop pause/error loops, and B) run the full orphan-clearing maintenance code rather than just the re-count job</li>
+                        <li>noneable string widgets now blank their placeholder text when set to none</li>
+                        <li>test result text boxes in exe manager and parsing UI now have monospaced font</li>
+                        <li><h3>hash-search</h3></li>
+                        <li>system:hash gets a logical makeover. this thing has always been a bit of a mess as it tried to navigate prefixes like `sha256:abcd...`. I have made it simpler</li>
+                        <li>the edit dialog now lets you type or paste whatever, with no instant auto-correct. there are now two buttons underneath, `clean up text and guess hash type` and `clean up text and guess hash type (remove bad lines)`, which do the parsing on demand. the first button moans about any errors at all; the second removes errors, so if you want to post a mix of garbage and have hydrus filter it, go ahead</li>
+                        <li>the ok button is plugged into this tech too and, as the parsing is also improved, gives richer errors. if you hit ok and the hashes are fine but the hash type seems wrong, it now gives you a special error text</li>
+                        <li>hydrus hash parsing now recognises and removes an `0x` prefix from a hash</li>
+                        <li>hydrus hash parsing is now much better about case insensitivity. `MD5:AbCD...` is fine</li>
+                        <li>hydrus hash parsing now has an error state for hashes with a non-even number of hex characters</li>
+                        <li>hydrus hash parsing no longer attempts to hex filter an incoming line; if a hash includes a non-hex character, this now goes in a new error bucket for reporting</li>
+                        <li><h3>notes quality of life</h3></li>
+                        <li>added a 'when you middle-click to copy a note hover, only copy the text (not the title)' setting to `options-&gt;notes`</li>
+                        <li>added that and the 'put cursor at the end' checkboxes to the cog icon button in the edit notes panel</li>
+                        <li>added a 'link' icon button to notes that sucks up all the URLs from the current note text. it isn't perfect, but covers all normal 'http...' situations using a `https?://[^\s&lt;&gt;"\']+` regex</li>
+                        <li>in a new test, when you do this 'copy URLs in the note' job, it fires off a '3 URLs!' tooltip micro-notification for feedback. give it a go, let me know how it feels, and I think I'll spam this all over the place</li>
+                        <li><h3>exe manager</h3></li>
+                        <li>finished off the core edit UI for my exe manager, which still only advanced users can see under `options-&gt;external programs`. you can edit everything, and there's a fullly functional test panel that reports return code and stdout/stderr on failures. it isn't perfect, but I'm happy with it as a first step. I will again ask advanced users to check it out, with these instructions: look at the defaults, pick a call that you should have, and then edit it and put in a sensible file path or URL in the test panel and try it! Let me know if you have any errors and where I need to add help text!</li>
+                        <li>the defaults button now asks if you want all the default calls or just those for your platform</li>
+                        <li>many many other improvements and finishings-off here, and a touch of misc new subprocess tech</li>
+                        <li><h3>boring exe manager stuff</h3></li>
+                        <li>rewangled the 'windows startfile' hardcoded launch call to be a platform-agnostic 'OS launch file'</li>
+                        <li>added a 'OS launch URL' hardcoded launch call in the same way</li>
+                        <li>improved the hydrus subprocess 'this process has timed out' detection system. in doing exe manager work this week, I realised it was waiting after a kill fallback in a blocking way and only reporting the timeout after the final (indefinite) reap went through</li>
+                        <li>improved some subprocess error formatting</li>
+                    </ul>
+                </li>
+                <li>
                     <h2 id="version_683"><a href="#version_683">version 683</a></h2>
                     <ul>
                         <li><h3>file metadata</h3></li>

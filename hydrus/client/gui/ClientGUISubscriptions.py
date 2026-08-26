@@ -971,12 +971,15 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         def publish_callable( result ):
             
-            self.setEnabled( True )
-            
             self._CopyQualityInfo( result )
             
         
-        async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable )
+        def ui_restoration_callable():
+            
+            self.setEnabled( True )
+            
+        
+        async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable, ui_restoration_callable = ui_restoration_callable )
         
         async_call.start()
         
@@ -1026,12 +1029,15 @@ class EditSubscriptionPanel( ClientGUIScrolledPanels.EditPanel ):
         
         def publish_callable( result ):
             
-            self.setEnabled( True )
-            
             self._ShowQualityInfo( result )
             
         
-        async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable )
+        def ui_restoration_callable():
+            
+            self.setEnabled( True )
+            
+        
+        async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable, ui_restoration_callable = ui_restoration_callable )
         
         async_call.start()
         
@@ -1885,7 +1891,7 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         self._subscriptions_panel.NewButtonRow()
         
         self._subscriptions_panel.AddWindow( ClientGUICommon.BetterStaticText( self._subscriptions_panel, label = 'import options:' ) )
-        self._subscriptions_panel.AddIconButton( CC.global_icons().copy, self._CopyImportOptionsContainer, enabled_only_on_single_selection = True )
+        self._copy_import_options_button = self._subscriptions_panel.AddIconButton( CC.global_icons().copy, self._CopyImportOptionsContainer, enabled_only_on_single_selection = True )
         
         menu_template_items = []
         
@@ -1895,7 +1901,7 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'fill-in-gaps-paste', 'Fill in what is currently default in the selected with what you have in the clipboard that is non-default.', self._PasteImportOptionsContainersMerge ) )
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'replace-paste', 'Replace what is selected with what you have in the clipboard.', self._PasteImportOptionsContainersFillIn ) )
         
-        self._subscriptions_panel.AddMenuIconButton( CC.global_icons().paste, 'paste a new set of options from the clipboard', menu_template_items, enabled_only_on_selection = True )
+        self._paste_import_options_button = self._subscriptions_panel.AddMenuIconButton( CC.global_icons().paste, 'paste a new set of options from the clipboard', menu_template_items, enabled_only_on_selection = True )
         
         self._import_options_containers_favourites_button = ClientGUIImportOptionsContainer.ImportOptionsContainerFavouritesButton( self, CG.client_controller.import_options_manager, edit_allowed = True )
         self._subscriptions_panel.AddWindow( self._import_options_containers_favourites_button )
@@ -2399,6 +2405,8 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         
         CG.client_controller.pub( 'clipboard', 'text', payload )
         
+        self._copy_import_options_button.ShowMicroNotification( f'Copied!' )
+        
     
     def _DoAsyncGetQueryLogContainers( self, query_headers: collections.abc.Collection[ ClientImportSubscriptionQuery.SubscriptionQueryHeader ], call: HydrusData.Call ):
         
@@ -2424,12 +2432,15 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
                     self._names_to_edited_query_log_containers[ query_log_container.GetName() ] = query_log_container
                     
                 
-                self.setEnabled( True )
-                
                 call()
                 
             
-            async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable )
+            def ui_restoration_callable():
+                
+                self.setEnabled( True )
+                
+            
+            async_call = ClientGUIAsync.AsyncQtJob( self, work_callable, publish_callable, ui_restoration_callable = ui_restoration_callable )
             
             async_call.start()
             
@@ -2638,6 +2649,8 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
         
         self._subscriptions.UpdateDatas( subscriptions )
         
+        self._paste_import_options_button.ShowMicroNotification( f'Pasted!' )
+        
     
     def _PasteImportOptionsContainerCustom( self ):
         
@@ -2651,6 +2664,8 @@ class EditSubscriptionsPanel( ClientGUIScrolledPanels.EditPanel ):
             
         
         self._LoadFavouriteImportOptionsContainer( pasted_import_options_container )
+        
+        self._paste_import_options_button.ShowMicroNotification( f'Pasted!' )
         
     
     def _PasteImportOptionsContainersFillIn( self ):

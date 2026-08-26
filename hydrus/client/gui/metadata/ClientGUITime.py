@@ -827,6 +827,8 @@ class DateTimesButtonWithCopyPaste( QW.QWidget ):
         
         CopyDateTimeValueRangeToClipboard( datetime_value_range )
         
+        self._copy_button.ShowMicroNotification( f'Copied!' )
+        
     
     def _Paste( self ):
         
@@ -844,6 +846,8 @@ class DateTimesButtonWithCopyPaste( QW.QWidget ):
         datetime_value_range = current_datetime_value_range.DuplicateWithNewQtDateTime( qt_datetime )
         
         self.SetValue( datetime_value_range, from_user = True )
+        
+        self._paste_button.ShowMicroNotification( f'Pasted!' )
         
     
     def GetValue( self ):
@@ -998,6 +1002,8 @@ class DateTimesCtrl( QW.QWidget ):
         
         CopyDateTimeValueRangeToClipboard( datetime_value_range )
         
+        self._copy_button.ShowMicroNotification( f'Copied!' )
+        
     
     def _NoneClicked( self ):
         
@@ -1021,6 +1027,8 @@ class DateTimesCtrl( QW.QWidget ):
         datetime_value_range = self._current_datetime_value_range.DuplicateWithNewQtDateTime( qt_datetime )
         
         self.SetValue( datetime_value_range )
+        
+        self._paste_button.ShowMicroNotification( f'Pasted!' )
         
     
     def _SetNow( self ):

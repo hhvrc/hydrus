@@ -169,10 +169,11 @@ SERIALISABLE_TYPE_NOTE_IMPORT_OPTIONS = 153
 SERIALISABLE_TYPE_NETWORK_CONTEXT_RECORD = 154
 SERIALISABLE_TYPE_EXECUTABLE_MANAGER = 155
 SERIALISABLE_TYPE_EXECUTABLE_CALLABLE = 156
-SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_TEMPLATE = 157
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_CALL = 157
 SERIALISABLE_TYPE_ID_AND_NAME = 158
 SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_INPUT_TEMPLATE_PARAM_PROCESSING_RULE = 159
-SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_WINDOWS_STARTFILE = 160
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_DEFAULT_LAUNCH_FILE = 160
+SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_DEFAULT_LAUNCH_URL = 161
 
 SERIALISABLE_TYPES_TO_OBJECT_TYPES = {}
 
@@ -465,7 +466,10 @@ class SerialisableBaseNamed( SerialisableBase ):
         
     
 
-class SerialisableDictionary( SerialisableBase, dict ):
+K = typing.TypeVar( 'K' )
+V = typing.TypeVar( 'V' )
+
+class SerialisableDictionary( SerialisableBase, dict[ K, V ] ):
     
     SERIALISABLE_TYPE = SERIALISABLE_TYPE_DICTIONARY
     SERIALISABLE_NAME = 'Serialisable Dictionary'
@@ -628,8 +632,10 @@ class SerialisableDictionary( SerialisableBase, dict ):
 
 SERIALISABLE_TYPES_TO_OBJECT_TYPES[ SERIALISABLE_TYPE_DICTIONARY ] = SerialisableDictionary
 
+V_bytes = typing.TypeVar( 'V_bytes' )
+
 # yo now that SerialisableDict can handle bytes anywhere, is this guy obsolete?
-class SerialisableBytesDictionary( SerialisableBase, dict ):
+class SerialisableBytesDictionary( SerialisableBase, dict[ int | bytes, V_bytes ] ):
     
     SERIALISABLE_TYPE = SERIALISABLE_TYPE_BYTES_DICT
     SERIALISABLE_NAME = 'Serialisable Dictionary With Bytestring Key/Value Support'
@@ -704,7 +710,6 @@ class SerialisableBytesDictionary( SerialisableBase, dict ):
             
         
     
-
     def GetSerialisableDescription( self ):
         
         result = f'{self.SERIALISABLE_NAME} ({self.SERIALISABLE_TYPE})'
@@ -742,9 +747,12 @@ class SerialisableBytesDictionary( SerialisableBase, dict ):
         return result
         
     
+
 SERIALISABLE_TYPES_TO_OBJECT_TYPES[ SERIALISABLE_TYPE_BYTES_DICT ] = SerialisableBytesDictionary
 
-class SerialisableList( SerialisableBase, list ):
+T = typing.TypeVar( "T" )
+
+class SerialisableList( SerialisableBase, list[ T ] ):
     
     SERIALISABLE_TYPE = SERIALISABLE_TYPE_LIST
     SERIALISABLE_NAME = 'Serialisable List'

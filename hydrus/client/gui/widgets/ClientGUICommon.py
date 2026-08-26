@@ -378,6 +378,11 @@ class BetterButton( ShortcutAwareToolTipMixin, QW.QPushButton ):
         QW.QPushButton.setText( self, button_label )
         
     
+    def ShowMicroNotification( self, text ):
+        
+        ClientGUIFunctions.ShowMicroNotification( self, text )
+        
+    
 
 class ExpandCollapseArrowButton( BetterButton ):
     
@@ -855,6 +860,22 @@ class ButtonWithMenuArrow( QW.QToolButton ):
         return False
         
     
+
+class EnterCatchingRadioButton( QW.QRadioButton ):
+    
+    def keyPressEvent( self, event: QG.QKeyEvent ):
+        
+        if event.key() in ( QC.Qt.Key.Key_Return, QC.Qt.Key.Key_Enter ) and CG.client_controller.new_options.GetBoolean( 'force_enter_on_radio_buttons_to_do_dialog_ok' ):
+            
+            event.ignore()
+            return
+            
+        
+        super().keyPressEvent( event )
+        
+    
+
+# I tried making this a QGroupBox for a while, but it didn't add any bells or whistles I really wanted
 class BetterRadioBox( QW.QFrame ):
     
     radioBoxChanged = QC.Signal()
@@ -867,11 +888,11 @@ class BetterRadioBox( QW.QFrame ):
         
         if vertical:
             
-            self.setLayout( QP.VBoxLayout() )
+            layout = QP.VBoxLayout()
             
         else:
             
-            self.setLayout( QP.HBoxLayout() )
+            layout = QP.HBoxLayout()
             
         
         self._radio_buttons = []
@@ -889,29 +910,42 @@ class BetterRadioBox( QW.QFrame ):
                 ( text, data, tooltip ) = tup
                 
             
-            radiobutton = QW.QRadioButton( text, self )
+            radio_button = EnterCatchingRadioButton( self )
+            radio_button.setText( text )
             
             if tooltip is not None:
                 
-                radiobutton.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) ) 
+                radio_button.setToolTip( ClientGUIFunctions.WrapToolTip( tooltip ) ) 
                 
             
-            self._radio_buttons.append( radiobutton )
+            self._radio_buttons.append( radio_button )
             
-            self._buttons_to_data[ radiobutton ] = data
+            self._buttons_to_data[ radio_button ] = data
             
-            radiobutton.clicked.connect( self.radioBoxChanged )
+            radio_button.clicked.connect( self.radioBoxChanged )
             
-            self.layout().addWidget( radiobutton )
+            if vertical:
+                
+                QP.AddToLayout( layout, radio_button, CC.FLAGS_EXPAND_PERPENDICULAR )
+                
+            else:
+                
+                QP.AddToLayout( layout, radio_button, CC.FLAGS_CENTER_PERPENDICULAR )
+                
             
         
-        if vertical and len( self._radio_buttons ):
+        self.setLayout( layout )
+        
+        if len( self._radio_buttons ) > 0:
             
-            self._radio_buttons[0].setChecked( True )
-            
-        elif len( self._radio_buttons ) > 0:
-            
-            self._radio_buttons[-1].setChecked( True )
+            if vertical:
+                
+                self._radio_buttons[0].setChecked( True )
+                
+            else:
+                
+                self._radio_buttons[-1].setChecked( True )
+                
             
         
     
@@ -953,7 +987,7 @@ class BetterRadioBox( QW.QFrame ):
                 
             
         
-        QW.QFrame.setFocus( self, reason )
+        super().setFocus( reason )
         
     
     def Select( self, index ):
@@ -1410,6 +1444,11 @@ class IconButton( ShortcutAwareToolTipMixin, QW.QPushButton ):
         self.last_icon_set = icon
         
     
+    def ShowMicroNotification( self, text ):
+        
+        ClientGUIFunctions.ShowMicroNotification( self, text )
+        
+    
 
 class IconButtonMultiClickable( IconButton ):
     
@@ -1762,10 +1801,7 @@ class NoneableTextCtrl( QW.QWidget ):
             self._text.setText( default_text )
             
         
-        if placeholder_text != '':
-            
-            self._text.setPlaceholderText( placeholder_text )
-            
+        self._placeholder_text = placeholder_text
         
         if min_chars_width is not None:
             
@@ -1776,7 +1812,7 @@ class NoneableTextCtrl( QW.QWidget ):
         
         if len( message ) > 0:
             
-            QP.AddToLayout( hbox, BetterStaticText(self,message+': '), CC.FLAGS_CENTER_PERPENDICULAR )
+            QP.AddToLayout( hbox, BetterStaticText( self, message + ': ' ), CC.FLAGS_CENTER_PERPENDICULAR )
             
         
         QP.AddToLayout( hbox, self._text, CC.FLAGS_EXPAND_BOTH_WAYS )
@@ -1792,6 +1828,17 @@ class NoneableTextCtrl( QW.QWidget ):
         
         self.valueChanged.emit()
         
+    
+    def _UpdatePlaceholderText( self ):
+        
+        if self.GetValue() is None:
+            
+            self._text.setPlaceholderText( '' )
+            
+        else:
+            
+            self._text.setPlaceholderText( self._placeholder_text )
+            
         
     
     def EventCheckBox( self, state ):
@@ -1804,6 +1851,8 @@ class NoneableTextCtrl( QW.QWidget ):
             
             self._text.setEnabled( True )
             
+        
+        self._UpdatePlaceholderText()
         
     
     def GetValue( self ):
@@ -1820,7 +1869,9 @@ class NoneableTextCtrl( QW.QWidget ):
     
     def setPlaceholderText( self, text: str ):
         
-        self._text.setPlaceholderText( text )
+        self._placeholder_text = text
+        
+        self._UpdatePlaceholderText()
         
     
     def setReadOnly( self, value: bool ):
@@ -1857,6 +1908,8 @@ class NoneableTextCtrl( QW.QWidget ):
             
             self._text.setText( value )
             
+        
+        self._UpdatePlaceholderText()
         
     
 class OnOffButton( QW.QPushButton ):
@@ -1934,6 +1987,8 @@ class StaticBox( QW.QFrame ):
         self.setFrameStyle( QW.QFrame.Shape.Box | QW.QFrame.Shadow.Raised )
         self._spacer = QW.QSpacerItem( 0, 0, QW.QSizePolicy.Policy.Minimum, QW.QSizePolicy.Policy.MinimumExpanding )
         
+        self._my_widgets = []
+        
         normal_font = self.font()
         
         normal_font_size = normal_font.pointSize()
@@ -1996,7 +2051,21 @@ class StaticBox( QW.QFrame ):
         
         QP.AddToLayout( self._sizer, widget, flags )
         
+        self._my_widgets.append( widget )
+        
         self._sizer.addSpacerItem( self._spacer )
+        
+    
+    def Clear( self ):
+        
+        for widget in self._my_widgets:
+            
+            self._sizer.removeWidget( widget )
+            
+            widget.deleteLater()
+            
+        
+        self._my_widgets = []
         
     
     def ExpandCollapse( self ):

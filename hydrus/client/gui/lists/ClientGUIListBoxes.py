@@ -450,6 +450,9 @@ class AddEditDeleteListBox( QW.QWidget ):
         self._edit_button = ClientGUICommon.BetterButton( self, 'edit', self._Edit )
         self._delete_button = ClientGUICommon.BetterButton( self, 'delete', self._Delete )
         
+        self._copy_button = None
+        self._paste_button = None
+        
         self._enabled_only_on_selection_buttons = []
         
         self._permitted_object_types = tuple()
@@ -566,6 +569,11 @@ class AddEditDeleteListBox( QW.QWidget ):
         separated_text = '\n'.join( [ obj for obj in self.GetData( only_selected = True ) ] )
         
         CG.client_controller.pub( 'clipboard', 'text', separated_text )
+        
+        if self._copy_button is not None:
+            
+            self._copy_button.ShowMicroNotification( 'Copied!' )
+            
         
     
     def _Delete( self ):
@@ -884,16 +892,18 @@ class AddEditDeleteListBox( QW.QWidget ):
         
         try:
             
-            urls = HydrusText.DeserialiseNewlinedTexts( raw_text )
+            texts = HydrusText.DeserialiseNewlinedTexts( raw_text )
             
         except Exception as e:
             
-            ClientGUIDialogsQuick.PresentClipboardParseError( self, raw_text, 'Lines of URLs', e )
+            ClientGUIDialogsQuick.PresentClipboardParseError( self, raw_text, 'Lines of text', e )
             
             raise
             
         
-        self.AddDatas( urls )
+        self.AddDatas( texts )
+        
+        self._paste_button.ShowMicroNotification( f'Pasted {HydrusNumbers.ToHumanInt(len(texts))} items!' )
         
     
     def _SetNonDupeName( self, obj ):
@@ -937,12 +947,12 @@ class AddEditDeleteListBox( QW.QWidget ):
     
     def AddSimpleCopyPasteTextButtons( self ):
         
-        button = ClientGUICommon.IconButton( self, CC.global_icons().copy, self._CopyTextToClipboard )
-        QP.AddToLayout( self._buttons_hbox, button, CC.FLAGS_CENTER_PERPENDICULAR )
-        self._enabled_only_on_selection_buttons.append( button )
+        self._copy_button = ClientGUICommon.IconButton( self, CC.global_icons().copy, self._CopyTextToClipboard )
+        QP.AddToLayout( self._buttons_hbox, self._copy_button, CC.FLAGS_CENTER_PERPENDICULAR )
+        self._enabled_only_on_selection_buttons.append( self._copy_button )
         
-        button = ClientGUICommon.IconButton( self, CC.global_icons().paste, self._PasteTextFromClipboard )
-        QP.AddToLayout( self._buttons_hbox, button, CC.FLAGS_CENTER_PERPENDICULAR )
+        self._paste_button = ClientGUICommon.IconButton( self, CC.global_icons().paste, self._PasteTextFromClipboard )
+        QP.AddToLayout( self._buttons_hbox, self._paste_button, CC.FLAGS_CENTER_PERPENDICULAR )
         
         self._ShowHideButtons()
         
@@ -1492,6 +1502,8 @@ class QueueListBox( QW.QWidget ):
         
         self.listBoxContentsChanged.emit()
         self.listBoxChanged.emit()
+        
+        self._paste_button.ShowMicroNotification( f'Pasted {HydrusNumbers.ToHumanInt(len(datas))} items!' )
         
     
     def _Up( self ):
