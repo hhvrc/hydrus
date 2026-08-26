@@ -1,11 +1,13 @@
+from hydrus.core import HydrusConstants as HC
+
 from hydrus.client.executables import ClientExecutableActualCall
 from hydrus.client.executables import ClientExecutableCallables
 from hydrus.client.executables import ClientExecutablePipelines
 
 def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutableCallable ]:
     
-    parameter_processing_rules = [
-        ClientExecutableActualCall.LocalProcessCallTemplateInputParameterProcessingRule(
+    input_parameter_processing_rules = [
+        ClientExecutableActualCall.LocalProcessCallInputParameterProcessingRule(
             ClientExecutablePipelines.PARAMETER_TYPE_FILE_PATH,
             '%path%'
         )
@@ -15,24 +17,25 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessWindowsStartFile()
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessDefaultLaunchFile()
     
     call = ClientExecutableCallables.ClientExecutableCallable(
-        'Windows Startfile',
+        '-special- Default OS Launch File Command',
         pipeline_type = ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_FILE,
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( True, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'xdg-open "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'xdg-open',
+        executable_parameter_templates = [ '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'xdg-open' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'xdg-open',
@@ -40,16 +43,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'gio open "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'gio',
+        executable_parameter_templates = [ 'open', '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'gio' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'gio open (Gnome)',
@@ -57,16 +61,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'kioclient exec "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'kioclient',
+        executable_parameter_templates = [ 'exec', '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'kioclient' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'kioclient exec (KDE)',
@@ -74,16 +79,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'firefox "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'firefox',
+        executable_parameter_templates = [ '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'firefox' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'firefox (file path)',
@@ -91,16 +97,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX or HC.PLATFORM_WINDOWS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'google-chrome "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'google-chrome',
+        executable_parameter_templates = [ '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'google-chrome' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (file path)',
@@ -108,18 +115,19 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX, call ) )
     
     #
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'chrome "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'chrome',
+        executable_parameter_templates = [ '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'chrome' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (file path) (Windows)',
@@ -127,16 +135,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_WINDOWS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'open -a "Firefox" "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'open',
+        executable_parameter_templates = [ '-a', 'Firefox', '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityCall( 'open -Ra "Firefox"' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'firefox (file path) (macOS)',
@@ -144,16 +153,17 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_MACOS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'open -a "Google Chrome" "%path%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'open',
+        executable_parameter_templates = [ '-a', 'Google Chrome', '%path%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityCall( 'open -Ra "Google Chrome"' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (file path) (macOS)',
@@ -161,15 +171,15 @@ def GetDefaultOpenExternally() -> list[ ClientExecutableCallables.ClientExecutab
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_MACOS, call ) )
     
     return callables
     
 
 def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCallable ]:
     
-    parameter_processing_rules = [
-        ClientExecutableActualCall.LocalProcessCallTemplateInputParameterProcessingRule(
+    input_parameter_processing_rules = [
+        ClientExecutableActualCall.LocalProcessCallInputParameterProcessingRule(
             ClientExecutablePipelines.PARAMETER_TYPE_URL,
             '%url%'
         )
@@ -179,12 +189,25 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'firefox "%url%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessDefaultLaunchURL()
+    
+    call = ClientExecutableCallables.ClientExecutableCallable(
+        '-special- Default OS Launch URL Command',
+        pipeline_type = ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_URL,
+        actual_call = actual_call
     )
     
-    actual_call.SetAvailabilityWhichName( 'firefox' )
+    callables.append( ( True, call ) )
+    
+    #
+    
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'firefox',
+        executable_parameter_templates = [ '%url%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
+    )
+    
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'firefox (URL)',
@@ -192,16 +215,17 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX or HC.PLATFORM_WINDOWS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'google-chrome "%url%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'google-chrome',
+        executable_parameter_templates = [ '%url%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'google-chrome' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (URL)',
@@ -209,18 +233,19 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_LINUX, call ) )
     
     #
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'chrome "%url%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'chrome',
+        executable_parameter_templates = [ '%url%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityWhichName( 'chrome' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (URL) (Windows)',
@@ -228,16 +253,17 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_WINDOWS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'open -a "Firefox" "%url%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'open',
+        executable_parameter_templates = [ '-a', 'Firefox', '%url%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityCall( 'open -Ra "Firefox"' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'firefox (URL) (macOS)',
@@ -245,16 +271,17 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_MACOS, call ) )
     
     #
     
-    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCallTemplate(
-        'open -a "Google Chrome" "%url%"',
-        parameter_processing_rules = parameter_processing_rules
+    actual_call = ClientExecutableActualCall.ExecutableLocalProcessCall(
+        executable_path = 'open',
+        executable_parameter_templates = [ '-a', 'Google Chrome', '%url%' ],
+        input_parameter_processing_rules = input_parameter_processing_rules
     )
     
-    actual_call.SetAvailabilityCall( 'open -Ra "Google Chrome"' )
+    actual_call.SetThisIsAPotentiallyLongLivedExternalGuy( True )
     
     call = ClientExecutableCallables.ClientExecutableCallable(
         'chrome (URL) (macOS)',
@@ -262,7 +289,7 @@ def GetDefaultOpenURL() -> list[ ClientExecutableCallables.ClientExecutableCalla
         actual_call = actual_call
     )
     
-    callables.append( call )
+    callables.append( ( HC.PLATFORM_MACOS, call ) )
     
     return callables
     

@@ -171,31 +171,24 @@ def AddAudioVolumeMenu( menu, canvas_type, media_container ):
     
     ( mute_option_name, volume_option_name ) = ClientGUIMediaControls.volume_types_to_option_names[ volume_volume_type ]
     
-    # 0-100 inclusive
-    volumes = list( range( 0, 110, 10 ) )
-    
     current_volume = CG.client_controller.new_options.GetInteger( volume_option_name )
     
-    if current_volume not in volumes:
+    def change_volume_from_slider( v ):
         
-        volumes.append( current_volume )
-        
-        volumes.sort()
+        ClientGUIMediaControls.ChangeVolume( volume_volume_type, v )
         
     
-    for volume in volumes:
-        
-        label = 'volume: {}'.format( volume )
-        
-        if volume == current_volume:
-            
-            ClientGUIMenus.AppendMenuCheckItem( volume_menu, label, 'Set the volume.', True, ClientGUIMediaControls.ChangeVolume, volume_volume_type, volume )
-            
-        else:
-            
-            ClientGUIMenus.AppendMenuItem( volume_menu, label, 'Set the volume.', ClientGUIMediaControls.ChangeVolume, volume_volume_type, volume )
-            
-        
+    ClientGUIMenus.AppendMenuSlider(
+        volume_menu,
+        'volume',
+        'Set the volume directly',
+        current_volume,
+        0,
+        100,
+        1,
+        change_volume_from_slider,
+        min_width_chars = 15
+    )
     
     ClientGUIMenus.AppendMenu( menu, volume_menu, 'volume' )
     
@@ -596,7 +589,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
             return
             
         
-        for child in self.children():
+        for child in self.window().children():
             
             if isinstance( child, ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel ):
                 
@@ -618,7 +611,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         title = 'manage tags'
         frame_key = 'manage_tags_frame'
         
-        manage_tags = ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel( self, title, frame_key )
+        manage_tags = ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel( self.window(), title, frame_key )
         
         panel = ClientGUIManageTags.ManageTagsPanel( manage_tags, self._location_context, CC.TAG_PRESENTATION_MEDIA_VIEWER_MANAGE_TAGS, [ self._current_media ], immediate_commit = True, canvas_key = self._canvas_key )
         
@@ -1024,6 +1017,13 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                 if self._current_media is not None:
                     
                     ClientGUIMediaSimpleActions.CopyMediaURLs( [ self._current_media ] )
+                    
+                
+            elif action == CAC.SIMPLE_SHOW_DETAILED_EMBEDDED_FILE_METADATA_WINDOW:
+                
+                if self._current_media is not None:
+                    
+                    ClientGUIMediaModalActions.ShowFileEmbeddedMetadata( self, self._current_media.GetMediaResult() )
                     
                 
             elif action == CAC.SIMPLE_DELETE_FILE:
@@ -1824,11 +1824,9 @@ class CanvasPanel( Canvas ):
             
             #
             
-            info_lines = ClientMediaResultPrettyInfo.GetPrettyMediaResultInfoLines( self._current_media.GetMediaResult() )
-            
             info_menu = ClientGUIMenus.GenerateMenu( menu )
             
-            ClientGUIMediaMenus.AddPrettyMediaResultInfoLines( info_menu, info_lines )
+            ClientGUIMediaMenus.AddPrettyMediaResultInfoLines( self, info_menu, self._current_media.GetMediaResult() )
             
             ClientGUIMediaMenus.AddFileViewingStatsMenu( info_menu, (self._current_media,) )
             
@@ -4636,11 +4634,9 @@ class CanvasMediaListBrowser( CanvasMediaListNavigable ):
             
             #
             
-            info_lines = ClientMediaResultPrettyInfo.GetPrettyMediaResultInfoLines( self._current_media.GetMediaResult() )
-            
             info_menu = ClientGUIMenus.GenerateMenu( menu )
             
-            ClientGUIMediaMenus.AddPrettyMediaResultInfoLines( info_menu, info_lines )
+            ClientGUIMediaMenus.AddPrettyMediaResultInfoLines( self, info_menu, self._current_media.GetMediaResult() )
             
             ClientGUIMenus.AppendSeparator( info_menu )
             

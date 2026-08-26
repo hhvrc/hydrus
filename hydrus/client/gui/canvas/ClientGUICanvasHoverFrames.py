@@ -1154,7 +1154,7 @@ class CanvasHoverFrameTop( CanvasHoverFrame ):
             return
             
         
-        ClientGUIMediaModalActions.ShowFileEmbeddedMetadata( self, self._current_media )
+        ClientGUIMediaModalActions.ShowFileEmbeddedMetadata( self, self._current_media.GetMediaResult() )
         
     
     def _ShowShortcutMenu( self ):
@@ -2094,9 +2094,16 @@ class NotePanel( QW.QWidget ):
         self.setToolTip( ClientGUIFunctions.WrapToolTip( 'Left-click to edit, Middle-click to copy, Right-click to hide/show.' ) )
         
     
-    def _CopyNote( self ):
+    def _CopyNoteFromClick( self ):
         
-        copy_text = self._name + '\n\n' + self._note
+        if CG.client_controller.new_options.GetBoolean( 'copy_notes_quick_click_only_copies_text' ):
+            
+            copy_text = self._note
+            
+        else:
+            
+            copy_text = self._name + '\n\n' + self._note
+            
         
         CG.client_controller.pub( 'clipboard', 'text', copy_text )
         
@@ -2115,7 +2122,7 @@ class NotePanel( QW.QWidget ):
                     
                 elif event.button() == QC.Qt.MouseButton.MiddleButton:
                     
-                    self._CopyNote()
+                    self._CopyNoteFromClick()
                     
                 else:
                     
@@ -2402,6 +2409,7 @@ class CanvasHoverFrameRightNotes( CanvasHoverFrame ):
         self._position_initialised_since_last_media = False
         
     
+
 class CanvasHoverFrameRightDuplicates( CanvasHoverFrame ):
     
     showPairInPage = QC.Signal()
@@ -2416,7 +2424,7 @@ class CanvasHoverFrameRightDuplicates( CanvasHoverFrame ):
         
         self._comparison_media = None
         
-        self._show_in_a_page_button = ClientGUICommon.IconButton( self, CC.global_icons().copy, self.showPairInPage.emit )
+        self._show_in_a_page_button = ClientGUICommon.IconButton( self, CC.global_icons().copy, self._ShowPairInPage )
         self._show_in_a_page_button.setToolTip( ClientGUIFunctions.WrapToolTip( 'send pair to the duplicates media page, for later processing' ) )
         self._show_in_a_page_button.setFocusPolicy( QC.Qt.FocusPolicy.TabFocus )
         
@@ -2882,6 +2890,13 @@ class CanvasHoverFrameRightDuplicates( CanvasHoverFrame ):
         self.layout().activate()
         
         self._SizeAndPosition()
+        
+    
+    def _ShowPairInPage( self ):
+        
+        self.showPairInPage.emit()
+        
+        self._show_in_a_page_button.ShowMicroNotification( f'Sent!' )
         
     
     def _UpdateTotalScore( self, finished = True ):

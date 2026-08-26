@@ -121,6 +121,8 @@ class DialogManageRatings( CAC.ApplicationCommandProcessorMixin, ClientGUIDialog
         
         CG.client_controller.pub( 'clipboard', 'text', text )
         
+        self._copy_button.ShowMicroNotification( f'Copied {HydrusNumbers.ToHumanInt(len(rating_clipboard_pairs))} ratings!' )
+        
     
     def _Paste( self ):
         
@@ -152,6 +154,8 @@ class DialogManageRatings( CAC.ApplicationCommandProcessorMixin, ClientGUIDialog
             
             panel.SetRatingClipboardPairs( rating_clipboard_pairs )
             
+        
+        self._paste_button.ShowMicroNotification( f'Pasted {HydrusNumbers.ToHumanInt(len(rating_clipboard_pairs))} ratings!' )
         
     
     def EventOK( self ):
