@@ -11,7 +11,6 @@ from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusNumbers
-from hydrus.core import HydrusPaths
 from hydrus.core import HydrusTime
 from hydrus.core.networking import HydrusNetwork
 
@@ -886,11 +885,7 @@ class MediaResultsPanel( CAC.ApplicationCommandProcessorMixin, ClientMediaList.M
                 
                 path = client_files_manager.GetFilePath( hash, mime )
                 
-                new_options = CG.client_controller.new_options
-                
-                launch_path = new_options.GetMimeLaunch( mime )
-                
-                HydrusPaths.LaunchFile( path, launch_path )
+                ClientPaths.LaunchFileDefault( path, mime )
                 
                 return
                 
@@ -2068,9 +2063,9 @@ class MediaResultsPanel( CAC.ApplicationCommandProcessorMixin, ClientMediaList.M
             
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -2078,16 +2073,15 @@ class MediaResultsPanel( CAC.ApplicationCommandProcessorMixin, ClientMediaList.M
             
             if action == CAC.SIMPLE_COPY_FILE_BITMAP:
                 
-                if not self._HasFocusSingleton():
+                if self._HasFocusSingleton():
                     
-                    return
                     
-                
-                focus_singleton = self._GetFocusSingleton()
-                
-                bitmap_type = command.GetSimpleData()
-                
-                ClientGUIMediaSimpleActions.CopyMediaBitmap( focus_singleton, bitmap_type )
+                    focus_singleton = self._GetFocusSingleton()
+                    
+                    bitmap_type = command.GetSimpleData()
+                    
+                    ClientGUIMediaSimpleActions.CopyMediaBitmap( focus_singleton, bitmap_type )
+                    
                 
             elif action == CAC.SIMPLE_COPY_FILES:
                 
@@ -2475,7 +2469,20 @@ class MediaResultsPanel( CAC.ApplicationCommandProcessorMixin, ClientMediaList.M
                     
                     focused_singleton = self._GetFocusSingleton()
                     
-                    it_worked = ClientGUIMediaSimpleActions.OpenExternally( focused_singleton )
+                    data = command.GetSimpleData()
+                    
+                    if data is not None:
+                        
+                        # TODO: aiiiieeee, I am doing this because I need to differentiate between None launch path while it is in strings
+                        # ditch the _ gumpf when I am using id_and_name
+                        ( _, open_externally_launch_path ) = data
+                        
+                        it_worked = ClientGUIMediaSimpleActions.OpenExternally( focused_singleton, open_externally_launch_path )
+                        
+                    else:
+                        
+                        it_worked = ClientGUIMediaSimpleActions.OpenExternallyDefault( focused_singleton )
+                        
                     
                     if it_worked:
                         
@@ -2609,32 +2616,33 @@ class MediaResultsPanel( CAC.ApplicationCommandProcessorMixin, ClientMediaList.M
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         elif command.IsContentCommand():
             
-            command_processed = ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, self._GetSelectedFlatMedia() )
+            ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, self._GetSelectedFlatMedia() )
             
         elif command.IsInteractiveContentCommand():
             
-            content_command = ClientGUIMediaModalActions.GetContentApplicationCommandFromInteractiveContentCommand( self, command, self._GetSelectedFlatMedia()[ 0 ] )
+            selected_flat_media = self._GetSelectedFlatMedia()
             
-            if content_command.IsContentCommand():
+            if len( selected_flat_media ) > 0:
                 
-                command_processed = ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, content_command, self._GetSelectedFlatMedia() )
+                content_command = ClientGUIMediaModalActions.GetContentApplicationCommandFromInteractiveContentCommand( self, command, selected_flat_media[ 0 ] )
                 
-            else:
-                
-                command_processed = False
+                if content_command.IsContentCommand():
+                    
+                    ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, content_command, selected_flat_media )
+                    
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        return command_processed
+        return command_matched
         
     
     def ProcessContentUpdatePackage( self, content_update_package: ClientContentUpdates.ContentUpdatePackage ):
@@ -2930,7 +2938,7 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
         
         self._focused_media = None
         self._last_hit_media = None
-        self._next_best_media_if_focuses_removed = None
+        self._previously_focused_media_when_nothing_now = None
         self._shift_select_started_with_this_media = None
         self._media_added_in_current_shift_select = set()
         
@@ -3679,11 +3687,7 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
                 
                 path = client_files_manager.GetFilePath( hash, mime )
                 
-                new_options = CG.client_controller.new_options
-                
-                launch_path = new_options.GetMimeLaunch( mime )
-                
-                HydrusPaths.LaunchFile( path, launch_path )
+                ClientPaths.LaunchFileDefault( path, mime )
                 
                 return
                 
@@ -4157,7 +4161,69 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
     
     def _RemoveMediaDirectly( self, singleton_media, collected_media ):
         
+        # ok we are about to remove the current focus. let's get ahead of it and set up our new ghost index
+        if self._focused_media is not None and ( self._focused_media in singleton_media or self._focused_media in collected_media ):
+            
+            self._SetFocusedMedia( None )
+            
+        
+        # ghost index is now set up. let's now slide it out of the removees
+        if self._previously_focused_media_when_nothing_now is not None and self._previously_focused_media_when_nothing_now in self._sorted_media:
+            
+            try:
+                
+                new_candidate_for_previously_focused_media_when_nothing_now = self._previously_focused_media_when_nothing_now
+                
+                index = self._sorted_media.index( new_candidate_for_previously_focused_media_when_nothing_now )
+                
+                while index < len( self._sorted_media ) - 1 and ( new_candidate_for_previously_focused_media_when_nothing_now in singleton_media or new_candidate_for_previously_focused_media_when_nothing_now in collected_media ):
+                    
+                    index += 1
+                    
+                    new_candidate_for_previously_focused_media_when_nothing_now = self._sorted_media[ index ]
+                    
+                
+                if index == len( self._sorted_media ) - 1:
+                    
+                    # ok going forward produced no result. selection probably until the end of the thumbs. let's try and step back
+                    
+                    new_candidate_for_previously_focused_media_when_nothing_now = self._previously_focused_media_when_nothing_now
+                    
+                    while index > 0 and ( new_candidate_for_previously_focused_media_when_nothing_now in singleton_media or new_candidate_for_previously_focused_media_when_nothing_now in collected_media ):
+                        
+                        index -= 1
+                        
+                        new_candidate_for_previously_focused_media_when_nothing_now = self._sorted_media[ index ]
+                        
+                    
+                
+                if 0 <= index <= len( self._sorted_media ) - 1:
+                    
+                    self._previously_focused_media_when_nothing_now = new_candidate_for_previously_focused_media_when_nothing_now
+                    
+                
+            except:
+                
+                self._previously_focused_media_when_nothing_now = None
+                
+            
+        
         super()._RemoveMediaDirectly( singleton_media, collected_media )
+        
+        if self._last_hit_media is not None and self._last_hit_media not in self._sorted_media:
+            
+            self._last_hit_media = None
+            
+        
+        if self._shift_select_started_with_this_media is not None and self._shift_select_started_with_this_media not in self._sorted_media:
+            
+            self._shift_select_started_with_this_media = None
+            
+        
+        if len( self._media_added_in_current_shift_select ) > 0:
+            
+            self._media_added_in_current_shift_select = { item for item in self._media_added_in_current_shift_select if item in self._sorted_media }
+            
         
         self._MaintainMediaAssociatedGraphics( singleton_media )
         self._MaintainMediaAssociatedGraphics( collected_media )
@@ -4613,55 +4679,35 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
         self._SetDuplicates( HC.DUPLICATE_POTENTIAL, media_group = media_group )
         
     
-    def _SetFocusedMedia( self, media, focus_page = False ):
+    def _SetFocusedMedia( self, new_focused_media, focus_page = False ):
         
-        if media == self._focused_media:
+        if new_focused_media == self._focused_media:
             
             return
             
         
-        self._next_best_media_if_focuses_removed = None
-        
-        for m in [ media, self._focused_media ]:
+        # I used to have a whole thing here that tried to find the least previous media that was not selected, since those are removed a bunch
+        # it caused confusion in certain situations, particularly stuff where non-selected files were removed (after A/D and delete-file weirdness)
+        # ultimately I added a thing in removemediadirectly to handle it nicer in there, _and_ we moved to _next_ rather than previous since it feels better
+        # this guy is now just a convenient 'where were we?' fallback than some predetermined landing zone
+
+        if new_focused_media is None and self._focused_media is not None and self._focused_media in self._sorted_media:
             
-            if m is None:
-                
-                continue
-                
+            self._previously_focused_media_when_nothing_now = self._focused_media
             
-            if m in self._sorted_media:
-                
-                next_best_media = m
-                
-                i = self._sorted_media.index( next_best_media )
-                
-                while next_best_media in self._selected_media:
-                    
-                    if i == 0:
-                        
-                        next_best_media = None
-                        
-                        break
-                        
-                    
-                    i -= 1
-                    
-                    next_best_media = self._sorted_media[ i ]
-                    
-                
-                if next_best_media is not None:
-                    
-                    self._next_best_media_if_focuses_removed = next_best_media
-                    
-                    break
-                    
-                
+        else:
+            
+            self._previously_focused_media_when_nothing_now = None
             
         
         publish_media = None
         
-        self._focused_media = media
-        self._last_hit_media = media
+        self._focused_media = new_focused_media
+        
+        if self._focused_media is not None:
+            
+            self._last_hit_media = new_focused_media
+            
         
         if self._focused_media is not None:
             
@@ -4939,9 +4985,9 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
             
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -4949,16 +4995,14 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
             
             if action == CAC.SIMPLE_COPY_FILE_BITMAP:
                 
-                if not self._HasFocusSingleton():
+                if self._HasFocusSingleton():
                     
-                    return
+                    focus_singleton = self._GetFocusSingleton()
                     
-                
-                focus_singleton = self._GetFocusSingleton()
-                
-                bitmap_type = command.GetSimpleData()
-                
-                ClientGUIMediaSimpleActions.CopyMediaBitmap( focus_singleton, bitmap_type )
+                    bitmap_type = command.GetSimpleData()
+                    
+                    ClientGUIMediaSimpleActions.CopyMediaBitmap( focus_singleton, bitmap_type )
+                    
                 
             elif action == CAC.SIMPLE_COPY_FILES:
                 
@@ -5100,12 +5144,10 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
                         
                     
                 
-                if insertion_index is None:
+                if insertion_index is not None:
                     
-                    return True
+                    self.MoveMedia( ordered_selected_media, insertion_index = insertion_index )
                     
-                
-                self.MoveMedia( ordered_selected_media, insertion_index = insertion_index )
                 
             elif action == CAC.SIMPLE_SHOW_DUPLICATES:
                 
@@ -5346,7 +5388,20 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
                     
                     focused_singleton = self._GetFocusSingleton()
                     
-                    it_worked = ClientGUIMediaSimpleActions.OpenExternally( focused_singleton )
+                    data = command.GetSimpleData()
+                    
+                    if data is not None:
+                        
+                        # TODO: aiiiieeee, I am doing this because I need to differentiate between None launch path while it is in strings
+                        # ditch the _ gumpf when I am using id_and_name
+                        ( _, open_externally_launch_path ) = data
+                        
+                        it_worked = ClientGUIMediaSimpleActions.OpenExternally( focused_singleton, open_externally_launch_path )
+                        
+                    else:
+                        
+                        it_worked = ClientGUIMediaSimpleActions.OpenExternallyDefault( focused_singleton )
+                        
                     
                     if it_worked:
                         
@@ -5480,19 +5535,33 @@ class MediaResultsPanelGraphicsViewTest( CAC.ApplicationCommandProcessorMixin, C
                 
             else:
                 
-                command_processed = False
+                command_matched = False
+                
+            
+        elif command.IsInteractiveContentCommand():
+            
+            selected_flat_media = self._GetSelectedFlatMedia()
+            
+            if len( selected_flat_media ) > 0:
+                
+                content_command = ClientGUIMediaModalActions.GetContentApplicationCommandFromInteractiveContentCommand( self, command, selected_flat_media[ 0 ] )
+                
+                if content_command.IsContentCommand():
+                    
+                    ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, content_command, selected_flat_media )
+                    
                 
             
         elif command.IsContentCommand():
             
-            command_processed = ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, self._GetSelectedFlatMedia() )
+            ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, self._GetSelectedFlatMedia() )
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        return command_processed
+        return command_matched
         
     
     def ProcessContentUpdatePackage( self, content_update_package: ClientContentUpdates.ContentUpdatePackage ):

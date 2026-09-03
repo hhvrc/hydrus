@@ -1720,9 +1720,9 @@ class MediaResultsPanelThumbnails( ClientGUIMediaResultsPanel.MediaResultsPanel 
         self._RedrawMedia( affected_media )
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -1796,21 +1796,21 @@ class MediaResultsPanelThumbnails( ClientGUIMediaResultsPanel.MediaResultsPanel 
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
             return super().ProcessApplicationCommand( command )
             
         else:
             
-            return command_processed
+            return command_matched
             
         
     
@@ -2859,7 +2859,10 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
         self._ArrangeThumbnails()
         
-        self._ResetThumbnailScrollSingleStep()
+        # WOOP WOOP, this does not work well when called here!
+        # if we set it here, it sets to 126 or whatever, and then when the page is later, actually shown, it gets transmogrified into half, 63
+        # therefore we do it on the next frame and reset on pageshown, let's go
+        CG.client_controller.CallAfterQtSafe( self, self._ResetThumbnailScrollSingleStep )
         
         CG.client_controller.sub( self, 'MaintainPageCache', 'memory_maintenance_pulse' )
         CG.client_controller.sub( self, 'NotifyFilesNeedRedraw', 'notify_files_need_redraw' )
@@ -3033,26 +3036,37 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
             
         
     
-    def _MediaToUseWhenMovingFocus( self ):
+    def _MediaToUseWhenMovingFocus( self, shift: bool ):
         
         media_to_use = None
-        next_best = False
+        you_should_just_select_this_guy = False
         
-        if self._last_hit_media is not None:
+        last_hit_media_is_important = shift or CG.client_controller.new_options.GetBoolean( 'on_shift_click_move_ghost_focus_to_last_hit' )
+        
+        if last_hit_media_is_important and self._last_hit_media is not None:
             
             media_to_use = self._last_hit_media
             
-        elif self._next_best_media_if_focuses_removed is not None:
+        elif self._focused_media is not None:
             
-            media_to_use = self._next_best_media_if_focuses_removed
+            media_to_use = self._focused_media
             
-            next_best = True
+        elif self._previously_focused_media_when_nothing_now is not None:
+            
+            media_to_use = self._previously_focused_media_when_nothing_now
+            
+            you_should_just_select_this_guy = True
+            
+        elif not last_hit_media_is_important and self._last_hit_media is not None:
+            
+            media_to_use = self._last_hit_media
             
         elif len( self._sorted_media ) > 0:
             
             media_to_use = self._sorted_media[ 0 ]
             
-        return media_to_use, next_best
+        
+        return ( media_to_use, you_should_just_select_this_guy )
         
     
     def _MoveThumbnailFocus( self, new_position, shift ):
@@ -3065,6 +3079,7 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                 
                 new_position = len( self._sorted_media ) - 1
                 
+            
             new_media = self._sorted_media[ new_position ]
             
             self._HitMedia( new_media, False, shift )
@@ -3196,6 +3211,11 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         
     
     def _ResetThumbnailScrollSingleStep( self ):
+        
+        if not self.isVisible():
+            
+            return
+            
         
         # No idea what to do if thumbnail height and/or width isn't constant.
         # For now, use the "generic"/"average" thumbnail size for this purpose.
@@ -4158,9 +4178,22 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
         self._RedrawMedia( affected_media )
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def PageShown( self ):
         
-        command_processed = True
+        super().PageShown()
+        
+        # yeah so if we don't set this on the frame after every show, it seems to cut in half!?
+        # maybe it is something to do with the position preservation in this method's super?
+        # maybe a relayout is doing it, maybe something like fitInView. it isn't going to a clean 50 default either, but actually half, so 126->63
+        # the halving happens _after_ showEvent completes
+        # it re-breaks on every hide but does not compound, so there is an idempotent mess-up here. I think a misfiring 'adjust for device independent pixels' call somewhere
+        # I worked on this a bit and think it is a QGV Qt bug. wasn't true for QWidget
+        CG.client_controller.CallAfterQtSafe( self, self._ResetThumbnailScrollSingleStep )
+        
+    
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
+        
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -4183,48 +4216,48 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                         self._ScrollEnd( shift )
                         
                     
-                elif move_direction in ( CAC.MOVE_PAGE_UP, CAC.MOVE_PAGE_DOWN ):
-                    
-                    if move_direction == CAC.MOVE_PAGE_UP:
-                        
-                        direction = -1
-                        
-                    else: # MOVE_PAGE_DOWN
-                        
-                        direction = 1
-                        
-                    focus_media, _ = self._MediaToUseWhenMovingFocus()
-                    
-                    if focus_media:
-                        
-                        scene_rect = self.mapToScene( self.viewport().rect() ).boundingRect()
-                        media_index = self._sorted_media.index( focus_media )
-                        percent_visible = CG.client_controller.new_options.GetInteger( 'thumbnail_visibility_scroll_percent' ) / 100
-                        
-                        new_index = self._thumbnail_layout.JumpPage( scene_rect, media_index, direction, percent_visible )
-                        
-                        self._MoveThumbnailFocus( new_index, shift )
-                    
                 else:
                     
-                    focus_media, is_next_best = self._MediaToUseWhenMovingFocus()
+                    ( focus_media, you_should_just_select_this_guy ) = self._MediaToUseWhenMovingFocus( shift )
                     
-                    if focus_media:
+                    if you_should_just_select_this_guy:
                         
-                        # TODO
-                        # I expanded this check so rows & columns behave symmetrically (previously there was only an equivalent condition for columns i.e. the MOVE_LEFT case inside _MoveThumbnailFocus).
-                        # Symmetric behavior will be important when we have non-uniform grids or grids scrolling horizontally,
-                        # but honestly even after playing around with the original implementation, I still don't fully understand what this is supposed to achieve.
-                        # If this logic weren't needed we could remove this ugly is_next_best return value when determining the focus media...
-                        if is_next_best and ( move_direction == CAC.MOVE_LEFT or move_direction == CAC.MOVE_UP ): # treat it as if the focused area is between this and the next
+                        # ok user hit 'left' after removing the previous selection, something like that
+                        # it is difficult to make a general nice 'continue from this ghost position', so we intercept and select the current ghost so the user has reliable feedback
+                        self._HitMedia( focus_media, False, shift )
+                        
+                    else:
+                        
+                        if move_direction in ( CAC.MOVE_PAGE_UP, CAC.MOVE_PAGE_DOWN ):
                             
-                            pass
+                            if move_direction == CAC.MOVE_PAGE_UP:
+                                
+                                direction = -1
+                                
+                            else: # MOVE_PAGE_DOWN
+                                
+                                direction = 1
+                                
+                            
+                            if focus_media is not None and focus_media in self._sorted_media:
+                                
+                                scene_rect = self.mapToScene( self.viewport().rect() ).boundingRect()
+                                media_index = self._sorted_media.index( focus_media )
+                                percent_visible = CG.client_controller.new_options.GetInteger( 'thumbnail_visibility_scroll_percent' ) / 100
+                                
+                                new_index = self._thumbnail_layout.JumpPage( scene_rect, media_index, direction, percent_visible )
+                                
+                                self._MoveThumbnailFocus( new_index, shift )
+                                
                             
                         else:
                             
-                            focus_media_index = self._sorted_media.index( focus_media )
-                            
-                            self._MoveThumbnailFocus( self._thumbnail_layout.MoveFromIndex( focus_media_index, move_direction ), shift )
+                            if focus_media is not None and focus_media in self._sorted_media:
+                                
+                                focus_media_index = self._sorted_media.index( focus_media )
+                                
+                                self._MoveThumbnailFocus( self._thumbnail_layout.MoveFromIndex( focus_media_index, move_direction ), shift )
+                                
                             
                         
                     
@@ -4237,21 +4270,21 @@ class MediaResultsPanelThumbnailsGraphicsViewTest( ClientGUIMediaResultsPanel.Me
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
             return super().ProcessApplicationCommand( command )
             
         else:
             
-            return command_processed
+            return command_matched
             
         
     

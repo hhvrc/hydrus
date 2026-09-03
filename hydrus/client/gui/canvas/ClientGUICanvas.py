@@ -921,9 +921,9 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
         self._media_container.Pause()
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -959,14 +959,12 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                 
             elif action == CAC.SIMPLE_COPY_FILE_BITMAP:
                 
-                if self._current_media is None:
+                if self._current_media is not None:
                     
-                    return
+                    bitmap_type = command.GetSimpleData()
                     
-                
-                bitmap_type = command.GetSimpleData()
-                
-                ClientGUIMediaSimpleActions.CopyMediaBitmap( self._current_media, bitmap_type )
+                    ClientGUIMediaSimpleActions.CopyMediaBitmap( self._current_media, bitmap_type )
+                    
                 
             elif action == CAC.SIMPLE_COPY_FILES:
                 
@@ -1040,7 +1038,20 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                 
             elif action == CAC.SIMPLE_OPEN_FILE_IN_EXTERNAL_PROGRAM:
                 
-                it_worked = ClientGUIMediaSimpleActions.OpenExternally( self._current_media )
+                data = command.GetSimpleData()
+                
+                if data is not None:
+                    
+                    # TODO: aiiiieeee, I am doing this because I need to differentiate between None launch path while it is in strings
+                    # ditch the _ gumpf when I am using id_and_name
+                    ( _, open_externally_launch_path ) = data
+                    
+                    it_worked = ClientGUIMediaSimpleActions.OpenExternally( self._current_media, open_externally_launch_path )
+                    
+                else:
+                    
+                    it_worked = ClientGUIMediaSimpleActions.OpenExternallyDefault( self._current_media )
+                    
                 
                 if it_worked:
                     
@@ -1064,6 +1075,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                     
                     self._MediaFocusWentToExternalProgram()
                     
+                
             elif action == CAC.SIMPLE_NATIVE_OPEN_FILE_PROPERTIES:
                 
                 it_worked = ClientGUIMediaSimpleActions.OpenNativeFileProperties( self._current_media )
@@ -1072,6 +1084,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                     
                     self._MediaFocusWentToExternalProgram()
                     
+                
             elif action == CAC.SIMPLE_NATIVE_OPEN_FILE_WITH_DIALOG:
                 
                 it_worked = ClientGUIMediaSimpleActions.OpenFileWithDialog( self._current_media )
@@ -1146,7 +1159,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                                 
                             else:
                                 
-                                return
+                                return command_matched
                                 
                             
                         
@@ -1354,7 +1367,7 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                 self._media_container.SizeSelfToMedia()
                 
             elif action == CAC.SIMPLE_RESIZE_WINDOW_TO_MEDIA_VIEWER_CENTER:
-            
+                
                 self._media_container.SizeSelfToMedia()
                 
                 self._media_container.ResetCenterPosition()
@@ -1498,42 +1511,34 @@ class Canvas( CAC.ApplicationCommandProcessorMixin, QW.QWidget ):
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         elif command.IsContentCommand():
             
-            if self._current_media is None:
+            if self._current_media is not None:
                 
-                return
+                ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, ( self._current_media, ) )
                 
-            
-            command_processed = ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, command, ( self._current_media, ) )
             
         elif command.IsInteractiveContentCommand():
             
-            if self._current_media is None:
+            if self._current_media is not None:
                 
-                return
+                content_command = ClientGUIMediaModalActions.GetContentApplicationCommandFromInteractiveContentCommand( self, command, self._current_media )
                 
-            
-            content_command = ClientGUIMediaModalActions.GetContentApplicationCommandFromInteractiveContentCommand( self, command, self._current_media )
-            
-            if content_command.IsContentCommand():
-                
-                command_processed = ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, content_command, ( self._current_media, ) )
-                
-            else:
-                
-                command_processed = False
+                if content_command.IsContentCommand():
+                    
+                    ClientGUIMediaModalActions.ApplyContentApplicationCommandToMedia( self, content_command, ( self._current_media, ) )
+                    
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        return command_processed
+        return command_matched
         
     
     def ReadyToDestroy( self ):
@@ -3283,9 +3288,9 @@ class CanvasWithHovers( Canvas ):
         pass
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -3338,20 +3343,20 @@ class CanvasWithHovers( Canvas ):
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
-            command_processed = super().ProcessApplicationCommand( command )
+            command_matched = super().ProcessApplicationCommand( command )
             
         
-        return command_processed
+        return command_matched
         
     
     def RedrawDetails( self ):
@@ -3820,9 +3825,9 @@ class CanvasMediaListFilterArchiveDelete( CanvasMediaList ):
             
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -3850,20 +3855,20 @@ class CanvasMediaListFilterArchiveDelete( CanvasMediaList ):
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
-            command_processed = CanvasMediaList.ProcessApplicationCommand( self, command )
+            command_matched = CanvasMediaList.ProcessApplicationCommand( self, command )
             
         
-        return command_processed
+        return command_matched
         
     
     def Skip( self, canvas_key ):
@@ -4134,9 +4139,9 @@ class CanvasMediaListNavigable( CanvasMediaList ):
             
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -4184,20 +4189,20 @@ class CanvasMediaListNavigable( CanvasMediaList ):
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
-            command_processed = CanvasMediaList.ProcessApplicationCommand( self, command )
+            command_matched = CanvasMediaList.ProcessApplicationCommand( self, command )
             
         
-        return command_processed
+        return command_matched
         
     
     def ShowFirst( self, canvas_key ):
@@ -4549,9 +4554,9 @@ class CanvasMediaListBrowser( CanvasMediaListNavigable ):
         self._RegisterNextSlideshowPresentation()
         
     
-    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ):
+    def ProcessApplicationCommand( self, command: CAC.ApplicationCommand ) -> bool:
         
-        command_processed = True
+        command_matched = True
         
         if command.IsSimpleCommand():
             
@@ -4598,20 +4603,20 @@ class CanvasMediaListBrowser( CanvasMediaListNavigable ):
                 
             else:
                 
-                command_processed = False
+                command_matched = False
                 
             
         else:
             
-            command_processed = False
+            command_matched = False
             
         
-        if not command_processed:
+        if not command_matched:
             
-            command_processed = super().ProcessApplicationCommand( command )
+            command_matched = super().ProcessApplicationCommand( command )
             
         
-        return command_processed
+        return command_matched
         
     
     def ShowMenuFromSignal( self, pos ):
