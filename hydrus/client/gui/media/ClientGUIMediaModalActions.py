@@ -59,9 +59,7 @@ def ApplyContentApplicationCommandToMedia( win: QW.QWidget, command: CAC.Applica
         
     except HydrusExceptions.DataMissing:
         
-        command_processed = False
-        
-        return command_processed
+        return
         
     
     service_type = service.GetServiceType()
@@ -119,12 +117,12 @@ def ApplyContentApplicationCommandToMedia( win: QW.QWidget, command: CAC.Applica
                 
             else:
                 
-                return True
+                return
                 
             
         else:
             
-            return False
+            return
             
         
         def do_it():
@@ -158,7 +156,7 @@ def ApplyContentApplicationCommandToMedia( win: QW.QWidget, command: CAC.Applica
         CG.client_controller.CallToThread( do_it )
         
     
-    return True
+    return
     
 
 def ClearDeleteRecord( win, media ):
@@ -376,7 +374,7 @@ def DoOpenKnownURLFromShortcut( win, media ):
             
         
     
-    ClientPaths.LaunchURLInWebBrowser( url )
+    ClientPaths.LaunchURLInDefaultWebBrowser( url )
     
 
 # this isn't really a 'media' guy, and it edits the options in place, so maybe move/edit/whatever!
@@ -1062,7 +1060,7 @@ def MoveOrDuplicateLocalFiles( win: QW.QWidget, dest_service_key: bytes, action:
     CG.client_controller.CallToThread( ClientFileMigration.DoMoveOrDuplicateLocalFiles, dest_service_key, action, applicable_media_results, source_service_key )
     
 
-def OpenURLs( win: QW.QWidget, urls ):
+def OpenURLs( win: QW.QWidget, urls, web_browser_launch_path ):
     
     urls = sorted( urls )
     
@@ -1115,7 +1113,7 @@ def OpenURLs( win: QW.QWidget, urls ):
                     job_status.SetGauge( i, num_urls )
                     
                 
-                ClientPaths.LaunchURLInWebBrowser( url )
+                ClientPaths.LaunchURLInWebBrowser( url, web_browser_launch_path )
                 
                 time.sleep( 1 )
                 
@@ -1132,7 +1130,7 @@ def OpenURLs( win: QW.QWidget, urls ):
     CG.client_controller.CallToThread( do_it, urls )
     
 
-def OpenMediaURLs( win: QW.QWidget, medias ):
+def OpenMediaURLs( win: QW.QWidget, medias, web_browser_launch_path ):
     
     urls = set()
     
@@ -1143,10 +1141,10 @@ def OpenMediaURLs( win: QW.QWidget, medias ):
         urls.update( media_urls )
         
     
-    OpenURLs( win, urls )
+    OpenURLs( win, urls, web_browser_launch_path )
     
 
-def OpenMediaURLClassURLs( win: QW.QWidget, medias, url_class ):
+def OpenMediaURLClassURLs( win: QW.QWidget, medias, url_class, web_browser_launch_path ):
     
     urls = set()
     
@@ -1164,7 +1162,7 @@ def OpenMediaURLClassURLs( win: QW.QWidget, medias, url_class ):
             
         
     
-    OpenURLs( win, urls )
+    OpenURLs( win, urls, web_browser_launch_path )
     
 
 def RedownloadURLClassURLsForceRefetch( win: QW.QWidget, medias, url_class ):

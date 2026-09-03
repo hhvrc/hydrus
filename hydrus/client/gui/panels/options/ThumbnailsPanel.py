@@ -19,10 +19,10 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         self._new_options = new_options
         
-        graphics_view_test_box = ClientGUICommon.StaticBox( self, 'New Rendering Tech Test' )
+        graphics_view_test_box = ClientGUICommon.StaticBox( self, 'New Rendering Tech' )
         
         self._test_thumbnails_graphics_view = QW.QCheckBox( graphics_view_test_box )
-        tt = 'Test out a new rendering method that uses more advanced, Qt-native drawing tech. Will only apply to new thumbnail pages, so you might need to do a client restart to guarantee a full reset either way.'
+        tt = 'Use a new rendering method that uses more advanced, Qt-native drawing tech to draw thumbnails. Will only apply to new thumbnail pages, so you might need to do a client restart to guarantee a full reset either way. This was tested a bunch and is now the default; if you have big thumbnail problems, switch this off, restart your client, and tell hydev.'
         self._test_thumbnails_graphics_view.setToolTip( ClientGUIFunctions.WrapToolTip( tt ) )
         
         thumbnail_appearance_box = ClientGUICommon.StaticBox( self, 'appearance' )
@@ -70,6 +70,9 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._focus_preview_on_shift_click = QW.QCheckBox( thumbnail_interaction_box )
         self._focus_preview_on_shift_click_only_static = QW.QCheckBox( thumbnail_interaction_box )
         
+        self._on_shift_click_move_ghost_focus_to_last_hit = QW.QCheckBox( thumbnail_interaction_box )
+        self._on_shift_click_move_ghost_focus_to_last_hit.setToolTip( ClientGUIFunctions.WrapToolTip( 'This is a tricky one, but if you decide not to move your focus on shift-selection changes (with the above checkboxes) and then press a non-shift movement key, where do you want to start from--the current focus, or where you last changed your shift select? If the current way feels non-intuitive and you are always de-selecting your stuff by accident rather than navigating within it, try flipping this.' ) )
+        
         self._thumbnail_visibility_scroll_percent = ClientGUICommon.BetterSpinBox( thumbnail_interaction_box, min=1, max=99 )
         self._thumbnail_visibility_scroll_percent.setToolTip( ClientGUIFunctions.WrapToolTip( 'Lower numbers will cause fewer scrolls, higher numbers more.' ) )
         
@@ -106,6 +109,7 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._focus_preview_on_ctrl_click_only_static.setChecked( self._new_options.GetBoolean( 'focus_preview_on_ctrl_click_only_static' ) )
         self._focus_preview_on_shift_click.setChecked( self._new_options.GetBoolean( 'focus_preview_on_shift_click' ) )
         self._focus_preview_on_shift_click_only_static.setChecked( self._new_options.GetBoolean( 'focus_preview_on_shift_click_only_static' ) )
+        self._on_shift_click_move_ghost_focus_to_last_hit.setChecked( self._new_options.GetBoolean( 'on_shift_click_move_ghost_focus_to_last_hit' ) )
         
         self._thumbnail_visibility_scroll_percent.setValue( self._new_options.GetInteger( 'thumbnail_visibility_scroll_percent' ) )
         
@@ -124,7 +128,7 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         rows = []
         
-        rows.append( ( 'TEST, ADVANCED USERS ARE INVITED TO TRY: Try out the new thumbnail rendering tech (only applies to new pages): ', self._test_thumbnails_graphics_view ) )
+        rows.append( ( 'Use the new thumbnail rendering tech (only applies to new pages): ', self._test_thumbnails_graphics_view ) )
         
         gridbox = ClientGUICommon.WrapInGrid( graphics_view_test_box, rows )
         
@@ -153,10 +157,11 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         rows = []
         
         rows.append( ( 'When a single thumbnail is selected, show the media viewer\'s normal top hover file text in the status bar: ', self._show_extended_single_file_info_in_status_bar ) )
-        rows.append( ( 'On ctrl-click, focus thumbnails in the preview window: ', self._focus_preview_on_ctrl_click ) )
+        rows.append( ( 'On ctrl-selection, focus thumbnails in the preview window: ', self._focus_preview_on_ctrl_click ) )
         rows.append( ( '  Only on files with no duration: ', self._focus_preview_on_ctrl_click_only_static ) )
-        rows.append( ( 'On shift-click, focus thumbnails in the preview window: ', self._focus_preview_on_shift_click ) )
+        rows.append( ( 'On shift-selection, focus thumbnails in the preview window: ', self._focus_preview_on_shift_click ) )
         rows.append( ( '  Only on files with no duration: ', self._focus_preview_on_shift_click_only_static ) )
+        rows.append( ( 'When shift-selecting, move the "navigate from here" position with it: ', self._on_shift_click_move_ghost_focus_to_last_hit ) )
         rows.append( ( 'Do not scroll down on key navigation if thumbnail at least this % visible: ', self._thumbnail_visibility_scroll_percent ) )
         rows.append( ( 'EXPERIMENTAL: Scroll thumbnails at this rate per scroll tick: ', self._thumbnail_scroll_rate ) )
         
@@ -186,6 +191,10 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         self.setLayout( vbox )
         
+        self._focus_preview_on_shift_click.clicked.connect( self._UpdatePreviewCheckboxes )
+        self._focus_preview_on_shift_click_only_static.clicked.connect( self._UpdatePreviewCheckboxes )
+        self._focus_preview_on_ctrl_click.clicked.connect( self._UpdatePreviewCheckboxes )
+        
         self._UpdatePreviewCheckboxes()
         
     
@@ -193,6 +202,9 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         self._focus_preview_on_ctrl_click_only_static.setEnabled( self._focus_preview_on_ctrl_click.isChecked() )
         self._focus_preview_on_shift_click_only_static.setEnabled( self._focus_preview_on_shift_click.isChecked() )
+        
+        # how ugly. we want to say 'if any non-focus-on-move going on'
+        self._on_shift_click_move_ghost_focus_to_last_hit.setEnabled( not self._focus_preview_on_shift_click.isChecked() or self._focus_preview_on_shift_click_only_static.isChecked() )
         
     
     def UpdateOptions( self ):
@@ -215,6 +227,7 @@ class ThumbnailsPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         self._new_options.SetBoolean( 'focus_preview_on_ctrl_click_only_static', self._focus_preview_on_ctrl_click_only_static.isChecked() )
         self._new_options.SetBoolean( 'focus_preview_on_shift_click', self._focus_preview_on_shift_click.isChecked() )
         self._new_options.SetBoolean( 'focus_preview_on_shift_click_only_static', self._focus_preview_on_shift_click_only_static.isChecked() )
+        self._new_options.SetBoolean( 'on_shift_click_move_ghost_focus_to_last_hit', self._on_shift_click_move_ghost_focus_to_last_hit.isChecked() )
         
         self._new_options.SetBoolean( 'allow_blurhash_fallback', self._allow_blurhash_fallback.isChecked() )
         
