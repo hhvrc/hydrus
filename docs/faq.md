@@ -103,11 +103,11 @@ The access key is the account. Do not give it to anyone you do not want to have 
 
 ## What is an account id? { id="account_ids" }
 
-This is another long string of random hexadecimal that _identifies_ your account without giving away access. If you need to identify yourself to a repository administrator (say, to get your account's permissions modified), you will need to tell them your account id. You can copy it to your clipboard in _services->review services_.
+This is another long string of random hexadecimal that _identifies_ your account without giving away access. If you need to identify yourself to a repository administrator (say, to get your account's permissions modified), you will need to tell them your account id. You can copy it to your clipboard in _services->review_.
 
 ## Why does the file I deleted and then re-imported still have its tags? { id="service_isolation" }
 
-Hydrus splits its different abilities and domains (e.g. the list of files on your disk, or the tag mappings in 'my tags', or your files' notes) into separate _services_. You can see these in _review services_ and _manage services_. Although the services of the same type may interact (e.g. deleting a file from one service might send that file to the 'trash' service, or adding tag parents to one tag service might implicate tags on another), those of different types are generally completely independent. Your tags don't care where the files they map to are.
+Hydrus splits its different abilities and domains (e.g. the list of files on your disk, or the tag mappings in 'my tags', or your files' notes) into separate _services_. You can see these in _services->review_ and _services->edit_. Although the services of the same type may interact (e.g. deleting a file from one service might send that file to the 'trash' service, or adding tag parents to one tag service might implicate tags on another), those of different types are generally completely independent. Your tags don't care where the files they map to are.
 
 So, when you delete a file from 'my files', none of its tag mappings in 'my tags' change--they remain attached to the 'ghost' of the deleted file. Your notes, ratings, and known URLs are the same (URLs is important, since it lets the client skip URLs for files you previously deleted). If you re-import the file, it will have everything it did before, with only a couple of pertinent changes like, obviously, _import time_.
 
@@ -118,8 +118,8 @@ When you feel like playing with some more advanced concepts, turn on _help->adva
 If you really want to delete the tags or other data for some files you deleted, then:
 
 - If the job is small, do a search for the files inside 'deleted from my local files' (or 'all known files' if you did not leave a deletion record) and then hit `Ctrl+A->manage tags` and manually delete the tags there.
-- If the job is very large, then make a backup and hit up _tags->migrate tags_. You can select the tag service _x_ tag mappings for all files in 'deleted from my local files' and then make the action to delete from _x_ again. 
-- If the job is complicated, then note that you can open the _tags->migrate tags_ dialog from _manage tags_, and it will only apply to the files that booted _manage tags_.
+- If the job is very large, then make a backup and hit up `tags->migrate`. You can select the tag service _x_ tag mappings for all files in 'deleted from my local files' and then make the action to delete from _x_ again. 
+- If the job is complicated, then note that you can open the `migrate tags` dialog from `manage tags`, and it will only apply to the files that booted `manage tags`.
 
 ### Does this deleted-file metadata take up a lot of database space? Should I clear it to get rid of bloat?
 

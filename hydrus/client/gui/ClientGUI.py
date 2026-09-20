@@ -30,7 +30,6 @@ from hydrus.client import ClientApplicationCommand as CAC
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientLocation
-from hydrus.client import ClientPaths
 from hydrus.client import ClientServices
 from hydrus.client import ClientThreading
 from hydrus.client.exporting import ClientExportingFiles
@@ -38,6 +37,7 @@ from hydrus.client.gui import ClientGUIAboutWindow
 from hydrus.client.gui import ClientGUIAsync
 from hydrus.client.gui import ClientGUICharts
 from hydrus.client.gui import ClientGUIDialogs
+from hydrus.client.gui import ClientGUIDialogsDocumentation
 from hydrus.client.gui import ClientGUIDialogsFiles
 from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUIDialogsQuick
@@ -60,6 +60,7 @@ from hydrus.client.gui import QtPorting as QP
 from hydrus.client.gui.canvas import ClientGUICanvasFrame
 from hydrus.client.gui.canvas import ClientGUIMPV
 from hydrus.client.gui.canvas import ClientGUIQtMediaPlayer
+from hydrus.client.gui.executables import ClientGUIExecutableActions
 from hydrus.client.gui.exporting import ClientGUIExport
 from hydrus.client.gui.importing import ClientGUIImportFolders
 from hydrus.client.gui.media import ClientGUIMediaControls
@@ -183,7 +184,7 @@ def THREADUploadPending( service_key ):
             
             if account.IsUnknown():
                 
-                HydrusData.ShowText( 'Your account is currently unsynced, so the upload was cancelled. Please refresh the account under _review services_.' )
+                HydrusData.ShowText( 'Your account is currently unsynced, so the upload was cancelled. Please refresh the account under _services->review_.' )
                 
                 return
                 
@@ -248,9 +249,9 @@ def THREADUploadPending( service_key ):
                 )
                 
                 message += '\n' * 2
-                message += 'If you are currently using a public, read-only account (such as with the PTR), you may be able to generate your own private account with more permissions. Please hit the button below to open this service in _manage services_ and see if you can generate a new account. If accounts cannot be automatically created, you may have to contact the server owner directly to get this permission.'
+                message += 'If you are currently using a public, read-only account (such as with the PTR), you may be able to generate your own private account with more permissions. Please hit the button below to open this service in _services->edit_ and see if you can generate a new account. If accounts cannot be automatically created, you may have to contact the server owner directly to get this permission.'
                 message += '\n' * 2
-                message += 'If you think your account does have this permission, try refreshing it under _review services_.'
+                message += 'If you think your account does have this permission, try refreshing it under _services->review_.'
                 
                 unauthorised_job_status = ClientThreading.JobStatus()
                 
@@ -265,7 +266,7 @@ def THREADUploadPending( service_key ):
                 
                 call = HydrusData.Call( CG.client_controller.pub, 'open_manage_services_and_try_to_auto_create_account', service_key )
                 
-                call.SetLabel( 'open manage services and check for auto-creatable accounts' )
+                call.SetLabel( 'open _services->edit_ and check for auto-creatable accounts' )
                 
                 unauthorised_job_status.SetUserCallable( call )
                 
@@ -274,7 +275,7 @@ def THREADUploadPending( service_key ):
             
             if len( paused_content_types ) > 0:
                 
-                message = 'You have some pending content of type ({}), but processing for that is currently paused! No worries, but I won\'t upload the paused stuff. If you want to upload it, please unpause in _review services_ and then catch up processing.'.format(
+                message = 'You have some pending content of type ({}), but processing for that is currently paused! No worries, but I won\'t upload the paused stuff. If you want to upload it, please unpause in _services->review_ and then catch up processing.'.format(
                     ', '.join( ( HC.content_type_string_lookup[ content_type ] for content_type in paused_content_types ) )
                 )
                 
@@ -855,7 +856,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
             
             self._controller.SetServices( all_services )
             
-            message = 'PTR setup done! Check services->review services to see it.'
+            message = 'PTR setup done! Check _services->review_ to see it.'
             message += '\n' * 2
             message += 'The PTR has a lot of tags and will sync a little bit at a time when you are not using the client. Expect it to take a few weeks to sync fully.'
             
@@ -880,9 +881,9 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
                 
             
         
-        text = 'This will automatically set up your client with public shared \'read-only\' account for the Public Tag Repository, just as if you had added it manually under services->manage services.'
+        text = 'This will automatically set up your client with public shared \'read-only\' account for the Public Tag Repository, just as if you had added it manually under _services->edit_.'
         text += '\n' * 2
-        text += 'Over the coming weeks, your client will download updates and then process them into your database in idle time, and the PTR\'s tags will increasingly appear across your files. If you decide to upload tags, it is just a couple of clicks (under services->manage services again) to generate your own account that has permission to do so.'
+        text += 'Over the coming weeks, your client will download updates and then process them into your database in idle time, and the PTR\'s tags will increasingly appear across your files. If you decide to upload tags, it is just a couple of clicks (under _services->edit_ again) to generate your own account that has permission to do so.'
         text += '\n' * 2
         text += 'Be aware that the PTR has been growing since 2011 and now has more than two billion mappings. As of 2021-06, it requires about 6GB of bandwidth and file storage, and your database itself will grow by 50GB! Processing also takes a lot of CPU and HDD work, and, due to the unavoidable mechanical latency of HDDs, will only work if your hydrus database (the .db files, normally in install_dir/db) is on an SSD.'
         text += '\n' * 2
@@ -891,7 +892,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         if have_it_already:
             
             text += '\n' * 2
-            text += 'You seem to have the PTR already. If it is paused or desynchronised, this is best fixed under services->review services. Are you sure you want to add a duplicate?'
+            text += 'You seem to have the PTR already. If it is paused or desynchronised, this is best fixed under _services->review_. Are you sure you want to add a duplicate?'
             
         
         result = ClientGUIDialogsQuick.GetYesNo( self, text, yes_label = 'do it', no_label = 'not now' )
@@ -1466,7 +1467,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
             
             call = HydrusData.Call( CG.client_controller.pub, 'open_manage_services_and_try_to_auto_create_account', service_key )
             
-            call.SetLabel( 'open manage services and check for auto-creatable accounts' )
+            call.SetLabel( 'open _services->edit_ and check for auto-creatable accounts' )
             
             job_status.SetUserCallable( call )
             
@@ -1719,7 +1720,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
             
             message = 'This clears the cached counts for things like the number of files or tags on a service. Due to unusual situations and little counting bugs, these numbers can sometimes become unsynced. Clearing them forces an accurate recount from source.'
             message += '\n' * 2
-            message += 'Some GUI elements (review services, mainly) may be slow the next time they launch. Especially if you clear for all services.'
+            message += 'Some GUI elements (_services->review_, mainly) may be slow the next time they launch. Especially if you clear for all services.'
             
         
         result = ClientGUIDialogsQuick.GetYesNo( self, message )
@@ -2441,7 +2442,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
             elif name == 'pending':
                 
-                self._pending_service_keys_to_submenus = {}
+                self._pending_service_keys_to_submenus_and_count_labels: dict[ bytes, tuple[ QW.QMenu, QW.QAction ] ] = {}
                 
                 self._menubar_pending_submenu = ClientGUIMenus.GenerateMenu( self )
                 
@@ -2760,7 +2761,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                         ClientGUIMenus.AppendMenu( append_backup, submenu, name )
                         
                     
-                    ClientGUIMenus.AppendMenu( self._menubar_pages_sessions_submenu, append_backup, 'append session backup' )
+                    ClientGUIMenus.AppendMenu( self._menubar_pages_sessions_submenu, append_backup, 'append backup' )
                     
                 
             
@@ -2811,12 +2812,12 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
                 location_context = ClientLocation.LocationContext.STATICCreateSimple( service.GetServiceKey() )
                 
-                ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, service.GetName(), 'Open a new search tab.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
+                ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, f'new "{service.GetName()}" search page', f'Open a new search tab for {service.GetName()}.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
                 
             
             location_context = ClientLocation.LocationContext.STATICCreateSimple( CC.TRASH_SERVICE_KEY )
             
-            ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, 'trash', 'Open a new search tab for your recently deleted files.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
+            ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, 'new "trash" page', 'Open a new search tab for your recently deleted files.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
             
             repositories: list[ ClientServices.ServiceRepository ] = [ service for service in services if service.GetServiceType() in HC.REPOSITORIES ]
             
@@ -2826,7 +2827,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
                 location_context = ClientLocation.LocationContext.STATICCreateSimple( service.GetServiceKey() )
                 
-                ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, service.GetName(), 'Open a new search tab for ' + service.GetName() + '.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
+                ClientGUIMenus.AppendMenuItem( self._menubar_pages_search_submenu, f'new "{service.GetName()}" search page', f'Open a new search tab for {service.GetName()}.', self._notebook.NewPageQuery, location_context, on_deepest_notebook = True )
                 
             
             petition_permissions = [ ( content_type, HC.PERMISSION_ACTION_MODERATE ) for content_type in HC.SERVICE_TYPES_TO_CONTENT_TYPES ]
@@ -2841,7 +2842,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
             
             for service in petition_resolvable_repositories:
                 
-                ClientGUIMenus.AppendMenuItem( self._menubar_pages_petition_submenu, service.GetName(), 'Open a new petition page for ' + service.GetName() + '.', self._notebook.NewPagePetitions, service.GetServiceKey(), on_deepest_notebook = True )
+                ClientGUIMenus.AppendMenuItem( self._menubar_pages_petition_submenu, f'new "{service.GetName()}" petition page', f'Open a new petition page for {service.GetName()}.', self._notebook.NewPagePetitions, service.GetServiceKey(), on_deepest_notebook = True )
                 
             
         
@@ -2870,13 +2871,17 @@ ATTACH "client.mappings.db" as external_mappings;'''
             
             for service_key in nums_pending.keys():
                 
-                if service_key not in self._pending_service_keys_to_submenus:
+                if service_key not in self._pending_service_keys_to_submenus_and_count_labels:
                     
                     service = self._controller.services_manager.GetService( service_key )
                     
                     name = service.GetName()
                     
                     submenu = ClientGUIMenus.GenerateMenu( self._menubar_pending_submenu )
+                    
+                    num_stuff_to_go_menu_item = ClientGUIMenus.AppendMenuLabel( submenu, 'num to commit', no_copy = True )
+                    
+                    ClientGUIMenus.AppendSeparator( submenu )
                     
                     ClientGUIMenus.AppendMenuItem( submenu, 'commit', 'Upload {}\'s pending content.'.format( name ), self.UploadPending, service_key )
                     ClientGUIMenus.AppendMenuItem( submenu, 'forget', 'Clear {}\'s pending content.'.format( name ), self.ForgetPending, service_key )
@@ -2904,11 +2909,11 @@ ATTACH "client.mappings.db" as external_mappings;'''
                         self._menubar_pending_submenu.insertMenu( insert_before_action, submenu )
                         
                     
-                    self._pending_service_keys_to_submenus[ service_key ] = submenu
+                    self._pending_service_keys_to_submenus_and_count_labels[ service_key ] = ( submenu, num_stuff_to_go_menu_item )
                     
                 
             
-            for ( service_key, submenu ) in self._pending_service_keys_to_submenus.items():
+            for ( service_key, ( submenu, num_stuff_to_go_menu_item ) ) in self._pending_service_keys_to_submenus_and_count_labels.items():
                 
                 num_pending = 0
                 num_petitioned = 0
@@ -2921,6 +2926,9 @@ ATTACH "client.mappings.db" as external_mappings;'''
                     
                     service_type = service.GetServiceType()
                     name = service.GetName()
+                    
+                    pending_phrase = ''
+                    petitioned_phrase = ''
                     
                     if service_type == HC.TAG_REPOSITORY:
                         
@@ -2951,25 +2959,30 @@ ATTACH "client.mappings.db" as external_mappings;'''
                     
                     if num_pending + num_petitioned > 0:
                         
+                        submessages = []
+                        
+                        if num_pending > 0:
+                            
+                            submessages.append( '{} {}'.format( HydrusNumbers.ToHumanInt( num_pending ), pending_phrase ) )
+                            
+                        
+                        if num_petitioned > 0:
+                            
+                            submessages.append( '{} {}'.format( HydrusNumbers.ToHumanInt( num_petitioned ), petitioned_phrase ) )
+                            
+                        
+                        stuff_to_go_label = ', '.join( submessages )
+                        
+                        ClientGUIMenus.SetMenuTexts( num_stuff_to_go_menu_item, stuff_to_go_label, stuff_to_go_label )
+                        
+                    
+                    if num_pending + num_petitioned > 0:
+                        
+                        title = name
+                        
                         if service_key in self._currently_uploading_pending:
                             
-                            title = '{}: currently uploading {}'.format( name, HydrusNumbers.ToHumanInt( num_pending + num_petitioned ) )
-                            
-                        else:
-                            
-                            submessages = []
-                            
-                            if num_pending > 0:
-                                
-                                submessages.append( '{} {}'.format( HydrusNumbers.ToHumanInt( num_pending ), pending_phrase ) )
-                                
-                            
-                            if num_petitioned > 0:
-                                
-                                submessages.append( '{} {}'.format( HydrusNumbers.ToHumanInt( num_petitioned ), petitioned_phrase ) )
-                                
-                            
-                            title = '{}: {}'.format( name, ', '.join( submessages ) )
+                            title += ': currently uploading'
                             
                         
                         submenu.setEnabled( service_key not in self._currently_uploading_pending )
@@ -3061,7 +3074,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                         
                         ClientGUIMenus.AppendSeparator( submenu )
                         
-                        ClientGUIMenus.AppendMenuItem( submenu, 'manage account types', 'Add, edit and delete account types for this service.', self._STARTManageAccountTypes, service_key )
+                        ClientGUIMenus.AppendMenuItem( submenu, 'manage account types' + HC.UNICODE_ELLIPSIS, 'Add, edit and delete account types for this service.', self._STARTManageAccountTypes, service_key )
                         
                     
                     if can_overrule_options and service_type in HC.REPOSITORIES:
@@ -3090,7 +3103,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                         
                         ClientGUIMenus.AppendSeparator( submenu )
                         
-                        ClientGUIMenus.AppendMenuItem( submenu, 'manage services' + HC.UNICODE_ELLIPSIS, 'Add, edit, and delete this server\'s services.', self._ManageServer, service_key )
+                        ClientGUIMenus.AppendMenuItem( submenu, 'edit services' + HC.UNICODE_ELLIPSIS, 'Add, edit, and delete this server\'s services.', self._ManageServer, service_key )
                         ClientGUIMenus.AppendMenuItem( submenu, 'restart server services', 'Command the server to disconnect and restart its services.', self._RestartServerServices, service_key )
                         ClientGUIMenus.AppendSeparator( submenu )
                         ClientGUIMenus.AppendMenuItem( submenu, 'backup server', 'Command the server to temporarily pause and back up its database.', self._BackupServer, service_key )
@@ -3263,27 +3276,27 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         menu = ClientGUIMenus.GenerateMenu( self )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'set a password' + HC.UNICODE_ELLIPSIS, 'Set a simple password for the database so only you can open it in the client.', self._SetPassword )
+        backup_submenu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendSeparator( menu )
+        self._menubar_database_set_up_backup_path = ClientGUIMenus.AppendMenuItem( backup_submenu, 'set up a database backup location' + HC.UNICODE_ELLIPSIS, 'Choose a path to back the database up to.', self._SetupBackupPath )
+        self._menubar_database_update_backup = ClientGUIMenus.AppendMenuItem( backup_submenu, 'update database backup' + HC.UNICODE_ELLIPSIS, 'Back the database up to an external location.', self._BackupDatabase )
+        self._menubar_database_change_backup_path = ClientGUIMenus.AppendMenuItem( backup_submenu, 'change database backup location' + HC.UNICODE_ELLIPSIS, 'Choose a path to back the database up to.', self._SetupBackupPath )
         
-        self._menubar_database_set_up_backup_path = ClientGUIMenus.AppendMenuItem( menu, 'set up a database backup location' + HC.UNICODE_ELLIPSIS, 'Choose a path to back the database up to.', self._SetupBackupPath )
-        self._menubar_database_update_backup = ClientGUIMenus.AppendMenuItem( menu, 'update database backup' + HC.UNICODE_ELLIPSIS, 'Back the database up to an external location.', self._BackupDatabase )
-        self._menubar_database_change_backup_path = ClientGUIMenus.AppendMenuItem( menu, 'change database backup location' + HC.UNICODE_ELLIPSIS, 'Choose a path to back the database up to.', self._SetupBackupPath )
+        ClientGUIMenus.AppendSeparator( backup_submenu )
         
-        ClientGUIMenus.AppendSeparator( menu )
-        
-        self._menubar_database_restore_backup = ClientGUIMenus.AppendMenuItem( menu, 'restore from a database backup' + HC.UNICODE_ELLIPSIS, 'Restore the database from an external location.', self._controller.RestoreDatabase )
+        self._menubar_database_restore_backup = ClientGUIMenus.AppendMenuItem( backup_submenu, 'restore from a database backup' + HC.UNICODE_ELLIPSIS, 'Restore the database from an external location.', self._controller.RestoreDatabase )
         
         message = 'Your database is stored across multiple locations. The in-client backup routine can only handle simple databases (in one location), so the menu commands to backup have been hidden. To back up, please use a third-party program that will work better than anything I can write.'
         message += '\n' * 2
         message += 'Check the help for more info on how best to backup manually.'
         
-        self._menubar_database_multiple_location_label = ClientGUIMenus.AppendMenuItem( menu, 'database is stored in multiple locations', 'The database is migrated, and internal backups are not possible--click for more info.', HydrusData.ShowText, message )
+        self._menubar_database_multiple_location_label = ClientGUIMenus.AppendMenuItem( backup_submenu, 'database is stored in multiple locations', 'The database is migrated, and internal backups are not possible--click for more info.', HydrusData.ShowText, message )
+        
+        ClientGUIMenus.AppendMenu( menu, backup_submenu, 'backup' )
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'move media files' + HC.UNICODE_ELLIPSIS, 'Review and manage the locations your database is stored.', self._MoveMediaFiles )
+        ClientGUIMenus.AppendMenuItem( menu, 'locations' + HC.UNICODE_ELLIPSIS, 'Review and manage the locations your database and media files are stored.', self._MoveMediaFiles )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -3406,14 +3419,16 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendMenu( menu, regen_submenu, 'regenerate' )
         
+        clear_submenu = ClientGUIMenus.GenerateMenu( menu )
+        
+        ClientGUIMenus.AppendMenuItem( clear_submenu, 'clear all file viewing statistics' + HC.UNICODE_ELLIPSIS, 'Delete all file viewing records from the database.', self._ClearFileViewingStats )
+        ClientGUIMenus.AppendMenuItem( clear_submenu, 'cull file viewing statistics based on current min/max values' + HC.UNICODE_ELLIPSIS, 'Cull your file viewing statistics based on minimum and maximum permitted time deltas.', self._CullFileViewingStats )
+        
+        ClientGUIMenus.AppendMenu( menu, clear_submenu, 'clear' )
+        
         ClientGUIMenus.AppendSeparator( menu )
         
-        file_viewing_submenu = ClientGUIMenus.GenerateMenu( menu )
-        
-        ClientGUIMenus.AppendMenuItem( file_viewing_submenu, 'clear all file viewing statistics' + HC.UNICODE_ELLIPSIS, 'Delete all file viewing records from the database.', self._ClearFileViewingStats )
-        ClientGUIMenus.AppendMenuItem( file_viewing_submenu, 'cull file viewing statistics based on current min/max values' + HC.UNICODE_ELLIPSIS, 'Cull your file viewing statistics based on minimum and maximum permitted time deltas.', self._CullFileViewingStats )
-        
-        ClientGUIMenus.AppendMenu( menu, file_viewing_submenu, 'file viewing statistics' )
+        ClientGUIMenus.AppendMenuItem( menu, 'set a password' + HC.UNICODE_ELLIPSIS, 'Set a simple password for the database so only you can open it in the client.', self._SetPassword )
         
         return ( menu, '&database' )
         
@@ -3452,7 +3467,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuItem( i_and_e_submenu, 'manage import folders' + HC.UNICODE_ELLIPSIS, 'Manage folders from which the client can automatically import.', self._ManageImportFolders )
         ClientGUIMenus.AppendMenuItem( i_and_e_submenu, 'manage export folders' + HC.UNICODE_ELLIPSIS, 'Manage folders to which the client can automatically export.', self._ManageExportFolders )
         
-        ClientGUIMenus.AppendMenu( menu, i_and_e_submenu, 'import and export folders' )
+        ClientGUIMenus.AppendMenu( menu, i_and_e_submenu, 'import/export folders' )
         
         #
         
@@ -3474,11 +3489,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         label = 'minimise to system tray'
         
-        if not (HC.PLATFORM_WINDOWS or HC.PLATFORM_MACOS):
-            
-            label += ' (may be buggy/crashy!)'
-            
-        
         self._menubar_file_minimise_to_system_tray = ClientGUIMenus.AppendMenuItem( menu, label, 'Hide the client to an icon on your system tray.', self._SystemTrayHide, role = QW.QAction.MenuRole.ApplicationSpecificRole )
         
         ClientGUIMenus.AppendSeparator( menu )
@@ -3490,7 +3500,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
             ClientGUIMenus.AppendMenuItem( menu, 'restart', 'Shut the client down and then start it up again.', self.TryToExit, role = QW.QAction.MenuRole.ApplicationSpecificRole, restart = True )
             
         
-        ClientGUIMenus.AppendMenuItem( menu, 'exit and force shutdown maintenance', 'Shut the client down and force any outstanding shutdown maintenance to run.', self.TryToExit, role = QW.QAction.MenuRole.ApplicationSpecificRole, force_shutdown_maintenance = True )
+        ClientGUIMenus.AppendMenuItem( menu, 'exit/force maintenance', 'Shut the client down and force any outstanding shutdown maintenance to run.', self.TryToExit, role = QW.QAction.MenuRole.ApplicationSpecificRole, force_shutdown_maintenance = True )
         
         ClientGUIMenus.AppendMenuItem( menu, 'exit', 'Shut the client down.', self.TryToExit, role = QW.QAction.MenuRole.QuitRole )
         
@@ -3501,27 +3511,27 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         menu = ClientGUIMenus.GenerateMenu( self )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'help and getting started guide', 'Open hydrus\'s local help in your web browser.', self._OpenHelp )
+        ClientGUIMenus.AppendMenuItem( menu, 'open help', 'Open hydrus\'s local help and getting started guide in your web browser.', self._OpenHelp )
         
         links = ClientGUIMenus.GenerateMenu( menu )
         
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'site', 'Open hydrus\'s website, which is a mirror of the local help.', CC.global_icons().hydrus_black_square, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://hydrusnetwork.github.io/hydrus/' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'github repository', 'Open the hydrus github repository.', CC.global_icons().github, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://github.com/hydrusnetwork/hydrus' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'latest build', 'Open the latest build on the hydrus github repository.', CC.global_icons().github, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://github.com/hydrusnetwork/hydrus/releases/latest' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'issue tracker', 'Open the github issue tracker, which is run by users.', CC.global_icons().github, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://github.com/hydrusnetwork/hydrus/issues' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, '8chan.moe /t/ (Hydrus Network General)', 'Open the 8chan.moe /t/ board, where a Hydrus Network General should exist with release posts and other status updates.', CC.global_icons().eight_chan, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://8chan.moe/t/catalog.html' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'x', 'Open hydrus dev\'s X account, where he makes general progress updates and emergency notifications.', CC.global_icons().x, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://x.com/hydrusnetwork' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'tumblr', 'Open hydrus dev\'s tumblr, where he makes release posts and other status updates.', CC.global_icons().tumblr, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://hydrus.tumblr.com/' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'discord', 'Open a discord channel where many hydrus users congregate. Hydrus dev visits regularly.', CC.global_icons().discord, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://discord.gg/wPHPCUZ' )
-        site = ClientGUIMenus.AppendMenuIconItem( links, 'patreon', 'Open hydrus dev\'s patreon, which lets you support development.', CC.global_icons().patreon, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://www.patreon.com/hydrus_dev' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'site', 'Open hydrus\'s website, which is a mirror of the local help.', CC.global_icons().hydrus_black_square, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://hydrusnetwork.github.io/hydrus/' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'github repository', 'Open the hydrus github repository.', CC.global_icons().github, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://github.com/hydrusnetwork/hydrus' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'latest build', 'Open the latest build on the hydrus github repository.', CC.global_icons().github, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://github.com/hydrusnetwork/hydrus/releases/latest' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'issue tracker', 'Open the github issue tracker, which is run by users.', CC.global_icons().github, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://github.com/hydrusnetwork/hydrus/issues' )
+        ClientGUIMenus.AppendMenuIconItem( links, '8chan.moe /t/ (Hydrus Network General)', 'Open the 8chan.moe /t/ board, where a Hydrus Network General should exist with release posts and other status updates.', CC.global_icons().eight_chan, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://8chan.moe/t/catalog.html' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'x', 'Open hydrus dev\'s X account, where he makes general progress updates and emergency notifications.', CC.global_icons().x, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://x.com/hydrusnetwork' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'tumblr', 'Open hydrus dev\'s tumblr, where he makes release posts and other status updates.', CC.global_icons().tumblr, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://hydrus.tumblr.com/' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'discord', 'Open a discord channel where many hydrus users congregate. Hydrus dev visits regularly.', CC.global_icons().discord, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://discord.gg/wPHPCUZ' )
+        ClientGUIMenus.AppendMenuIconItem( links, 'patreon', 'Open hydrus dev\'s patreon, which lets you support development.', CC.global_icons().patreon, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://www.patreon.com/hydrus_dev' )
         
         ClientGUIMenus.AppendMenu( menu, links, 'links' )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'changelog', 'Open hydrus\'s local changelog in your web browser.', ClientGUIDialogsQuick.OpenDocumentation, self, HC.DOCUMENTATION_CHANGELOG )
+        ClientGUIMenus.AppendMenuItem( menu, 'changelog', 'Open hydrus\'s local changelog in your web browser.', ClientGUIDialogsDocumentation.OpenDocumentation, self, HC.DOCUMENTATION_CHANGELOG )
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'add the public tag repository' + HC.UNICODE_ELLIPSIS, 'This will add the public tag repository to your client.', self._AutoRepoSetup )
+        ClientGUIMenus.AppendMenuItem( menu, 'add the PTR' + HC.UNICODE_ELLIPSIS, 'Want to add the public tag repository to your client in one click?', self._AutoRepoSetup )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -3780,7 +3790,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'manage subscriptions' + HC.UNICODE_ELLIPSIS, 'Change the queries you want the client to regularly import from.', self._ManageSubscriptions )
+        ClientGUIMenus.AppendMenuItem( menu, 'subscriptions' + HC.UNICODE_ELLIPSIS, 'Change the queries you want the client to regularly import from.', self._ManageSubscriptions )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -3795,7 +3805,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         #
         
-        submenu = ClientGUIMenus.GenerateMenu( menu )
+        downloaders_submenu = ClientGUIMenus.GenerateMenu( menu )
         
         if not ClientParsing.HTML5LIB_IS_OK:
             
@@ -3803,63 +3813,60 @@ ATTACH "client.mappings.db" as external_mappings;'''
             message += '\n' * 2
             message += 'You are likely running from source, so I recommend you close the client, run \'pip install html5lib\' (or whatever is appropriate for your environment) and try again. You can double-check what imported ok under help->about.'
             
-            ClientGUIMenus.AppendMenuItem( submenu, '*** html5lib not found! ***', 'Your client does not have an important library.', ClientGUIDialogsMessage.ShowWarning, self, message )
+            ClientGUIMenus.AppendMenuItem( downloaders_submenu, '*** html5lib not found! ***', 'Your client does not have an important library.', ClientGUIDialogsMessage.ShowWarning, self, message )
             
-            ClientGUIMenus.AppendSeparator( submenu )
+            ClientGUIMenus.AppendSeparator( downloaders_submenu )
             
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'import downloaders' + HC.UNICODE_ELLIPSIS, 'Import new download capability through encoded pngs from other users.', self._ImportDownloaders )
-        ClientGUIMenus.AppendMenuIconItem( submenu, 'user-run downloader repository', 'Open the user-run github repository that has many additional downloaders.', CC.global_icons().github, ClientPaths.LaunchURLInDefaultWebBrowser, 'https://github.com/CuddleBear92/Hydrus-Presets-and-Scripts' )
-        ClientGUIMenus.AppendMenuItem( submenu, 'export downloaders' + HC.UNICODE_ELLIPSIS, 'Export downloader components to easy-import pngs.', self._ExportDownloader )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'import downloaders' + HC.UNICODE_ELLIPSIS, 'Import new download capability through encoded pngs from other users.', self._ImportDownloaders )
+        ClientGUIMenus.AppendMenuIconItem( downloaders_submenu, 'user-run downloader repository', 'Open the user-run github repository that has many additional downloaders.', CC.global_icons().github, ClientGUIExecutableActions.OpenExternallyURLDefault, self, 'https://github.com/CuddleBear92/Hydrus-Presets-and-Scripts' )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'export downloaders' + HC.UNICODE_ELLIPSIS, 'Export downloader components to easy-import pngs.', self._ExportDownloader )
         
-        ClientGUIMenus.AppendSeparator( submenu )
+        ClientGUIMenus.AppendSeparator( downloaders_submenu )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage downloader and url display' + HC.UNICODE_ELLIPSIS, 'Configure how downloader objects present across the client.', self._ManageDownloaderDisplay )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'downloader and url display' + HC.UNICODE_ELLIPSIS, 'Configure how downloader objects present across the client.', self._ManageDownloaderDisplay )
         
-        ClientGUIMenus.AppendSeparator( submenu )
-        
-        clipboard_menu = ClientGUIMenus.GenerateMenu( submenu )
+        clipboard_menu = ClientGUIMenus.GenerateMenu( downloaders_submenu )
         
         ClientGUIMenus.AppendMenuCheckItem( clipboard_menu, 'watcher urls', 'Automatically import watcher URLs that enter the clipboard just as if you drag-and-dropped them onto the ui.', self._controller.new_options.GetBoolean( 'watch_clipboard_for_watcher_urls' ), self._FlipClipboardWatcher, 'watch_clipboard_for_watcher_urls' )
         ClientGUIMenus.AppendMenuCheckItem( clipboard_menu, 'other recognised urls', 'Automatically import recognised URLs that enter the clipboard just as if you drag-and-dropped them onto the ui.', self._controller.new_options.GetBoolean( 'watch_clipboard_for_other_recognised_urls' ), self._FlipClipboardWatcher, 'watch_clipboard_for_other_recognised_urls' )
         
-        ClientGUIMenus.AppendMenu( submenu, clipboard_menu, 'watch clipboard for urls' )
+        ClientGUIMenus.AppendMenu( downloaders_submenu, clipboard_menu, 'watch clipboard for urls' )
         
-        ClientGUIMenus.AppendMenu( menu, submenu, 'downloaders' )
+        ClientGUIMenus.AppendMenu( menu, downloaders_submenu, 'downloaders' )
         
-        #
+        ClientGUIMenus.AppendSeparator( downloaders_submenu )
         
-        submenu = ClientGUIMenus.GenerateMenu( menu )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'gallery url generators' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s GUGs, which convert search terms into URLs.', self._ManageGUGs )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'url classes' + HC.UNICODE_ELLIPSIS, 'Configure which URLs the client can recognise.', self._ManageURLClasses )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'parsers' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s parsers, which convert URL content into hydrus metadata.', self._ManageParsers )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage url class links' + HC.UNICODE_ELLIPSIS, 'Configure how URLs present across the client.', self._ManageURLClassLinks )
+        ClientGUIMenus.AppendSeparator( downloaders_submenu )
         
-        ClientGUIMenus.AppendSeparator( submenu )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'url class links' + HC.UNICODE_ELLIPSIS, 'Configure how URLs present across the client.', self._ManageURLClassLinks )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage gallery url generators' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s GUGs, which convert search terms into URLs.', self._ManageGUGs )
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage url classes' + HC.UNICODE_ELLIPSIS, 'Configure which URLs the client can recognise.', self._ManageURLClasses )
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage parsers' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s parsers, which convert URL content into hydrus metadata.', self._ManageParsers )
+        ClientGUIMenus.AppendSeparator( downloaders_submenu )
         
-        ClientGUIMenus.AppendSeparator( submenu )
-        
-        ClientGUIMenus.AppendMenuItem( submenu, 'SEMI-LEGACY: manage file lookup scripts' + HC.UNICODE_ELLIPSIS, 'Manage how the client parses different types of web content.', self._ManageParsingScripts )
-        
-        ClientGUIMenus.AppendMenu( menu, submenu, 'downloader components' )
+        ClientGUIMenus.AppendMenuItem( downloaders_submenu, 'LEGACY: lookup scripts' + HC.UNICODE_ELLIPSIS, 'Manage how the client parses different types of web content.', self._ManageParsingScripts )
         
         #
         
-        submenu = ClientGUIMenus.GenerateMenu( menu )
+        logins_submenu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage logins' + HC.UNICODE_ELLIPSIS, 'Edit which domains you wish to log in to.', self._ManageLogins )
+        ClientGUIMenus.AppendMenuLabel( logins_submenu, 'THIS SYSTEM IS LEGACY' )
+        ClientGUIMenus.AppendMenuLabel( logins_submenu, 'TRY TO MIGRATE AWAY FROM IT' )
         
-        ClientGUIMenus.AppendSeparator( submenu )
+        ClientGUIMenus.AppendSeparator( logins_submenu )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'manage login scripts' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s login scripts, which define how to log in to different sites.', self._ManageLoginScripts )
+        ClientGUIMenus.AppendMenuItem( logins_submenu, 'logins' + HC.UNICODE_ELLIPSIS, 'Edit which domains you wish to log in to.', self._ManageLogins )
         
-        ClientGUIMenus.AppendSeparator( submenu )
+        ClientGUIMenus.AppendSeparator( logins_submenu )
         
-        ClientGUIMenus.AppendMenuItem( submenu, 'DEBUG: do tumblr GDPR click-through', 'Do a manual click-through for the tumblr GDPR page.', self._controller.CallLater, 0.0, self._controller.network_engine.login_manager.LoginTumblrGDPR )
+        ClientGUIMenus.AppendMenuItem( logins_submenu, 'login scripts' + HC.UNICODE_ELLIPSIS, 'Manage the client\'s login scripts, which define how to log in to different sites.', self._ManageLoginScripts )
         
-        ClientGUIMenus.AppendMenu( menu, submenu, 'logins (legacy; simple sites only)' )
+        ClientGUIMenus.AppendSeparator( logins_submenu )
+        
+        ClientGUIMenus.AppendMenu( menu, logins_submenu, 'logins' )
         
         #
         
@@ -3870,9 +3877,13 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         menu = ClientGUIMenus.GenerateMenu( self )
         
-        self._menubar_pages_page_count = ClientGUIMenus.AppendMenuLabel( menu, 'initialising', 'You have this many pages open.' )
+        session_info_menu = ClientGUIMenus.GenerateMenu( menu )
         
-        self._menubar_pages_session_weight = ClientGUIMenus.AppendMenuItem( menu, 'initialising', 'Your session is this heavy.', self._ShowPageWeightInfo )
+        self._menubar_pages_page_count = ClientGUIMenus.AppendMenuLabel( session_info_menu, 'initialising', 'You have this many pages open.' )
+        
+        self._menubar_pages_session_weight = ClientGUIMenus.AppendMenuItem( session_info_menu, 'initialising', 'Your session is this heavy.', self._ShowPageWeightInfo )
+        
+        ClientGUIMenus.AppendMenu( menu, session_info_menu, 'weight' )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -3885,6 +3896,8 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendSeparator( menu )
         
         ClientGUIMenus.AppendMenuItem( menu, 'refresh', 'If the current page has a search, refresh it.', self._RefreshCurrentPage )
+        
+        ClientGUIMenus.AppendSeparator( menu )
         
         splitter_menu = ClientGUIMenus.GenerateMenu( menu )
         
@@ -3902,7 +3915,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendMenuItem( splitter_menu, 'restore all pages\' sidebar/preview sizes to saved value', 'Restore all pages\' sizes to the saved value.', self._RestoreSplitterPositions )
         
-        ClientGUIMenus.AppendMenu( menu, splitter_menu, 'sidebar and preview panels' )
+        ClientGUIMenus.AppendMenu( menu, splitter_menu, 'sidebar' )
         
         ClientGUIMenus.AppendSeparator( menu )
         
@@ -3912,39 +3925,39 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'pick a new page' + HC.UNICODE_ELLIPSIS, 'Choose a new page to open.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( menu, 'new page' + HC.UNICODE_ELLIPSIS, 'Choose a new page to open.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_PAGE ) )
         
         #
         
         self._menubar_pages_search_submenu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenu( menu, self._menubar_pages_search_submenu, 'new file search page' )
+        ClientGUIMenus.AppendMenu( menu, self._menubar_pages_search_submenu, 'file search' )
         
         #
         
         self._menubar_pages_petition_submenu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenu( menu, self._menubar_pages_petition_submenu, 'new petition page' )
+        ClientGUIMenus.AppendMenu( menu, self._menubar_pages_petition_submenu, 'petition' )
         
         #
         
         download_menu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenuItem( download_menu, 'url download', 'Open a new tab to download some separate urls.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_URL_DOWNLOADER_PAGE ) )
-        ClientGUIMenus.AppendMenuItem( download_menu, 'watcher', 'Open a new tab to watch threads or other updating locations.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_WATCHER_DOWNLOADER_PAGE ) )
-        ClientGUIMenus.AppendMenuItem( download_menu, 'gallery', 'Open a new tab to download from gallery sites.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_GALLERY_DOWNLOADER_PAGE ) )
-        ClientGUIMenus.AppendMenuItem( download_menu, 'simple downloader', 'Open a new tab to download files from generic galleries or threads.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_SIMPLE_DOWNLOADER_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( download_menu, 'new url download page', 'Open a new tab to download some separate urls.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_URL_DOWNLOADER_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( download_menu, 'new watcher page', 'Open a new tab to watch threads or other updating locations.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_WATCHER_DOWNLOADER_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( download_menu, 'new gallery page', 'Open a new tab to download from gallery sites.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_GALLERY_DOWNLOADER_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( download_menu, 'new simple downloader page', 'Open a new tab to download files from generic galleries or threads.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_SIMPLE_DOWNLOADER_PAGE ) )
         
-        ClientGUIMenus.AppendMenu( menu, download_menu, 'new download page' )
+        ClientGUIMenus.AppendMenu( menu, download_menu, 'download' )
         
         #
         
         special_menu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenuItem( special_menu, 'page of pages', 'Open a new tab that can hold more tabs.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_PAGE_OF_PAGES ) )
-        ClientGUIMenus.AppendMenuItem( special_menu, 'duplicates processing', 'Open a new tab to discover and filter duplicate files.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_DUPLICATE_FILTER_PAGE ) )
+        ClientGUIMenus.AppendMenuItem( special_menu, 'new page of pages', 'Open a new tab that can hold more tabs.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_PAGE_OF_PAGES ) )
+        ClientGUIMenus.AppendMenuItem( special_menu, 'new duplicates processing page', 'Open a new tab to discover and filter duplicate files.', self.ProcessApplicationCommand, CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_NEW_DUPLICATE_FILTER_PAGE ) )
         
-        ClientGUIMenus.AppendMenu( menu, special_menu, 'new special page' )
+        ClientGUIMenus.AppendMenu( menu, special_menu, 'special' )
         
         #
         
@@ -3952,9 +3965,9 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         special_command_menu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenuItem( special_command_menu, 'clear all multiwatcher highlights', 'Command all multiwatcher pages to clear their highlighted watchers.', CG.client_controller.pub, 'clear_multiwatcher_highlights' )
+        ClientGUIMenus.AppendMenuItem( special_command_menu, 'all multiwatcher highlights', 'Command all multiwatcher pages to clear their highlighted watchers.', CG.client_controller.pub, 'clear_multiwatcher_highlights' )
         
-        ClientGUIMenus.AppendMenu( menu, special_command_menu, 'special commands' )
+        ClientGUIMenus.AppendMenu( menu, special_command_menu, 'clear' )
         
         #
         
@@ -3973,16 +3986,20 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'review services', 'Look at the services your client connects to.', self._ReviewServices )
-        ClientGUIMenus.AppendMenuItem( menu, 'manage services' + HC.UNICODE_ELLIPSIS, 'Edit the services your client connects to.', self._ManageServices )
+        ClientGUIMenus.AppendMenuItem( menu, 'review', 'Look at the services your client connects to.', self._ReviewServices )
+        ClientGUIMenus.AppendMenuItem( menu, 'edit' + HC.UNICODE_ELLIPSIS, 'Edit the services your client connects to.', self._ManageServices )
         
         self._menubar_services_admin_submenu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenu( menu, self._menubar_services_admin_submenu, 'administrate services' )
+        ClientGUIMenus.AppendMenu( menu, self._menubar_services_admin_submenu, 'administrate' )
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'import repository update files' + HC.UNICODE_ELLIPSIS, 'Add repository update files to the database.', self._ImportUpdateFiles )
+        submenu = ClientGUIMenus.GenerateMenu( menu )
+        
+        ClientGUIMenus.AppendMenuItem( submenu, 'import repository update files' + HC.UNICODE_ELLIPSIS, 'Add repository update files to the database.', self._ImportUpdateFiles )
+        
+        ClientGUIMenus.AppendMenu( menu, submenu, 'advanced' )
         
         return ( menu, '&services' )
         
@@ -3991,24 +4008,28 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         menu = ClientGUIMenus.GenerateMenu( self )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'migrate tags' + HC.UNICODE_ELLIPSIS, 'Migrate tags from one place to another.', self._MigrateTags )
+        ClientGUIMenus.AppendMenuItem( menu, 'migrate' + HC.UNICODE_ELLIPSIS, 'Migrate tags from one place to another.', self._MigrateTags )
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'manage tag display and search' + HC.UNICODE_ELLIPSIS, 'Set which tags you want to see from which services.', self._ManageTagDisplay )
+        ClientGUIMenus.AppendMenuItem( menu, 'display/search' + HC.UNICODE_ELLIPSIS, 'Set which tags you want to see from which services.', self._ManageTagDisplay )
         
         ClientGUIMenus.AppendSeparator( menu )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'manage tag siblings' + HC.UNICODE_ELLIPSIS, 'Set certain tags to be automatically replaced with other tags.', self._ManageTagSiblings )
-        ClientGUIMenus.AppendMenuItem( menu, 'manage tag parents' + HC.UNICODE_ELLIPSIS, 'Set certain tags to be automatically added with other tags.', self._ManageTagParents )
+        ClientGUIMenus.AppendMenuItem( menu, 'siblings' + HC.UNICODE_ELLIPSIS, 'Set certain tags to be automatically replaced with other tags.', self._ManageTagSiblings )
+        ClientGUIMenus.AppendMenuItem( menu, 'parents' + HC.UNICODE_ELLIPSIS, 'Set certain tags to be automatically added with other tags.', self._ManageTagParents )
         
-        ClientGUIMenus.AppendMenuItem( menu, 'manage where tag siblings and parents apply' + HC.UNICODE_ELLIPSIS, 'Set which services\' siblings and parents apply where.', self._ManageTagDisplayApplication )
+        submenu = ClientGUIMenus.GenerateMenu( menu )
+        
+        ClientGUIMenus.AppendMenuItem( submenu, 'manage where tag siblings and parents apply' + HC.UNICODE_ELLIPSIS, 'Set which services\' siblings and parents apply where.', self._ManageTagDisplayApplication )
+        
+        ClientGUIMenus.AppendMenu( menu, submenu, 'advanced' )
         
         #
         
         tag_display_maintenance_menu = ClientGUIMenus.GenerateMenu( menu )
         
-        ClientGUIMenus.AppendMenuItem( tag_display_maintenance_menu, 'review current sync', 'See how siblings and parents are currently applied.', self._ReviewTagDisplayMaintenance )
+        ClientGUIMenus.AppendMenuItem( tag_display_maintenance_menu, 'review current sibling/parent sync', 'See how siblings and parents are currently applied.', self._ReviewTagDisplayMaintenance )
         
         ClientGUIMenus.AppendSeparator( tag_display_maintenance_menu )
         
@@ -4030,7 +4051,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         self._menubar_tags_tag_display_maintenance_during_active = ClientGUIMenus.AppendMenuCheckItem( tag_display_maintenance_menu, 'sync tag display during normal time', 'Control whether tag display processing can work during normal time.', current_value, func )
         
-        ClientGUIMenus.AppendMenu( menu, tag_display_maintenance_menu, 'sibling/parent sync' )
+        ClientGUIMenus.AppendMenu( menu, tag_display_maintenance_menu, 'sync' )
         
         #
         
@@ -4681,7 +4702,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         try:
             
-            title = 'manage services'
+            title = 'edit services'
             
             with ClientGUITopLevelWindowsPanels.DialogManage( self, title ) as dlg:
                 
@@ -5202,7 +5223,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
     
     def _MoveMediaFiles( self ):
         
-        with ClientGUITopLevelWindowsPanels.DialogNullipotent( self, 'move media files' ) as dlg:
+        with ClientGUITopLevelWindowsPanels.DialogNullipotent( self, 'database locations' ) as dlg:
             
             panel = ClientGUIFilesPhysicalStoragePanels.MoveMediaFilesPanel( dlg, self._controller )
             
@@ -5279,7 +5300,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
     
     def _OpenHelp( self ):
         
-        ClientGUIDialogsQuick.OpenDocumentation( self, HC.DOCUMENTATION_INDEX )
+        ClientGUIDialogsDocumentation.OpenDocumentation( self, HC.DOCUMENTATION_INDEX )
         
     
     def _OpenInstallFolder( self ):
@@ -6527,7 +6548,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 self._controller.RefreshServices()
                 
             
-            HydrusData.ShowText( 'Done! Check services->review services to see your new server and its services.' )
+            HydrusData.ShowText( 'Done! Check _services->review_ to see your new server and its services.' )
             
         
         text = 'Woe unto you unless you click "no" NOW.'

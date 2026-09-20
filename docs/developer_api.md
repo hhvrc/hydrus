@@ -178,11 +178,11 @@ But I strongly encourage you to move away from them as soon as reasonably possib
 
 If you have a clever script/program that does many things, then hit up [/get\_services](#get_services) on session initialisation and cache an internal map of key_to_name for the labels to use when you present services to the user.
 
-Also, note that all users can now copy their service keys from _review services_.
+Also, note that all users can now copy their service keys from _services->review_.
 
 ## The Services Object { id="services_object" }
 
-Hydrus manages its different available domains and actions with what it calls _services_. If you are a regular user of the program, you will know about _review services_ and _manage services_. The Client API needs to refer to services, either to accept commands from you or to tell you what metadata files have and where.
+Hydrus manages its different available domains and actions with what it calls _services_. If you are a regular user of the program, you will know about _services->review_ and _services->edit_. The Client API needs to refer to services, either to accept commands from you or to tell you what metadata files have and where.
 
 When the client tells you about the available services, it gives you the following structure, typically under a `services_v2` key right off the root node.
 
@@ -360,11 +360,11 @@ You won't see all of these, but the service `type` enum is:
 * 22 - a 'inc/dec' rating service with positive integer rating
 * 99 - server administration
 
-`type_pretty` is something you can show users. Hydrus uses the same labels in _manage services_ and so on.
+`type_pretty` is something you can show users. Hydrus uses the same labels in `services->edit` and so on.
 
 Rating services have some extra data:
 
-- They all have some `colours` for differing rating states, the same as you'd see in `manage services`. Pen and brush are the line and the fill of the rating star shape, respectively. `like` generally means set/left-click, `dislike` means off/right-click, `null` means not set, and `mixed` is what I show in the edit rating dialog for multiple files when the files have differing values. Feel free to use them however you like.
+- They all have some `colours` for differing rating states, the same as you'd see in `services->edit`. Pen and brush are the line and the fill of the rating star shape, respectively. `like` generally means set/left-click, `dislike` means off/right-click, `null` means not set, and `mixed` is what I show in the edit rating dialog for multiple files when the files have differing values. Feel free to use them however you like.
 - They all have `show_in_thumbnail` and `show_in_thumbnail_even_when_null`, which you can obey in your display context if convenient.
 - Like/dislike and numerical services have `star_shape`, which is one of `circle | square | fat star | pentagram star | six point star | eight point star | x shape | square cross | triangle up | triangle down | triangle right | triangle left | diamond | rhombus right | rhombus left | hourglass | pentagon | hexagon | small hexagon | heart | teardrop | crescent moon` -or- `svg`, which means a custom user svg that can be fetched with [/get\_service\_rating\_svg](#get_service_rating_svg).
 - Numerical services have `min_stars` (0 or 1) and `max_stars` (1 to 20). `allows_zero` lines up with `min_stars` and is for your convenience.
@@ -373,7 +373,7 @@ If you are displaying ratings, don't feel crazy obligated to obey the shape! Sho
 
 If you want to know the services in a client, hit up [/get\_services](#get_services), which simply gives the above. The same structure appears in a few other calls for convenience, like [/get\_files/file\_metadata](#get_files_file_metadata), since that refers to many different services when it is talking about file locations and ratings and so on.
 
-Note: If you need to do some quick testing, you should be able to copy the `service_key` of any service by hitting the 'copy service key' button in _review services_.
+Note: If you need to do some quick testing, you should be able to copy the `service_key` of any service by hitting the 'copy service key' button in _services->review_.
 
 ## Current Deleted Pending Petitioned { id="CDPP" }
 
@@ -451,7 +451,7 @@ Response:
 
 ### **GET `/request_new_permissions`** { id="request_new_permissions" }
 
-_Register a new external program with the client. This requires the 'add from api request' mini-dialog under_ services->review services _to be open, otherwise it will 403._
+_Register a new external program with the client. This requires the 'add from api request' mini-dialog under_ services->review _to be open, otherwise it will 403._
 
 Restricted access:
 :   NO.
@@ -1310,8 +1310,8 @@ Response:
     !!! warning "Tag Relationships Apply In A Complicated Way"
         There are two caveats to this data:  
         
-        1. The siblings and parents here are not just what is in _tags->manage tag siblings/parents_, they are the final computed combination of rules as set in _tags->manage where tag siblings and parents apply_. The data given here is not guaranteed to be useful for editing siblings and parents on a particular service. That data, which is currently pair-based, will appear in a different API request in future.
-        2. This is what is _actually processed, right now,_ for those user preferences, as per _tags->sibling/parent sync->review current sync_. It reflects what they currently see in the UI. If the user still has pending sync work, this computation will change in future, perhaps radically (e.g. if they just removed the whole PTR ruleset two minutes ago), as will the rest of the "display" domain. The results may be funky while a user is in the midst of syncing, but these values are fine for most purposes. In the short term, you can broadly assume that the rules here very closely align with what you see in a recent file metadata call that pulls storage vs display mappings. If you want to decorate an autocomplete results call with sibling or parent data, this data is good for that.
+        1. The siblings and parents here are not just what is in `tags->siblings/parents`, they are the final computed combination of rules as set in `tags->advanced->manage where tag siblings and parents apply`. The data given here is not guaranteed to be useful for editing siblings and parents on a particular service. That data, which is currently pair-based, will appear in a different API request in future.
+        2. This is what is _actually processed, right now,_ for those user preferences, as per `tags->sync->review current sibling/parent sync`. It reflects what they currently see in the UI. If the user still has pending sync work, this computation will change in future, perhaps radically (e.g. if they just removed the whole PTR ruleset two minutes ago), as will the rest of the "display" domain. The results may be funky while a user is in the midst of syncing, but these values are fine for most purposes. In the short term, you can broadly assume that the rules here very closely align with what you see in a recent file metadata call that pulls storage vs display mappings. If you want to decorate an autocomplete results call with sibling or parent data, this data is good for that.
     
     - `ideal_tag` is how the tag appears in normal display to the user.
     - `siblings` is every tag that will show as the `ideal_tag`, including the `ideal_tag` itself.
@@ -1379,7 +1379,7 @@ Response:
 }
 ```
 
-The `tags` list will be sorted by descending count. The various rules in _tags->manage tag display and search_ (e.g. no pure `*` searches on certain services) will also be checked--and if violated, you will get 200 OK but an empty result.
+The `tags` list will be sorted by descending count. The various rules in `tags->display/search` (e.g. no pure `*` searches on certain services) will also be checked--and if violated, you will get 200 OK but an empty result.
 
 The `autocomplete_text` structure lets you know how hydrus sees the search. `search_text` is a basic cleaned-up version of what text the user entered, and `inclusive` is whether they prepended their search text with a hyphen '-' character. If the user has entered an exclusive search, you may with to prepend all the results' display, similarly, with a hypen.
 
@@ -2406,7 +2406,7 @@ Size is in bytes. Duration is in milliseconds, and may be an int or a float.
 
 `ipfs_multihashes` stores the ipfs service key to any known multihash for the file. 
 
-The `thumbnail_width` and `thumbnail_height` are a generally reliable prediction but aren't a promise. The actual thumbnail you get from [/get\_files/thumbnail](#get_files_thumbnail) will be different if the user hasn't looked at it since changing their thumbnail options. You only get these rows for files that hydrus actually generates an actual thumbnail for. Things like pdf won't have it. You can use your own thumb, or ask the api and it'll give you a fixed fallback; those are mostly 200x200, but you can and should size them to whatever you want.
+The `thumbnail_width` and `thumbnail_height` are a generally reliable prediction but aren't a promise. The actual thumbnail you get from [/get\_files/thumbnail](#get_files_thumbnail) will be different if the user hasn't looked at it since changing their thumbnail options. You only get these rows for files that hydrus actually generates an actual thumbnail for. Things like pdf won't have it. You can serve your own generic filetype thumbnail, or ask the api and it'll give you a fixed fallback; those are mostly 200x200, but you can and should size them to whatever you want.
 
 `include_notes` will decide whether to show a file's notes, in a simple names->texts Object.
 
@@ -2719,7 +2719,7 @@ Response:
 }
 ```
 
-Note that `ideal_weight` and `max_num_bytes` are provided for courtesy and mean nothing fixed. Each storage location might store anything, thumbnails or files or nothing, regardless of the ideal situation. Whenever a folder is non-ideal, the 'move media files' dialog shows "files need to be moved now", but it will still keep doing its thing.
+Note that `ideal_weight` and `max_num_bytes` are provided for courtesy and mean nothing fixed. Each storage location might store anything, thumbnails or files or nothing, regardless of the ideal situation. Whenever a folder is non-ideal, the `database->locations` dialog shows "files need to be moved now", but it will still keep doing its thing.
 
 For now, a prefix only occurs in one location, so there will always be 512 total prefixes in this response, all unique. **However, please note that this will not always be true!** In a future expansion, the client will be, on user command, slowly migrating files from one place to another in the background, and during that time there will be multiple valid locations for a file to actually be. When this happens, you will have to hit all the possible locations and test.
 

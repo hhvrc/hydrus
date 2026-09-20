@@ -16,6 +16,7 @@ from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientThreading
 from hydrus.client.files import ClientFilesPhysical
+from hydrus.client.gui import ClientGUIDialogsDocumentation
 from hydrus.client.gui import ClientGUIDialogsMessage
 from hydrus.client.gui import ClientGUIDialogsQuick
 from hydrus.client.gui import ClientGUIFunctions
@@ -58,7 +59,7 @@ class ReviewGranularityPanel( ClientGUIScrolledPanels.ReviewPanel ):
         
         menu_template_items = []
         
-        page_func = HydrusData.Call( ClientGUIDialogsQuick.OpenDocumentation, self, HC.DOCUMENTATION_DATABASE_MIGRATION_GRANULARITY )
+        page_func = HydrusData.Call( ClientGUIDialogsDocumentation.OpenDocumentation, self, HC.DOCUMENTATION_DATABASE_MIGRATION_GRANULARITY )
         
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open the html migration/granularity help', 'Open the help page for database migration/granularity in your web browser.', page_func ) )
         
@@ -144,11 +145,11 @@ class ReviewGranularityPanel( ClientGUIScrolledPanels.ReviewPanel ):
             
             message = 'We are going to be rearranging your file storage completely, restoring it to how a client starts, granularity 2. The process can be cancelled if it is taking too long, but it has to do the same amount of work to undo. If it fails half way through, I will attempt to undo it.'
             message += '\n\n'
-            message += 'If your client has done a lot of "move media files" since you moved to granularity 3, this job will require additional time to shuffle things around!'
+            message += 'If your client has done a bunch of multi-folder file migration since you moved to granularity 3, this job will require additional time to shuffle things around!'
             
         else:
             
-            ClientGUIDialogsMessage.ShowCritical( 'error!', 'Granularity init error!', 'This process was started with a granularity other than 2 or 3! Something went wrong, please tell hydev!' )
+            ClientGUIDialogsMessage.ShowCritical( self, 'Granularity init error!', 'This process was started with a granularity other than 2 or 3! Something went wrong, please tell hydev!' )
             
             return
             
@@ -488,7 +489,7 @@ class MoveMediaFilesPanel( ClientGUIScrolledPanels.ReviewPanel ):
         
         menu_template_items = []
         
-        page_func = HydrusData.Call( ClientGUIDialogsQuick.OpenDocumentation, self, HC.DOCUMENTATION_DATABASE_MIGRATION )
+        page_func = HydrusData.Call( ClientGUIDialogsDocumentation.OpenDocumentation, self, HC.DOCUMENTATION_DATABASE_MIGRATION )
         
         menu_template_items.append( ClientGUIMenuButton.MenuTemplateItemCall( 'open the html migration help', 'Open the help page for database migration in your web browser.', page_func ) )
         
