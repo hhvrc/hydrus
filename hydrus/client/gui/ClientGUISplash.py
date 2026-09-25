@@ -37,12 +37,38 @@ class FrameSplashPanel( QW.QWidget ):
         self._drag_last_pos = None
         self._initial_position = self.parentWidget().pos()
         
-        # this is 124 x 166
-        self._hydrus_pixmap = QG.QPixmap( HydrusStaticDir.GetStaticPath( 'hydrus_splash.png' ) )
+        splash_image_path = HydrusStaticDir.GetStaticIconPath( 'hydrus_splash' )
+        
+        if splash_image_path.endswith( '.svg' ):
+            
+            from qtpy import QtSvg as QS
+            
+            renderer = QS.QSvgRenderer( splash_image_path )
+            
+            logical_size = QC.QSizeF( 144, 196 )
+            
+            dpr = self.devicePixelRatio()
+            
+            hydrus_pixmap = QG.QPixmap( round( logical_size.width() * dpr ), round( logical_size.height() * dpr ) )
+            
+            hydrus_pixmap.setDevicePixelRatio( dpr )
+            
+            hydrus_pixmap.fill( QC.Qt.GlobalColor.transparent )
+            
+            painter = QG.QPainter( hydrus_pixmap )
+            
+            renderer.render( painter, QC.QRectF( QC.QPointF( 0, 0 ), logical_size ) )
+            painter.end()
+            
+        else:
+            
+            # this is 144 x 196 by default
+            hydrus_pixmap = QG.QPixmap( splash_image_path )
+            
         
         self._image_label = QW.QLabel( self )
         
-        self._image_label.setPixmap( self._hydrus_pixmap )
+        self._image_label.setPixmap( hydrus_pixmap )
         
         self._image_label.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
         

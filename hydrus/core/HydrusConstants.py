@@ -127,7 +127,7 @@ options = {}
 # Misc
 
 NETWORK_VERSION = 20
-SOFTWARE_VERSION = 687
+SOFTWARE_VERSION = 688
 CLIENT_API_VERSION = 95
 
 SERVER_THUMBNAIL_DIMENSIONS = ( 200, 200 )
@@ -1578,6 +1578,7 @@ DOCUMENTATION_RATINGS = 'getting_started_ratings.html'
 DOCUMENTATION_SIDECARS = 'advanced_sidecars.html'
 DOCUMENTATION_ABOUT_DOCS = "about_docs.html"
 DOCUMENTATION_IMPORT_OPTIONS = 'getting_started_import_options.html'
+DOCUMENTATION_EXTERNAL_PROGRAMS = 'external_programs.html'
 
 # default options
 

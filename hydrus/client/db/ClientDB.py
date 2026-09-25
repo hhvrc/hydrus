@@ -7633,7 +7633,14 @@ class DB( HydrusDB.HydrusDB ):
                     
                     if len( hash_ids ) > 0:
                         
-                        do_transparency_recheck = self._controller.CallBlockingToQtTLW( ask_what_to_do_transparency_recheck_644, len( hash_ids ) )
+                        if HG.non_interactive_update:
+                            
+                            do_transparency_recheck = True
+                            
+                        else:
+                            
+                            do_transparency_recheck = self._controller.CallBlockingToQtTLW( ask_what_to_do_transparency_recheck_644, len( hash_ids ) )
+                            
                         
                         if do_transparency_recheck:
                             
@@ -7849,7 +7856,14 @@ class DB( HydrusDB.HydrusDB ):
                         message += '\n\n'
                         message += 'If you close this dialog, I will continue with the update but insert the default "db/client_files" location for this entry, and you will get the repair file locations dialog after the update. If you know you need to fix this by a different method, kill the hydrus process now.'
                         
-                        CG.client_controller.BlockingSafeShowCriticalMessage( 'Problem updating!', message )
+                        if HG.non_interactive_update:
+                            
+                            HydrusData.Print( message )
+                            
+                        else:
+                            
+                            CG.client_controller.BlockingSafeShowCriticalMessage( 'Problem updating!', message )
+                            
                         
                         problem_locations.add( absolute_location )
                         
@@ -8265,7 +8279,14 @@ class DB( HydrusDB.HydrusDB ):
                 
                 self._controller.frame_splash_status.SetSubtext( f'scheduling file metadata regen maintenance' )
                 
-                do_it = self._controller.CallBlockingToQtTLW( ask_what_to_do_metadata_regen_682 )
+                if HG.non_interactive_update:
+                    
+                    do_it = True
+                    
+                else:
+                    
+                    do_it = self._controller.CallBlockingToQtTLW( ask_what_to_do_metadata_regen_682 )
+                    
                 
                 if do_it:
                     
@@ -8531,6 +8552,27 @@ class DB( HydrusDB.HydrusDB ):
                 
             
         
+        if version == 687:
+            
+            try:
+                
+                import_options_manager = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_IMPORT_OPTIONS_MANAGER )
+                
+                from hydrus.client.importing.options import ImportOptionsConstants as IOC
+                
+                global_import_options_container = import_options_manager.GetDefaultImportOptionsContainerForCallerType( IOC.IMPORT_OPTIONS_CALLER_TYPE_GLOBAL )
+                
+                from hydrus.client.importing.options import ExternalProgramsImportOptions
+                
+                global_import_options_container.SetImportOptions( ExternalProgramsImportOptions.ExternalProgramsImportOptions() )
+                
+                self.modules_serialisable.SetJSONDump( import_options_manager )
+                
+            except Exception as e:
+                
+                raise Exception( 'Hey, unfortunately I could not update your import options. Something is wrong. Roll back to v687 and tell hydev about this. There should be more info in the log.' ) from e
+                
+            
         #
         
         self._controller.frame_splash_status.SetTitleText( 'updated db to v{}'.format( HydrusNumbers.ToHumanInt( version + 1 ) ) )

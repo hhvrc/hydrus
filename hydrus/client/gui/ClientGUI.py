@@ -4570,6 +4570,11 @@ ATTACH "client.mappings.db" as external_mappings;'''
     
     def _ManageOptions( self ):
         
+        original_options = dict( HC.options )
+        original_new_options = CG.client_controller.new_options.Duplicate()
+        
+        #
+        
         title = 'manage options'
         frame_key = 'manage_options_dialog'
         
@@ -4582,8 +4587,48 @@ ATTACH "client.mappings.db" as external_mappings;'''
             dlg.exec()
             
         
-        qt_style_name = self._controller.new_options.GetNoneableString( 'qt_style_name' )
-        qt_stylesheet_name = self._controller.new_options.GetNoneableString( 'qt_stylesheet_name' )
+        #
+        
+        # we do this to convert tuples to lists, to match the earlier duped-up guy
+        test_new_options = CG.client_controller.new_options.Duplicate()
+        
+        curl_cffi_changes = original_new_options.GetNoneableString( 'curl_cffi_definition' ) != test_new_options.GetNoneableString( 'curl_cffi_definition' )
+        
+        if curl_cffi_changes:
+            
+            CG.client_controller.network_engine.session_manager.ReinitialiseSessions()
+            
+        
+        if test_new_options.GetStringList( 'favourite_tags' ) != original_new_options.GetStringList( 'favourite_tags' ):
+            
+            self._controller.pub( 'notify_new_favourite_tags' )
+            
+        
+        if test_new_options.GetMediaViewOptions() != original_new_options.GetMediaViewOptions():
+            
+            CG.client_controller.pub( 'clear_image_tile_cache' )
+            
+        
+        res_changed = HC.options[ 'thumbnail_dimensions' ] != original_options[ 'thumbnail_dimensions' ]
+        type_changed = test_new_options.GetInteger( 'thumbnail_scale_type' ) != original_new_options.GetInteger( 'thumbnail_scale_type' )
+        dpr_changed = test_new_options.GetInteger( 'thumbnail_dpr_percent' ) != original_new_options.GetInteger( 'thumbnail_dpr_percent' )
+        blurhash_changed = test_new_options.GetBoolean( 'allow_blurhash_fallback' ) != original_new_options.GetBoolean( 'allow_blurhash_fallback' )
+        
+        if res_changed or type_changed or dpr_changed or blurhash_changed:
+            
+            CG.client_controller.pub( 'clear_thumbnail_cache' )
+            
+        
+        border_changed = test_new_options.GetInteger( 'thumbnail_border' ) != original_new_options.GetInteger( 'thumbnail_border' )
+        margin_changed = test_new_options.GetInteger( 'thumbnail_margin' ) != original_new_options.GetInteger( 'thumbnail_margin' )
+        
+        if border_changed or margin_changed:
+            
+            CG.client_controller.pub( 'thumbnail_layout_changed' )
+            
+        
+        qt_style_name = test_new_options.GetNoneableString( 'qt_style_name' )
+        qt_stylesheet_name = test_new_options.GetNoneableString( 'qt_stylesheet_name' )
         
         if qt_style_name != ClientGUIStyle.CURRENT_STYLE_NAME:
             
@@ -4625,13 +4670,16 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
             
         
+        if original_new_options.GetString( 'current_colourset' ) != CG.client_controller.new_options.GetString( 'current_colourset' ):
+            
+            self._controller.pub( 'notify_new_colourset' )
+            
+        
         ClientGUIFunctions.UpdateAppDisplayName()
         
         self._controller.pub( 'wake_daemons' )
         self.SetStatusBarDirty()
         self._controller.pub( 'refresh_page_name' )
-        self._controller.pub( 'notify_new_colourset' )
-        self._controller.pub( 'notify_new_favourite_tags' )
         
         CG.client_controller.ReinitGlobalSettings()
         
@@ -5376,8 +5424,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
             self._vertical_splitter.setStretchFactor( notebook_index, 1 )
             
             self._tabs_tree_sidebar.setMinimumWidth( 100 )
-            
-            self._controller.CallLaterQtSafe( self, 0.05, 'expand treeview', self._tabs_tree_sidebar.expandToDepth, 2 )
             
         
     

@@ -25,6 +25,7 @@ from hydrus.core.files import HydrusFileHandling
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
 from hydrus.client import ClientTime
+from hydrus.client.executables import ClientExecutableActions
 from hydrus.client.importing import ClientImportFiles
 from hydrus.client.importing.options import ImportOptionsContainer
 from hydrus.client.importing.options import PrefetchImportOptions
@@ -738,6 +739,50 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
         self._CheckTagsVeto( self._tags, full_import_options_container )
         
     
+    def DoExternalProgramCalls( self, full_import_options_container: ImportOptionsContainer.ImportOptionsContainer ):
+        
+        external_programs_import_options = full_import_options_container.GetExternalProgramsImportOptions()
+        
+        entries_to_do = [ entry for entry in external_programs_import_options.GetEntries() if entry.ShouldFire( self.status ) ]
+        
+        if len( entries_to_do ) > 0:
+            
+            hash = self.GetHash()
+            
+            if hash is None: # u wot m8
+                
+                return
+                
+            
+            media_result = CG.client_controller.Read( 'media_result', hash )
+            
+            for entry in entries_to_do:
+                
+                id_and_name = entry.GetIdAndName()
+                
+                try:
+                    
+                    ClientExecutableActions.SendSingleFile( CG.client_controller.executable_manager, id_and_name, media_result )
+                    
+                except Exception as e:
+                    
+                    CG.client_controller.new_options.SetBoolean( 'pause_import_folders_sync', True )
+                    CG.client_controller.new_options.SetBoolean( 'pause_subs_sync', True )
+                    CG.client_controller.new_options.SetBoolean( 'pause_all_file_queues', True )
+                    
+                    HydrusData.ShowText( f'Failed to run "{id_and_name.name}" on file with hash "{hash.hex()}"! All importers--subscriptions, import folders, and paged file import queues--have been paused. Once the issue is clear, restart the client and resume your imports under the file and network menus!' )
+                    
+                    HydrusData.ShowException( e )
+                    
+                    CG.client_controller.pub( 'notify_refresh_network_menu' )
+                    CG.client_controller.pub( 'notify_new_import_folders' )
+                    
+                    return
+                    
+                
+            
+        
+    
     def DownloadAndImportRawFile( self, file_url: str, full_import_options_container: ImportOptionsContainer.ImportOptionsContainer, network_job_factory, network_job_presentation_context_factory, status_hook, override_bandwidth = False, spawning_url = None, forced_referral_url = None, file_seed_cache = None ):
         
         self.AddPrimaryURLs( ( file_url, ) )
@@ -1247,8 +1292,13 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
             else:
 
                 self.Import( path, full_import_options_container, status_hook = status_hook )
-
-
+                
+            
+            if self.status in ( CC.STATUS_SUCCESSFUL_AND_NEW, CC.STATUS_SUCCESSFUL_BUT_REDUNDANT ):
+                
+                self.DoExternalProgramCalls( full_import_options_container )
+                
+            
             self.WriteContentUpdates( full_import_options_container )
             
         except HydrusExceptions.VetoException as e:
@@ -1369,20 +1419,42 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                 
             
         
+        #
+        
+        if file_import_status.AlreadyInDB() and file_import_status.hash is not None and not full_import_options_container.GetFileFilteringImportOptions().AllowsAllBasedOnFileInfo():
+            
+            # even if this is already in db, should it be 'ignored' so we can skip writecontentupdates later?
+            
+            hash = file_import_status.hash
+            
+            media_result = CG.client_controller.Read( 'media_result', hash )
+            
+            from hydrus.client.media import ClientMediaManagers
+            
+            fim: ClientMediaManagers.FileInfoManager = media_result.GetFileInfoManager()
+            
+            try:
+                
+                full_import_options_container.GetFileFilteringImportOptions().CheckFileIsValid(
+                    fim.size,
+                    fim.mime,
+                    fim.width,
+                    fim.height
+                )
+                
+            except HydrusExceptions.FileImportRulesException as e:
+                
+                file_import_status.status = CC.STATUS_VETOED
+                file_import_status.note = str( e )
+                
+            
+        
         # update private status store if predictions are useful
         
         if self.status == CC.STATUS_UNKNOWN and not should_download_file:
             
-            self.status = file_import_status.status
-            
-            if file_import_status.hash is not None:
-                
-                self._hashes[ 'sha256' ] = file_import_status.hash
-                
-            
-            self.note = file_import_status.note
-            
-            self._UpdateModified()
+            self.SetStatus( file_import_status.status, note = file_import_status.note )
+            self.SetHash( file_import_status.hash )
             
         
         return ( should_download_metadata, should_download_file )
@@ -1731,6 +1803,11 @@ class FileSeed( HydrusSerialisable.SerialisableBase ):
                     
                     self.DownloadAndImportRawFile( file_url, full_import_options_container, network_job_factory, network_job_presentation_context_factory, status_hook, spawning_url = self._referral_url, file_seed_cache = file_seed_cache )
                     
+                
+            
+            if self.status in ( CC.STATUS_SUCCESSFUL_AND_NEW, CC.STATUS_SUCCESSFUL_BUT_REDUNDANT ):
+                
+                self.DoExternalProgramCalls( full_import_options_container )
                 
             
             did_substantial_work |= self.WriteContentUpdates( full_import_options_container )

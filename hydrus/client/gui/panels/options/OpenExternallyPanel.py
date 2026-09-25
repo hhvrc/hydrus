@@ -67,7 +67,7 @@ class EditOpenFileIdsAndNamesPanel( ClientGUIScrolledPanels.EditPanel ):
         
         if len( choice_tuples ) == 0:
             
-            message = 'You have added all the "open single file" calls that are currently registered with the executable manager! Try going to the "external programs" panel to add more.'
+            message = f'You have added all the "{ClientExecutablePipelines.executable_pipeline_types_to_strs[ ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_FILE ]}" calls that are currently registered with the executable manager! Try going to the "external programs" panel to add more.'
             
             ClientGUIDialogsMessage.ShowInformation( self, message )
             raise HydrusExceptions.CancelledException( message )
@@ -123,7 +123,7 @@ class OpenExternallyPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         #
         
-        mime_panel = ClientGUICommon.StaticBox( self, '\'open externally\' calls' )
+        mime_panel = ClientGUICommon.StaticBox( self, 'single file calls' )
         
         self._mime_launch_listctrl_panel = ClientGUIListCtrl.BetterListCtrlPanel( mime_panel )
         
@@ -155,7 +155,7 @@ class OpenExternallyPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         #
         
-        text = 'Similarly, when you ask to open a file "externally", by default hydrus will send it to your OS to figure out your "default" program. This OS call may fail or direct to a program you do not want for several reasons, so you may set a specific and more reliable call here instead. You can even set multiple.'
+        text = 'Similarly, when you ask to open a file "externally", by default hydrus will send it to your OS to figure out your "default" program. This OS call may fail or direct to a program you do not want for several reasons, so you may set a specific and more reliable call here instead. You can even set multiple choices.'
         text += '\n' * 2
         text += 'The "all files" entry is a backstop for all files. You can set an entry for "image", to mean all images, or specifically down to each filetype. A specific entry _completely overwrites_ a more general entry.'
         
@@ -197,7 +197,7 @@ class OpenExternallyPanel( ClientGUIOptionsPanelBase.OptionsPagePanel ):
         
         if len( choice_tuples ) == 0:
             
-            message = 'You have added all the "open single file" calls that are currently registered with the executable manager! Try going to the "external programs" panel to add more.'
+            message = f'You have added all the "{ClientExecutablePipelines.executable_pipeline_types_to_strs[ ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_URL ]}" calls that are currently registered with the executable manager! Try going to the "external programs" panel to add more.'
             
             ClientGUIDialogsMessage.ShowInformation( self, message )
             raise HydrusExceptions.CancelledException( message )
