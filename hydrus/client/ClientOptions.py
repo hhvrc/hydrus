@@ -368,7 +368,6 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'qt_media_player_null_audio_on_silent_media' : False,
             'mpv_null_audio_on_silent_media' : False,
             'mpv_allow_crashy_files_silently' : False,
-            'test_thumbnails_graphics_view' : True,
             'copy_import_files_to_temp_dir' : True,
             'treeview_hides_tabs' : False,
             'treeview_controls_at_top' : False,
@@ -388,6 +387,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'force_enter_on_radio_buttons_to_do_dialog_ok' : True,
             'make_child_frames_qt_tool' : True,
             'copy_notes_quick_click_only_copies_text' : False,
+            'do_flock_already_in_use_test_in_posix' : True,
         }
         
         #

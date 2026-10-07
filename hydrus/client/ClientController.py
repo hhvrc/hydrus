@@ -236,7 +236,6 @@ class Controller( HydrusController.HydrusController ):
         self.call_after_catcher = ClientGUICallAfter.CallAfterEventCatcher( QW.QApplication.instance() )
         
         self.thumbnails_cache = None
-        self.thumbnails_cache_graphics_view_test = None
         
         Controller.my_instance = self
         
@@ -696,7 +695,6 @@ class Controller( HydrusController.HydrusController ):
         self.images_cache.Clear()
         self.image_tiles_cache.Clear()
         self.thumbnails_cache.Clear()
-        self.thumbnails_cache_graphics_view_test.Clear()
         
     
     def ClipboardHasImage( self ):
@@ -1274,6 +1272,7 @@ class Controller( HydrusController.HydrusController ):
         from hydrus.core import HydrusPaths
         
         HydrusPaths.DO_NOT_DO_CHMOD_MODE = self.new_options.GetBoolean( 'do_not_do_chmod_mode' )
+        HydrusPaths.DO_FLOCK_ALREADY_IN_USE_TEST_IN_POSIX = self.new_options.GetBoolean( 'do_flock_already_in_use_test_in_posix' )
         
         with self._thread_slot_lock:
             
@@ -1315,10 +1314,8 @@ class Controller( HydrusController.HydrusController ):
         
         self.images_cache = ClientCaches.ImageRendererCache( self )
         self.image_tiles_cache = ClientCaches.ImageTileCache( self )
+        # TODO: if this guy still needs a mainloop, formalise him all as a mainloop manager. atm he calls his own loop start argh
         self.thumbnails_cache = ClientCaches.ThumbnailCache( self )
-        # TODO: When you move this guy to being the only thumb cache, and when you clean up the thumbs rendering pipeline...
-        # if this guy still has a mainloop, move him to being a DAEMON and formalise it all as a manager. atm he calls his own loop start argh
-        self.thumbnails_cache_graphics_view_test = ClientCaches.ThumbnailCacheGraphicsViewTest( self )
         
         self.frame_splash_status.SetText( 'initialising managers' )
         
@@ -1628,6 +1625,12 @@ class Controller( HydrusController.HydrusController ):
         
         self._managers_with_mainloops.append( self.import_folders_manager )
         
+        from hydrus.client.files import ClientTrashManager
+        
+        self.trash_maintenance_manager = ClientTrashManager.TrashMaintenanceManager( self )
+        
+        self._managers_with_mainloops.append( self.trash_maintenance_manager )
+        
         from hydrus.client.importing import ClientImportSubscriptions
         
         subscriptions = CG.client_controller.Read( 'serialisable_named', HydrusSerialisable.SERIALISABLE_TYPE_SUBSCRIPTION )
@@ -1914,10 +1917,6 @@ class Controller( HydrusController.HydrusController ):
         job.ShouldDelayOnWakeup( True )
         self._daemon_jobs[ 'export_folders' ] = job
         
-        job = self.CallRepeating( 30.0, 3600.0, ClientDaemons.DAEMONMaintainTrash )
-        job.ShouldDelayOnWakeup( True )
-        self._daemon_jobs[ 'maintain_trash' ] = job
-        
         job = self.CallRepeating( 0.0, 30.0, self.SaveDirtyObjectsImportant )
         job.WakeOnPubSub( 'important_dirt_to_clean' )
         self._daemon_jobs[ 'save_dirty_objects_important' ] = job
@@ -1938,6 +1937,7 @@ class Controller( HydrusController.HydrusController ):
         self.database_maintenance_manager.Start()
         self.duplicates_auto_resolution_manager.Start()
         self.import_folders_manager.Start()
+        self.trash_maintenance_manager.Start()
         self.subscriptions_manager.Start()
         
     
@@ -2384,11 +2384,6 @@ class Controller( HydrusController.HydrusController ):
         if self.thumbnails_cache is not None:
             
             self.thumbnails_cache.shutdown()
-            
-        
-        if self.thumbnails_cache_graphics_view_test is not None:
-            
-            self.thumbnails_cache_graphics_view_test.shutdown()
             
         
         if self._is_booted:
