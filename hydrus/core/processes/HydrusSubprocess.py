@@ -136,7 +136,9 @@ def GetSubprocessHideTerminalStartupInfo():
     return startupinfo
     
 
-def GetSubprocessKWArgs( hide_terminal = True, text = False, shell = False ):
+DO_HIDE_TERMINAL_TEST = False
+
+def GetSubprocessKWArgs( text = False, text_encoding = 'utf-8', this_is_a_potentially_long_lived_external_guy = False ):
     
     sbp_kwargs = {}
     
@@ -145,19 +147,49 @@ def GetSubprocessKWArgs( hide_terminal = True, text = False, shell = False ):
     if text:
         
         sbp_kwargs[ 'text' ] = True
-        sbp_kwargs[ 'encoding' ] = 'utf-8'
+        sbp_kwargs[ 'encoding' ] = text_encoding
         sbp_kwargs[ 'errors' ] = 'replace' # handling mp4s with invalid utf-8 metadata hooray
         
     
-    if shell:
-        
-        sbp_kwargs[ 'shell' ] = True
-        
-    
-    if hide_terminal:
+    if HC.PLATFORM_WINDOWS and not DO_HIDE_TERMINAL_TEST:
         
         sbp_kwargs[ 'startupinfo' ] = GetSubprocessHideTerminalStartupInfo()
         
+    
+    if this_is_a_potentially_long_lived_external_guy:
+        
+        if HC.PLATFORM_WINDOWS:
+            
+            # stops terminal logging and terminal ctrl+c and such passing from/to children
+            sbp_kwargs[ 'creationflags' ] = subprocess.DETACHED_PROCESS
+            
+        else:
+            
+            # sets non-child in POSIX--it does the os.setsid( None ) nicely
+            sbp_kwargs[ 'start_new_session' ] = True
+            
+        
+        stdin_pipe = subprocess.DEVNULL
+        stdout_pipe = subprocess.DEVNULL
+        stderr_pipe = subprocess.DEVNULL
+        
+    else:
+        
+        if HC.PLATFORM_WINDOWS and DO_HIDE_TERMINAL_TEST:
+            
+            # this and DETACHED_PROCESS are mutually exclusive, so we'll stick it here
+            # this says "hey hide an ffmpeg terminal from popping up, but a GUI program is good"
+            sbp_kwargs[ 'creationflags' ] = subprocess.CREATE_NO_WINDOW
+            
+        
+        stdin_pipe = subprocess.PIPE
+        stdout_pipe = subprocess.PIPE
+        stderr_pipe = subprocess.PIPE
+        
+    
+    sbp_kwargs[ 'stdin' ] = stdin_pipe
+    sbp_kwargs[ 'stdout' ] = stdout_pipe
+    sbp_kwargs[ 'stderr' ] = stderr_pipe
     
     if HG.subprocess_report_mode:
         
@@ -169,8 +201,35 @@ def GetSubprocessKWArgs( hide_terminal = True, text = False, shell = False ):
     return sbp_kwargs
     
 
+# TODO: wrap these guys in a thing that holds start time and any timeout info and have a nicer manager
+
 long_lived_external_processes_lock = threading.Lock()
 long_lived_external_processes = set()
+
+regular_running_processes_lock = threading.Lock()
+regular_running_processes = set()
+
+def MaintainRegularProcesses():
+    
+    with regular_running_processes_lock:
+        
+        for process in list( regular_running_processes ):
+            
+            if process.returncode is not None:
+                
+                regular_running_processes.discard( process )
+                
+            
+        
+    
+
+def RegisterRegularProcess( process: subprocess.Popen ):
+    
+    with regular_running_processes_lock:
+        
+        regular_running_processes.add( process )
+        
+    
 
 def ReapDeadLongLivedExternalProcesses():
     
@@ -195,6 +254,23 @@ def RegisterLongLivedExternalProcess( process: subprocess.Popen ):
         
         long_lived_external_processes.add( process )
         
+    
+
+def GetAllKnownProcesses():
+    
+    processes = []
+    
+    with long_lived_external_processes_lock:
+        
+        processes.extend( long_lived_external_processes )
+        
+    
+    with regular_running_processes_lock:
+        
+        processes.extend( regular_running_processes )
+        
+    
+    return processes
     
 
 def ReportBadReturnCode( cmd, returncode, stdout, stderr ):
@@ -259,16 +335,16 @@ def ReportTimeoutError( cmd, timeout, stdout, stderr ):
     raise HydrusExceptions.SubprocessTimedOut( message )
     
 
-def RunSubprocessRawCall( cmd, start_new_session, bufsize, stdin_pipe, stdout_pipe, stderr_pipe, hide_terminal: bool, text: bool, shell: bool ):
+def RunSubprocessRawCall( cmd, this_is_a_potentially_long_lived_external_guy, bufsize, text: bool, text_encoding: str ):
     
-    # just a reminder, the "shell" arg says "hey throw this _string_ cmd at a shell for parsing". it is not excellent, broadly speaking, but--
-    # --it allows for simple commands to be run without breaking into [ exe_name, '-p', '/path/to/blah' ]
+    # for a long time, I allowed the 'shell = True' command here; it allows you to execute 'exe_name -p /path/to/blah' instead of [ exe_name, '-p', '/path/to/blah' ] because it basically just pastes that into a new terminal
+    # I have now exorcised it. it is a security problem and a pain in a couple ways
     
-    sbp_kwargs = GetSubprocessKWArgs( hide_terminal = hide_terminal, text = text, shell = shell )
+    sbp_kwargs = GetSubprocessKWArgs( text = text, text_encoding = text_encoding, this_is_a_potentially_long_lived_external_guy = this_is_a_potentially_long_lived_external_guy )
     
     try:
         
-        return subprocess.Popen( cmd, start_new_session = start_new_session, bufsize = bufsize, stdin = stdin_pipe, stdout = stdout_pipe, stderr = stderr_pipe, **sbp_kwargs )
+        return subprocess.Popen( cmd, bufsize = bufsize, **sbp_kwargs )
         
     except FileNotFoundError:
         
@@ -292,30 +368,11 @@ def RunSubprocess(
     timeout: int = 15,
     bufsize: int = 65536,
     this_is_a_potentially_long_lived_external_guy = False,
-    hide_terminal = True,
     text = True,
-    shell = False
+    text_encoding = 'utf-8',
 ):
     
-    if this_is_a_potentially_long_lived_external_guy:
-        
-        # sets non-child in POSIX--it does the os.setsid( None ) nicely
-        start_new_session = True
-        
-        stdin_pipe = None
-        stdout_pipe = None
-        stderr_pipe = None
-        
-    else:
-        
-        start_new_session = False
-        
-        stdin_pipe = subprocess.PIPE
-        stdout_pipe = subprocess.PIPE
-        stderr_pipe = subprocess.PIPE
-        
-    
-    process = RunSubprocessRawCall( cmd, start_new_session, bufsize, stdin_pipe, stdout_pipe, stderr_pipe, hide_terminal, text, shell )
+    process = RunSubprocessRawCall( cmd, this_is_a_potentially_long_lived_external_guy, bufsize, text, text_encoding )
     
     if this_is_a_potentially_long_lived_external_guy:
         
@@ -323,6 +380,8 @@ def RunSubprocess(
         
         return ( None, None, 0 )
         
+    
+    RegisterRegularProcess( process )
     
     ( stdout, stderr ) = SubprocessCommunicate( cmd, process, timeout )
     
@@ -362,7 +421,7 @@ def SubprocessCommunicate( cmd, process: subprocess.Popen, timeout: int ):
                 pass
                 
             
-            raise HydrusExceptions.ShutdownException( 'Application is shutting down!' )
+            raise HydrusExceptions.ProgramShutdownException( 'Application is shutting down!' )
             
         
     
@@ -438,7 +497,7 @@ def TerminateAndReapProcess( process: subprocess.Popen ):
 # TODO: expand this to handle stderr better
 class SubprocessContext( object ):
     
-    def __init__( self, cmd, timeout: int = 15, bufsize: int = 65536, hide_terminal = True, text = True, shell = False ):
+    def __init__( self, cmd, timeout: int = 15, bufsize: int = 65536, text = True, text_encoding = 'utf-8' ):
         
         self.finished = False
         
@@ -449,16 +508,10 @@ class SubprocessContext( object ):
         
         self.SENTINEL = None
         
-        start_new_session = False
-        
-        stdin_pipe = subprocess.PIPE
-        stdout_pipe = subprocess.PIPE
-        stderr_pipe = subprocess.PIPE
-        
         self._timeout = timeout
         self._bufsize = bufsize
         
-        self.process = RunSubprocessRawCall( cmd, start_new_session, bufsize, stdin_pipe, stdout_pipe, stderr_pipe, hide_terminal, text, shell )
+        self.process = RunSubprocessRawCall( cmd, False, bufsize, text, text_encoding )
         
         HG.controller.CallToThread( self._THREADReader )
         
@@ -473,7 +526,7 @@ class SubprocessContext( object ):
                     
                     HydrusData.CheckProgramIsNotShuttingDown()
                     
-                except HydrusExceptions.ShutdownException:
+                except HydrusExceptions.ProgramShutdownException:
                     
                     return
                     

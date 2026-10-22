@@ -3,6 +3,7 @@ from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusGlobals as HG
 from hydrus.core.files import HydrusFileHandling
+from hydrus.core.files import HydrusFileTypeDetermination
 from hydrus.core.files import HydrusPSDHandling
 from hydrus.core.files.images import HydrusBlurhash
 from hydrus.core.files.images import HydrusImageHandling
@@ -14,6 +15,7 @@ from hydrus.client import ClientGlobals as CG
 from hydrus.client.files import ClientFiles
 from hydrus.client.files.images import ClientImageMetadata
 from hydrus.client.files.images import ClientImagePerceptualHashes
+from hydrus.core.files.images import HydrusImageThumbnails
 from hydrus.client.importing.options import ImportOptionsContainer
 
 class FileImportStatus( object ):
@@ -280,7 +282,7 @@ class FileImportJob( object ):
                 status_hook( 'generating filetype' )
                 
             
-            mime = HydrusFileHandling.GetMime( self._temp_path )
+            mime = HydrusFileTypeDetermination.GetMime( self._temp_path )
             
             self._pre_import_file_status.mime = mime
             
@@ -344,16 +346,16 @@ class FileImportJob( object ):
             thumbnail_scale_type = new_options.GetInteger( 'thumbnail_scale_type' )
             thumbnail_dpr_percent = new_options.GetInteger( 'thumbnail_dpr_percent' )
             
-            target_resolution = HydrusImageHandling.GetThumbnailResolution( ( width, height ), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
+            target_resolution = HydrusImageThumbnails.GetThumbnailResolution( ( width, height ), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
             
             percentage_in = new_options.GetInteger( 'video_thumbnail_percentage_in' )
             
             extra_description = f'File with hash "{self.GetHash().hex()}".'
             
-            thumbnail_numpy = HydrusFileHandling.GenerateThumbnailNumPy( self._temp_path, target_resolution, mime, duration_ms, num_frames, percentage_in = percentage_in, extra_description = extra_description )
+            thumbnail_numpy = HydrusImageThumbnails.GenerateThumbnailNumPy( self._temp_path, target_resolution, mime, duration_ms, num_frames, percentage_in = percentage_in, extra_description = extra_description )
             
             # this guy handles almost all his own exceptions now, so no need for clever catching. if it fails, we are prob talking an I/O failure, which is not a 'thumbnail failed' error
-            self._thumbnail_bytes = HydrusImageHandling.GenerateThumbnailBytesFromNumPy( thumbnail_numpy )
+            self._thumbnail_bytes = HydrusImageThumbnails.GenerateThumbnailBytesFromNumPy( thumbnail_numpy )
             
             try:
                 

@@ -577,6 +577,7 @@ class FrameGUI( CAC.ApplicationCommandProcessorMixin, ClientGUITopLevelWindows.M
         self._tabs_tree_view.emptySpaceDoubleLeftClicked.connect( self._notebook.ChooseNewPageForDeepestNotebook )
         
         self._notebook.selectionChanged.connect( self._tabs_tree_view.SelectLeafFromNotebookPage )
+        self._notebook.dataChanged.connect( self._tabs_tree_view.RefreshCurrentPagePath )
         
         self.page_nav_history = ClientGUIPages.PagesHistory()
         
@@ -3500,8 +3501,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
             ClientGUIMenus.AppendMenuItem( menu, 'restart', 'Shut the client down and then start it up again.', self.TryToExit, role = QW.QAction.MenuRole.ApplicationSpecificRole, restart = True )
             
         
-        ClientGUIMenus.AppendMenuItem( menu, 'exit/force maintenance', 'Shut the client down and force any outstanding shutdown maintenance to run.', self.TryToExit, role = QW.QAction.MenuRole.ApplicationSpecificRole, force_shutdown_maintenance = True )
-        
         ClientGUIMenus.AppendMenuItem( menu, 'exit', 'Shut the client down.', self.TryToExit, role = QW.QAction.MenuRole.QuitRole )
         
         return ( menu, '&file' )
@@ -3565,25 +3564,6 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendMenu( debug_menu, debug_modes, 'debug modes' )
         
-        profiling = ClientGUIMenus.GenerateMenu( debug_menu )
-        
-        profile_mode_message = 'If something is running slow, you can turn on a profile mode to have hydrus gather information on it. You probably want "db" profile mode, but if it seems to be lag related to dialog spawning or similar, you might like to try the "ui" mode.'
-        profile_mode_message += '\n' * 2
-        profile_mode_message += 'Turn the mode on, do the slow thing for a bit, and then turn it off. In your database directory will be a new profile log, which is really helpful for hydrus dev to figure out what is running slow for you and how to fix it.'
-        profile_mode_message += '\n' * 2
-        profile_mode_message += 'The Query Planner mode makes detailed database analysis of specific database queries. This is sometimes useful to hydev, but he will usually ask for it specifically.'
-        profile_mode_message += '\n' * 2
-        profile_mode_message += 'More information is available in the help, under \'reducing lag\'.'
-        
-        ClientGUIMenus.AppendMenuItem( profiling, 'what is this?', 'Show profile info.', ClientGUIDialogsMessage.ShowInformation, self, profile_mode_message )
-        self._profile_mode_client_api_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling, 'profile mode (client api)', 'Run detailed \'profiles\' on Client API jobs.', HydrusProfiling.IsProfileMode( 'client_api' ), self.FlipProfileMode, 'client_api' )
-        self._profile_mode_db_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling, 'profile mode (db)', 'Run detailed \'profiles\' on db jobs.', HydrusProfiling.IsProfileMode( 'db' ), self.FlipProfileMode, 'db' )
-        self._profile_mode_threads_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling, 'profile mode (threads)', 'Run detailed \'profiles\' on background threaded tasks.', HydrusProfiling.IsProfileMode( 'threads' ), self.FlipProfileMode, 'threads' )
-        self._profile_mode_ui_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling, 'profile mode (ui)', 'Run detailed \'profiles\' on some Qt jobs.', HydrusProfiling.IsProfileMode( 'ui' ), self.FlipProfileMode, 'ui' )
-        ClientGUIMenus.AppendMenuCheckItem( profiling, 'query planner mode', 'Run detailed \'query plans\'.', HydrusProfiling.query_planner_mode, CG.client_controller.FlipQueryPlannerMode )
-        
-        ClientGUIMenus.AppendMenu( debug_menu, profiling, 'profiling' )
-        
         report_modes = ClientGUIMenus.GenerateMenu( debug_menu )
         
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'blurhash mode', 'Draw blurhashes instead of thumbnails.', HG.blurhash_mode, self._SwitchBoolean, 'blurhash_mode' )
@@ -3612,6 +3592,37 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendMenuCheckItem( report_modes, 'subscription report mode', 'Have the subscription system report what it is doing.', HG.subscription_report_mode, self._SwitchBoolean, 'subscription_report_mode' )
         
         ClientGUIMenus.AppendMenu( debug_menu, report_modes, 'report modes' )
+        
+        ClientGUIMenus.AppendSeparator( debug_menu )
+        
+        profiling_menu = ClientGUIMenus.GenerateMenu( debug_menu )
+        
+        profile_mode_message = 'If something is running slow, you can turn on a profile mode to have hydrus gather information on it. You probably want "db" profile mode, but if it seems to be lag related to dialog spawning or similar, you might like to try the "ui" mode.'
+        profile_mode_message += '\n' * 2
+        profile_mode_message += 'Turn the mode on, do the slow thing for a bit, and then turn it off. In your database directory will be a new profile log, which is really helpful for hydrus dev to figure out what is running slow for you and how to fix it.'
+        profile_mode_message += '\n' * 2
+        profile_mode_message += 'The Query Planner mode makes detailed database analysis of specific database queries. This is sometimes useful to hydev, but he will usually ask for it specifically.'
+        profile_mode_message += '\n' * 2
+        profile_mode_message += 'More information is available in the help, under \'reducing lag\'.'
+        
+        ClientGUIMenus.AppendMenuItem( profiling_menu, 'what is this?', 'Show profile info.', ClientGUIDialogsMessage.ShowInformation, self, profile_mode_message )
+        self._profile_mode_client_api_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling_menu, 'profile mode (client api)', 'Run detailed \'profiles\' on Client API jobs.', HydrusProfiling.IsProfileMode( 'client_api' ), self.FlipProfileMode, 'client_api' )
+        self._profile_mode_db_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling_menu, 'profile mode (db)', 'Run detailed \'profiles\' on db jobs.', HydrusProfiling.IsProfileMode( 'db' ), self.FlipProfileMode, 'db' )
+        self._profile_mode_threads_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling_menu, 'profile mode (threads)', 'Run detailed \'profiles\' on background threaded tasks.', HydrusProfiling.IsProfileMode( 'threads' ), self.FlipProfileMode, 'threads' )
+        self._profile_mode_ui_menu_item = ClientGUIMenus.AppendMenuCheckItem( profiling_menu, 'profile mode (ui)', 'Run detailed \'profiles\' on some Qt jobs.', HydrusProfiling.IsProfileMode( 'ui' ), self.FlipProfileMode, 'ui' )
+        ClientGUIMenus.AppendMenuCheckItem( profiling_menu, 'query planner mode', 'Run detailed \'query plans\'.', HydrusProfiling.query_planner_mode, CG.client_controller.FlipQueryPlannerMode )
+        
+        ClientGUIMenus.AppendMenu( debug_menu, profiling_menu, 'profiling' )
+        
+        threads_menu = ClientGUIMenus.GenerateMenu( debug_menu )
+        
+        ClientGUIMenus.AppendMenuItem( threads_menu, 'review threads', 'Show current threads and what they are doing.', self._ReviewThreads )
+        ClientGUIMenus.AppendMenuItem( threads_menu, 'review subprocesses', 'Show current subprocesses and what they are doing.', self._ReviewSubprocesses )
+        ClientGUIMenus.AppendMenuItem( threads_menu, 'show scheduled jobs', 'Print some information about the currently scheduled jobs log.', self._DebugShowScheduledJobs )
+        
+        ClientGUIMenus.AppendMenu( debug_menu, threads_menu, 'threads and processes' )
+        
+        ClientGUIMenus.AppendSeparator( debug_menu )
         
         gui_actions = ClientGUIMenus.GenerateMenu( debug_menu )
         
@@ -3657,10 +3668,8 @@ ATTACH "client.mappings.db" as external_mappings;'''
         
         ClientGUIMenus.AppendMenuItem( data_actions, 'flush log', 'Command the log to write any buffered contents to hard drive.', HydrusData.DebugPrint, 'Flushing log' )
         ClientGUIMenus.AppendMenuItem( data_actions, 'force database commit', 'Command the database to flush all pending changes to disk.', CG.client_controller.ForceDatabaseCommit )
-        ClientGUIMenus.AppendMenuItem( data_actions, 'review threads', 'Show current threads and what they are doing.', self._ReviewThreads )
         ClientGUIMenus.AppendMenuItem( data_actions, 'scan file storage folders', 'Test out that thing.', self._DebugScanStorage )
         ClientGUIMenus.AppendMenuItem( data_actions, 'show env', 'Print your current environment variables.', HydrusEnvironment.DumpEnv )
-        ClientGUIMenus.AppendMenuItem( data_actions, 'show scheduled jobs', 'Print some information about the currently scheduled jobs log.', self._DebugShowScheduledJobs )
         ClientGUIMenus.AppendMenuItem( data_actions, 'subscription manager snapshot', 'Have the subscription system show what it is doing.', self._controller.subscriptions_manager.ShowSnapshot )
         ClientGUIMenus.AppendSeparator( data_actions )
         ClientGUIMenus.AppendMenuItem( data_actions, 'simulate program exit signal', 'Kill the program via a QApplication exit.', QW.QApplication.instance().exit )
@@ -3708,6 +3717,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
         ClientGUIMenus.AppendSeparator( tests )
         ClientGUIMenus.AppendMenuCheckItem( tests, 'fake petition mode', 'Fill the petition panels with fake local data for testing.', HG.fake_petition_mode, self._SwitchBoolean, 'fake_petition_mode' )
         ClientGUIMenus.AppendSeparator( tests )
+        ClientGUIMenus.AppendMenuItem( tests, 'do session sign-off (fake)', 'Test a session sign-off call for fast, ui-originating shutdown.', CG.client_controller.DoSessionShutdownSave )
         ClientGUIMenus.AppendMenuItem( tests, 'do self-sigterm', 'Test a sigterm call for fast, non-ui-originating shutdown.', CG.client_controller.DoSelfSigterm )
         ClientGUIMenus.AppendMenuItem( tests, 'do self-sigterm (fake)', 'Test a sigterm call for fast, non-ui-originating shutdown.', CG.client_controller.DoSelfSigtermFake )
         ClientGUIMenus.AppendSeparator( tests )
@@ -5127,7 +5137,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                         
                         CG.client_controller.subscriptions_manager.SetSubscriptions( subscriptions )
                         
-                    except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ShutdownException ):
+                    except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException ):
                         
                         return
                         
@@ -6091,6 +6101,15 @@ ATTACH "client.mappings.db" as external_mappings;'''
         frame.SetPanel( panel )
         
     
+    def _ReviewSubprocesses( self ):
+        
+        frame = ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel( self, 'review subprocesses' )
+        
+        panel = ClientGUIScrolledPanelsReview.ReviewSubprocesses( frame, self._controller )
+        
+        frame.SetPanel( panel )
+        
+    
     def _ReviewThreads( self ):
         
         frame = ClientGUITopLevelWindowsPanels.FrameThatTakesScrollablePanel( self, 'review threads' )
@@ -6256,7 +6275,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                     
                     page_key = CG.client_controller.CallBlockingToQtTLW( qt_session_gubbins )
                     
-                except HydrusExceptions.ShutdownException:
+                except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException ):
                     
                     return
                     
@@ -6505,7 +6524,7 @@ ATTACH "client.mappings.db" as external_mappings;'''
                 
                 CG.client_controller.CallBlockingToQt( self, qt_test_ac )
                 
-            except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ShutdownException ):
+            except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException ):
                 
                 HydrusData.Print( 'Test could not finish because of a shutdown, looks like.' )
                 
@@ -8467,13 +8486,9 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
             
             action = command.GetSimpleAction()
             
-            if action == CAC.SIMPLE_EXIT_APPLICATION:
+            if action in ( CAC.SIMPLE_EXIT_APPLICATION, CAC.SIMPLE_EXIT_APPLICATION_FORCE_MAINTENANCE ):
                 
                 self.TryToExit()
-                
-            elif action == CAC.SIMPLE_EXIT_APPLICATION_FORCE_MAINTENANCE:
-                
-                self.TryToExit( force_shutdown_maintenance = True )
                 
             elif action == CAC.SIMPLE_RESTART_APPLICATION:
                 
@@ -9231,7 +9246,7 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         self._notebook.ShowPage( page )
         
     
-    def TryToExit( self, restart = False, force_shutdown_maintenance = False ):
+    def TryToExit( self, restart = False ):
         
         if not self._controller.DoingFastExit():
             
@@ -9300,80 +9315,6 @@ The password is cleartext here but obscured in the entry dialog. Enter a blank p
         if restart:
             
             HG.restart = True
-            
-        
-        if force_shutdown_maintenance or HG.do_idle_shutdown_work:
-            
-            HG.do_idle_shutdown_work = True
-            
-        else:
-            
-            try:
-                
-                idle_shutdown_action = self._controller.options[ 'idle_shutdown' ]
-                
-                last_shutdown_work_time = self._controller.Read( 'last_shutdown_work_time' )
-                
-                shutdown_work_period = self._controller.new_options.GetInteger( 'shutdown_work_period' )
-                
-                shutdown_work_due = HydrusTime.TimeHasPassed( last_shutdown_work_time + shutdown_work_period )
-                
-                if shutdown_work_due:
-                    
-                    if idle_shutdown_action == CC.IDLE_ON_SHUTDOWN:
-                        
-                        HG.do_idle_shutdown_work = True
-                        
-                    elif idle_shutdown_action == CC.IDLE_ON_SHUTDOWN_ASK_FIRST:
-                        
-                        idle_shutdown_max_minutes = self._controller.options[ 'idle_shutdown_max_minutes' ]
-                        
-                        time_to_stop = HydrusTime.GetNow() + ( idle_shutdown_max_minutes * 60 )
-                        
-                        work_to_do = self._controller.GetIdleShutdownWorkDue( time_to_stop )
-                        
-                        if len( work_to_do ) > 0:
-                            
-                            text = 'Is now a good time for the client to do up to ' + HydrusNumbers.ToHumanInt( idle_shutdown_max_minutes ) + ' minutes\' maintenance work? (Will auto-no in 15 seconds)'
-                            text += '\n' * 2
-                            
-                            if CG.client_controller.IsFirstStart():
-                                
-                                text += 'Since this is your first session, this maintenance should just be some quick initialisation work. It should only take a few seconds.'
-                                text += '\n' * 2
-                                
-                            
-                            text += 'The outstanding jobs appear to be:'
-                            text += '\n' * 2
-                            text += '\n'.join( work_to_do )
-                            
-                            ( result, was_cancelled ) = ClientGUIDialogsQuick.GetYesNo( self, text, title = 'Maintenance is due', auto_no_time = 15, check_for_cancelled = True )
-                            
-                            if was_cancelled:
-                                
-                                return
-                                
-                            elif result == QW.QDialog.DialogCode.Accepted:
-                                
-                                HG.do_idle_shutdown_work = True
-                                
-                            else:
-                                
-                                # if they said no, don't keep asking
-                                self._controller.Write( 'register_shutdown_work' )
-                                
-                            
-                        
-                    
-                
-            except Exception as e:
-                
-                self._controller.BlockingSafeShowCriticalMessage( 'shutdown error', 'There was a problem trying to review pending shutdown maintenance work. No shutdown maintenance work will be done, and info has been written to the log. Please let hydev know.' )
-                
-                HydrusData.PrintException( e )
-                
-                HG.do_idle_shutdown_work = False
-                
             
         
         CG.client_controller.CallAfterQtSafe( self, self._controller.Exit )

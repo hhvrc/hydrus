@@ -155,13 +155,15 @@ def DumpToGETQuery( args: dict[ str, object ] ):
 def ParseFileArguments( path, decompression_bombs_ok = False ):
     
     from hydrus.core.files import HydrusFileHandling
+    from hydrus.core.files import HydrusFileTypeDetermination
     from hydrus.core.files.images import HydrusImageHandling
+    from hydrus.core.files.images import HydrusImageThumbnails
     
     hash = HydrusFileHandling.GetHashFromPath( path )
     
     try:
         
-        mime = HydrusFileHandling.GetMime( path )
+        mime = HydrusFileTypeDetermination.GetMime( path )
         
         if mime in HC.DECOMPRESSION_BOMB_IMAGES and not decompression_bombs_ok:
             
@@ -198,9 +200,9 @@ def ParseFileArguments( path, decompression_bombs_ok = False ):
             
             bounding_dimensions = HC.SERVER_THUMBNAIL_DIMENSIONS
             
-            target_resolution = HydrusImageHandling.GetThumbnailResolution( ( width, height ), bounding_dimensions, HydrusImageHandling.THUMBNAIL_SCALE_DOWN_ONLY, 100 )
+            target_resolution = HydrusImageThumbnails.GetThumbnailResolution( ( width, height ), bounding_dimensions, HydrusImageThumbnails.THUMBNAIL_SCALE_DOWN_ONLY, 100 )
             
-            thumbnail_bytes = HydrusFileHandling.GenerateThumbnailBytes( path, target_resolution, mime, duration_ms, num_frames )
+            thumbnail_bytes = HydrusImageThumbnails.GenerateThumbnailBytes( path, target_resolution, mime, duration_ms, num_frames )
             
         except Exception as e:
             

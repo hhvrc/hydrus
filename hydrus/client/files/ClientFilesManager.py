@@ -14,9 +14,10 @@ from hydrus.core import HydrusLists
 from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusPaths
 from hydrus.core import HydrusTime
-from hydrus.core.files import HydrusFileHandling
 from hydrus.core.files import HydrusFilesPhysicalStorage
+from hydrus.core.files import HydrusFileTypeDetermination
 from hydrus.core.files.images import HydrusImageHandling
+from hydrus.core.files.images import HydrusImageThumbnails
 from hydrus.core.processes import HydrusThreading
 
 from hydrus.client import ClientConstants as CC
@@ -408,13 +409,13 @@ class ClientFilesManager( object ):
         thumbnail_scale_type = self._controller.new_options.GetInteger( 'thumbnail_scale_type' )
         thumbnail_dpr_percent = CG.client_controller.new_options.GetInteger( 'thumbnail_dpr_percent' )
         
-        target_resolution = HydrusImageHandling.GetThumbnailResolution( ( width, height ), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
+        target_resolution = HydrusImageThumbnails.GetThumbnailResolution( ( width, height ), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
         
         percentage_in = self._controller.new_options.GetInteger( 'video_thumbnail_percentage_in' )
         
         try:
             
-            thumbnail_bytes = HydrusFileHandling.GenerateThumbnailBytes( file_path, target_resolution, mime, duration_ms, num_frames, percentage_in = percentage_in )
+            thumbnail_bytes = HydrusImageThumbnails.GenerateThumbnailBytes( file_path, target_resolution, mime, duration_ms, num_frames, percentage_in = percentage_in )
             
         except Exception as e:
             
@@ -1666,7 +1667,7 @@ class ClientFilesManager( object ):
                 raise Exception()
                 
             
-            thumbnail_mime = HydrusFileHandling.GetThumbnailMime( path )
+            thumbnail_mime = HydrusFileTypeDetermination.GetThumbnailMime( path )
             
             numpy_image = HydrusImageHandling.GenerateNumPyImage( path, thumbnail_mime )
             
@@ -1676,7 +1677,7 @@ class ClientFilesManager( object ):
             thumbnail_scale_type = self._controller.new_options.GetInteger( 'thumbnail_scale_type' )
             thumbnail_dpr_percent = CG.client_controller.new_options.GetInteger( 'thumbnail_dpr_percent' )
             
-            ( expected_width, expected_height ) = HydrusImageHandling.GetThumbnailResolution( (media_width, media_height), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
+            ( expected_width, expected_height ) = HydrusImageThumbnails.GetThumbnailResolution( (media_width, media_height), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
             
             if current_width != expected_width or current_height != expected_height:
                 

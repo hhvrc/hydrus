@@ -10,8 +10,8 @@ from hydrus.core import HydrusData
 from hydrus.core import HydrusGlobals as HG
 from hydrus.core import HydrusNumbers
 from hydrus.core import HydrusTime
-from hydrus.core.files import HydrusFileHandling
-from hydrus.core.files.images import HydrusImageHandling
+from hydrus.core.files import HydrusFileTypeDetermination
+from hydrus.core.files.images import HydrusImageThumbnails
 
 from hydrus.client import ClientApplicationCommand as CAC
 from hydrus.client import ClientConstants as CC
@@ -273,7 +273,7 @@ def CalculateMediaContainerSize( media, device_pixel_ratio: float, zoom, show_ac
         #thumbnail_dpr_percent = CG.client_controller.new_options.GetInteger( 'thumbnail_dpr_percent' )
         thumbnail_dpr_percent = 100
         
-        ( thumb_width, thumb_height ) = HydrusImageHandling.GetThumbnailResolution( media.GetResolution(), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
+        ( thumb_width, thumb_height ) = HydrusImageThumbnails.GetThumbnailResolution( media.GetResolution(), bounding_dimensions, thumbnail_scale_type, thumbnail_dpr_percent )
         
         height = height + min( OPEN_EXTERNALLY_MAX_THUMBNAIL_SIZE[1], thumb_height )
         
@@ -3406,7 +3406,7 @@ class EmbedButton( QW.QWidget ):
                 
                 thumbnail_path = CG.client_controller.client_files_manager.GetThumbnailPath( display_media_result )
                 
-                thumbnail_mime = HydrusFileHandling.GetThumbnailMime( thumbnail_path )
+                thumbnail_mime = HydrusFileTypeDetermination.GetThumbnailMime( thumbnail_path )
                 
                 self._thumbnail_qt_pixmap = ClientRendering.GenerateHydrusBitmap( thumbnail_path, thumbnail_mime ).GetQtPixmap()
                 

@@ -7,6 +7,96 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 691](https://github.com/hydrusnetwork/hydrus/releases/tag/v691)
+
+### exe manager
+
+* the 'this can live for a very long time' checkbox is renamed and now detaches the process better on Windows and POSIX. the long-time child process should no longer pipe stdout/stderr to our terminal
+* the `text` checkbox is removed from 'local process call' edit panels; this will now be inferred from any parsable result settings, and with a specific encoding
+* the `hide terminal` checkbox is removed from 'local process call' edit panels. this was only affecting Windows and has few debug uses, so the behaviour is now always on
+* if you are a Windows user, the 'external programs' options panel has a new 'TEST' checkbox to try out some cleaner 'hide terminal' tech. if you are an advanced user, please check out its tooltip and let me know how you get on
+* in the first step of getting arbitrary 'tag suggestions' working, you can now set an executable call type of 'get metadata for a single file' type. this exposes a new setting at the bottom of the 'local process call' panel where you can specify whether the metadata arrives on `stdout` or `stderr`, and in which encoding, if not `utf-8`. there's no parsing yet (it'll use the same UI as the downloader system), so it will always say it parsed nothing, but the test panel is hooked up and we are now reading basic responses from external tag calls. if you are interested in this stuff, feel free to wire up a test situation
+
+### session log-off detection
+
+* I wrote a nicer hook for the signal that your OS sends to programs when the user is about to log off. hydrus has never been great about catching these events and sometimes has a non-clean exit when the computer shuts down. I am not 100% confident in my implementation yet, so it is hidden behind a new `TEST: Try new log-off detection for clean exit` under `options>gui`.
+* added `help->debug->tests->do session sign-off (fake)` to simulate this event firing
+* if the test is on and it happens, your log will especially state "doing fast session shutdown" when it triggers. the program hides and saves without showing the splash
+* I'm worried about whether some users session managers fire the event at a time other than logoff, e.g. every fifteen minutes for some extraneous checkpointing that is misfiring, so if you are interested in cleaner program exit on log-off, please switch this test on and let me know how it goes. does it save nicely when you log off, and does the program ever now close randomly?
+
+### misc
+
+* fixed an issue where the QtMediaPlayer would render flag-rotated videos in a too-small area
+* the command palette no longer gives 'label' results (menu items with text but no function) when searching the main menu or media menu
+* I juggled some of `help->debug` around, including adding a 'threads and subprocesses' submenu
+* added a 'review subprocesses' window to this new submenu. it shows the current subprocess snapshot with basic launch command, pid, and running/return code, and buttons to do reaping maintenance, and terminate (+kill on POSIX). as we do more executable manager stuff, we're running into needing a better window on this stuff, so this is a first draft. I think we'll want some more stuff like start time and timeout
+
+### boring stuff
+
+* I did a bunch of boring cleanup and infrastructure expansion in the exe manager to prep for fetching tags. there's new enums, a nicer response object to handle responses, and the test panel is ready to talk about file/metadata responses
+* local process calls now have 'parsable' and 'importable' sourcing data so they can pull a metadata document (with an encoding) or (in future) a raw importable file from a pipe or (in future) a temp_path input parameter
+* executable definitions now have a page parser to parse metadata documents in prep for tag suggestions, but there's no UI for it yet
+* moved `Switch to main window when creating new file search page from media viewer` from `options->gui` to `options->media viewer`
+* brought `Pillow` from `12.3.0` to `13.0.0` for a security update
+
+## [Version 690](https://github.com/hydrusnetwork/hydrus/releases/tag/v690)
+
+### more treeview improvements
+
+* the user who has been working on the treeview experiment (under `options->gui pages` if you want to try it out!) has sent in more improvements (#2101)--
+* shift-double-click on a page entry in the treeview now does a page rename
+* the treeview page entries can now catch file drag and drops!
+* the cog icon has a new 'style/display' submenu with the alternate-row-colour setting and a new hide/show focus rectangle option
+* some bottom-label/page-name desync issues are fixed
+* fix when a page is first activated inside a notebook after selection moves from a different parent notebook, the parent notebook node would be highlighted instead of the activated page
+* fix the 'expand all' isnt enabled when i have a pages of pages inside another, and collapse the inner one (and the inverse situation)
+* fix some other small selection/activation bugs, clean up and consolidate some redundant code
+
+### no more shutdown maintenance
+
+* I have completely removed the 'do maintenance on shutdown' system. this system was old, creaky, inefficient, occasionally confusing, and had to jump through several unusual hoops to still work. it used to do a bunch of stuff, but I had whittled it down, over years, to just database analysis and repo processing work. removing it completely satisfies a long-term KISS plan
+* going forward, I will continue to push on maintenance work working in small increments in convenient invisible ways. ideally, most users should never care or have to bother with maintenance. I may add a 'yeah go nuts do work now' button for a convenient 'just do idle work now' mode in future, but for now, the plumbing behind shutdown is a bit simpler and a shutdown should now always be as prompt as possible
+* the related settings under `options->maintenance and processing` are removed, and the shortcut that did 'shutdown and force maintenance' now just does a normal shutdown
+
+### manage tags
+
+* _the manage tags dialog has more options on what happens when you enter tags. delete confirmations only take one 'yes' click, but it also interrupts you more when you are about to do something with no easy undo_
+* the 'confirm remove/petition tags on explicit delete actions' cog icon setting, which used to only apply on hitting the delete key on the taglist or the 'remove tags' button is now 'confirm remove/petition tags' and applies to all potential removes. instead of making a second yes/no dialog, it forces the action choice dialog to show even if there is only one available action (the delete/petition)
+* the action confirmation now appears even if there is only one action to do if that action is an undelete, clear deletion record, rescind pend, or rescind petitioned call
+* by default, the autocomplete paste button now only does add/pend actions (so if you paste tags that are already in the list, it will not offer to delete them or rescind pends or whatever), but you can allow it to do delete/petition, resind pend/petition, and clear deletion record if you like under a new cog icon submenu
+* by default, autocomplete tag entry can trigger any action except clear deletion record (add, delete, pend, petition, rescind pend, rescind petition), but you can configure it under a similar submenu
+* double-clicking the list to 'activate' it can now trigger any action (add, delete. clear deletion record, pend, petition, rescind pend, rescind petition). adding a tag from the tag suggestion boxes is the same (sans 'clear deletion record'), but since those lists filter themselves by tags already in the list, It'd be tricky to pull off one of the 'removes'
+* hitting the delete key on a list selection or hitting 'remove tags' button can now trigger delete, petition, rescind pend, or clear delete record outcomes
+* this retires the old 'allow remove/petition result on tag input for already existing tag', which was always a muddy fudge that I could never remember the precise meaning of
+* when you enter tags, there are more dialog labels to cover different situations. previously it would erroneously say 'of the 1 files being managed, some have that tag, but not all of them do' when showing the new add/clear deleted record choice, but now it handles stuff like that properly. further, it mentions if an 'add' action involves an undelete
+
+### related tags
+
+* _related tags works better in some clever ways; you don't have to do anything_
+* you can now customise whether 'related tags' starts with "just for my files" and "siblings and parents" on/off when the manage tags dialog boots. there's a cog icon on the related tags panel, and complementary checkboxes added to `options->tag suggestions->related tags`
+* the related tags search system does some smarter sibling lookups when it weights search and result tags, now weighting by the _ideal_ tag even when you search not in the sibling/parent space. if you don't want to receive any 'series' tags in your results, it will now stop giving you unnamespaced suggestions that sibling to a series tag. same deal for its searching tech
+* I have made significant improvements in how the 'related tags' list is filtered of tags that already exist in the list, so that it should be better about not suggesting a storage tag when a tag already in the list shares the same ideal tag or already includes the suggested via a parent implication. there are still a couple small holes here, but the improvement was enough that I have removed all the ugly and annoying filtering at the db level, saving some lookup time and making it so if you repeal an already-pending (tag repos) or already-current (local tags) tag, the 'related tags' list is probably going to spontaneously list it, since it already found that guy, knows it is important, and was actually hiding it already. it just makes for a more reactive list that you don't need to refresh so much if you remove something by mistake
+
+### import options
+
+* the 'import options' button-with-menu-arrow widget you see on every importer now allows you to edit the default import options (essentially just opening the `options->import options` panel on its own) from the menu. you can also open it from the edit panel itself with a new 'edit defaults' button. if you change the defaults, the panel should update on ok to show any new actual options inheritance
+* fixed the 'favourites' list in import options panel not sorting on init
+* fixed an error when trying to delete one favourite
+
+### couple of mpv things
+
+* updated the default_mpv.conf with formatting, some opening explanation blurb, and consolidated the info in the experimental confs into it as examples for the advanced user to check out. updated the label in the options help too; ask a chatbot works well for navigating the excellent-but-monstrous docs here: https://mpv.io/manual/master/
+* mpv `[error]`s of `Your platform doesn't support hardware accelerated X` are now ignored; previously they'd spam to log but the file would render fine
+
+### boring cleanup and little fixes
+
+* fixed `database->db maintenance->get tables using definitions`, which was failing due to a missing subclass method definition in one of the duplicate-file db modules
+* added a safety catch for file import or gallery download jobs so they always always get a status set, even if an error handler is supposed to but then fails; if nothing is set by an error handler, the job is set as error. we had one instance of this recently that had a looping file import job that was failing to set some sort of skip/ignore/error status because a backing daemon had shut down early
+* split the existing 'shutdown' exceptions into 'daemon' vs 'program' shutdown, so catchers can better handle the two situations
+* moved the client thumbnail cache to its own file, `ClientCacheThumbnails`, and wrote some new thumbnail sizing intention infrastructure
+* moved all the hydrus core thumbnail code to its own file `HydrusImageThumbnails`
+* moved the filetype determination code out to its own file `HydrusFileTypeDetermination`
+
 ## [Version 689](https://github.com/hydrusnetwork/hydrus/releases/tag/v689)
 
 ### all misc this week
@@ -342,141 +432,3 @@ title: Changelog
 * removed some old defunct Linux help regarding ffmpeg on the frozen builds. you got it now, bro
 * fixed some 'waiting for a work slot' labelling in the downloaders UI
 * a bunch of misc linting and some voodoo linting
-
-## [Version 681](https://github.com/hydrusnetwork/hydrus/releases/tag/v681)
-
-### misc
-
-* status bar 'busy' indicator is simpler, and the tooltip now says the number of threads working
-* wrote a catch to stop QSS stylesheets from specifying a hydrus property colour with transparency. these were drawing crazy, with noclip garbage left on bitmaps used for transparenty images and animations in the media viewer. also fixed the `e621_redux` stylesheet, where this issue was discovered, to simply set a background colour for the media viewer
-
-### more human-readable embedded metadata filtering
-
-* I further cleaned up what hydrus considers 'human-readable embedded metadata'. many more technical fields are now hidden from the little text panel, meaning when this guy does pop up, or you search 'has non-EXIF embedded metadata', you'll now tend to see something nice and human like 'Artist' or 'Title', or otherwise rich like an AI prompt or Character card
-* I now invite advanced users to do some 'determine if the file has non-EXIF embedded metadata' maintenance regenning on some 'has non-EXIF embedded metadata' files and tell me what technical/inhuman text remains in their collections. I'm getting pretty happy here and I expect to (optionally) schedule a big regen for all users pretty soon
-* the newly excluded fields are: 'software', 'transparency', 'bit_depth', 'duration', 'primary', 'default_image', 'Creation Time', 'create-date', 'modify-date', 'date:create', 'date:modify', 'chroma', 'loop', 'timestamp = 0', 'extension', 'photoshop', 'bbox', 'blend', 'mpoffset', 'disposal', 'interlace', 'aspect', 'sizes', a ton of 'Thumb::' garbage, 'iptc', 'Raw profile type exif', 'Raw profile type iptc' (ye olde XMP), 'xmp', 'XML:com.adobe.xmp', 'adobe', and 'adobe_transform'. a bunch of these are format specific DPI data and such and not useful to elevate to the user. the IPTC and XMP stuff will come back when I expand EXIF parsing
-* excluded 'comment' or 'Comment' from human-readable metadata fields if it matches a handful of 'Created with X' style regexes; this is now parsed as a 'software' field
-* the 'Creator' and 'Source' fields are now appended to the 'software' field
-* excluded any human-readable metadata fields that have null value or empty list/dict
-* I realised while doing this that maybe going for a whitelist of what we do want would be saner, but I think I prefer, for completeness and fun, to get everything and actually deal with the sore thumbs
-* put 'software' metadata field in the 'extra info' panel below, as 'source' ('source' rather than 'software' because sometimes stuff like Kodak blah blah comes through here). there's an argument to include this in human-readable fields, if we are keeping artist/title, but I'm falling on the side of extracting it. I like this field a lot as human-valuable and it'll be high priority to be its own thing when we add richer metadata storage/search
-* similarly, the 'create-date' and friends are cool and I'll figure out some way to pipe that to a 'file metadata' modified time 'domain'. you can't generally get any better than the file metadata for this
-* if a file has a 'chroma' field talking about '420' subsampling, this is now converted to a subsampling field in the 'extra info' panel, like for jpeg
-* optimised 'has human-readable metadata' test for a fast yes in many cases
-
-### new graphicsview thumbnail grid test
-
-* the new 'thumbnail rendering tech' TEST under `options->thumbnails` is fixed up a bit and ready for advanced users to tentatively try out. I think I have it doing pretty much everything the existing code does without complaint, but I would like to confirm that with a broader test. it only applies to new pages, so I recommend first opening a new page and do some of your normal stuff before you test your whole session with a full client restart
-* fixed 'collect-by' transitions, removing the ghost singles that hung around
-* fixed a late waterfall thumb keyerror when transitioning through collect-by states
-* fixed collections not redrawing for a new first media on sort-by changes
-* fixed updating the status bar on any collect-by change, in either old or new thumbgrid code. it now flips between '200 files' and '200 files in 12 collections' when you change the collections
-* fixed drawing of thumbs at higher than 100% UI scale (the bitmaps were cropped due to DPR fun)
-* fixed a blurhash thumb fallback route in the new test
-* shaved the test animation time down for snappier feel. I'm pretty sure the old animation is accidentally heavily curved so despite ostensibly being 0.5s it was visually done faster. new guy is now ~13 frames at 60Hz
-* did some KISS refactoring of this code
-
-### more de-laggification work
-
-* I hacked in a test last week to try a different way of scheduling jobs in the background. it worked very well and I seem to have found the cause of the 'I have a fat client and when it does heavy work like archive/delete filter commit, everything slows down a lot' issue. basically, when certain sorts of heavy work was going on, threads waiting on new work to do or database jobs to come back were getting into a kind of traffic jam and wasting lots of time figuring out who had to go first rather than letting the guy who was actually doing the work go ahead and do it. I have now replicated and cleaned my work to several places and big clients that do a lot should be a good bit less laggy when big things are going on
-* cleaned up the successful CallToThread anti-CPU-thrashing test, taking out older code and cleaning the loop of it
-* added anti-CPU-thrash tech to db mainloop
-* added anti-CPU-thrash tech to threads waiting on the db to finish current work
-* added anti-CPU-thrash tech to database jobs; when many threads are competing for the db, they'll wake less
-* added anti-CPU-thrash tech to network job waits; when many threads are competing for network resources, they'll wake less
-* added anti-CPU-thrash tech to pubsub, both in the managing daemon and any threads waiting on 'background work to free up'
-* added anti-CPU thrash tech to 'are we currently rendering any thumbnails?' wait, which a bunch of threads wait on before going ahead with their own work
-* added anti-CPU-thrash tech to the core read-write lock used in the filesystem. I was very careful here as this is not my fortÃ©, and tests are good. this should improve latency, particularly thumb and file loading latency, when many file imports are going on and the locks are churning, which is another place we've seen inexplicable lag during certain busy periods
-* retired the debug 'db ui-hang relief mode'. this was an interesting experiment but the incorrect solution to the problem of GUI threads waiting on the db
-
-### boring de-laggification stuff
-
-* wrote a new thread worker pool object to look after calltothreads
-* primary controller and test controller now use this same object to manage threads (test guy had its own hacky code before)
-* tightened up db mainloop shutdown--to assure that db jobs can wait forever safely, we now guarantee that every job posted will get explicitly woken with a result through db shutdown
-* network engine now guarantees every network job it gets will be done'd so waiting threads shall all be woken up on program shutdown
-* rejiggered some 'is it time to commit?' in db idle time stuff given the changes
-* cleaned up some thread status-checking locking, mostly in debug code
-* KISSed some network job status stuff, and removed some confusing shutdown detection from the core 'isdone' calls
-* removed defunct db I/O-locking error-handling code
-* pubsub takes work breaks more often
-* pubsub system now has a shutdown signal to tidy up waiters properly on shutdown
-* thumbnail caches now have an explicit shutdown signal and clean up after themselves better on shutdown
-* cleaned up some misc thumb cache code
-* misc shutdown code cleanup
-* reordered some controller shutdown code
-* misc cleanup of controller wait code
-* removal of spurious event flags in db and pubsub
-
-### future build committed
-
-* This release commits the changes tested with the recent future test build, which went well
-* the summary for this update is: loads of stuff
-* there are no special instructions for the update. update as normal
-* since library versions have been bumped, users who run from source will be encouraged to rebuild their venv on update this week.
-* the library changes are--
-   - `PySide6` (Qt) from `6.9.3` to `6.10.3`
-   - OpenCV (`opencv-python-headless`) from `4.12.0.88` to `4.13.0.92`
-   - `beatifulsoup4` `4.14.3` to `4.15.0`
-   - `cbor2` `6.1.1` to `6.1.3`
-   - `cryptography` `48.0.0` to `49.0.0`
-   - `Pillow` `12.2.0` to `12.3.0`
-   - `pillow-heif` `1.3.0` to `1.4.0`
-   - `pillow-jxl-plugin` `1.3.7` to `1.3.8`
-   - `pyopenssl` `26.2.0` to `26.3.0`
-   - `service-identity` `24.2.0` to `26.1.0`
-   - `numpy` `2.3.1` to `2.4.6` (this jump was a bit of a juggle, and now possible with OpenCV 4.13)
-   - `requests` `2.33.1` to `2.34.2`
-   - SQLite dll and sqlite3 terminal updated on Windows from `3.51.2` to `3.53.3`
-   - SQLite terminal executable `3.53.3` now added to Linux and added to new db folders just like the Windows extract
-* the 'test' library changes are--
-   - `PySide6` (Qt) from `6.10.3` to `6.11.1`
-   - OpenCV (`opencv-python-headless`) from `4.13.0.92` to `5.0.0.93`. I did some research, and this upcoming jump doesn't seem to be a super significant change for our purposes. mostly C++ cleanup and finally dropping python 2 support.
-* other stuff--
-   - db folder is now completely masked in gitignore
-* build environment--
-   - updated the workflow actions versions across the board
-   - Windows and Linux builds are moved from python 3.12 to 3.13
-   - `pyinstaller` `6.16.0` to `6.18.0`
-   - the builds now share the core pyproject.toml rather than using their own requirements.txt files
-   - `pywin32` in Windows build env from `311` to `312`
-   - Windows ffmpeg (GyanD) `8.1.1` to `8.1.2`
-   - Linux build now comes with ffmpeg (BtbN) `2026-06-30`, which I think covers `8.1.2`
-
-## [Version 680](https://github.com/hydrusnetwork/hydrus/releases/tag/v680)
-
-### misc
-
-* updated the newish `tldextract` stuff (which helps navigate two-part domain suffixes like .co.uk in URL parsing) to no longer fetch a fresh suffix definition file on first ever use from `publicsuffix.org` and not to make a cache in `~/.cache/python-tldextract`. hydrus now ships with a copy of `public_suffix_list.dat` in the static dir for this library to use, and it doesn't make a cachedir entry any more. I regret not reading the docs closer! I also optimised this code so it should be a bit quicker now, too. thank you to the user who noticed this! (issue #2067)
-* I _think_ I may have fixed some of the heavy CPU thrashing we have seen during heavy work like archive/delete commit and such. if you have had bad UI lag, I would like to know if some of it suddenly leaps forward today
-* made file add/delete calls a tiny bit faster when they have many tags
-* some thumbnail generation scheduling is a little smarter, with expensive filetypes generated more reliably at the end of the queue
-* fixed thumbnail generation for cbz. sorry for the trouble--I messed something up with a recent refactor! all cbzs imported since july 5th will get a thumbnail regen call (issue #2069)
-* setup_venv.py now warns the user that the path will be deleted if they specify a non-standard venv path that already exists
-* added a little safety warning to the Client API page. I don't make any of those plugins and cannot guarantee anything about them--use your common sense!
-
-### system tray
-
-* you no longer need to be in advanced mode to see the system tray icon in Linux (old safety check I forgot about)
-* added two BUGFIX checkboxes to `options->system tray` for those who have odd minimise-to-system-tray behaviour. if you had trouble, try these out and let me know what works
-
-### number locale
-
-* added `TEST: Use your locale for integer rendering` to `options->gui`. try it out, let me know where it works well and badly. I noticed in a fake `fr_FR` locale that the space-separator somehow messed up some taglist rendering and made system predicates no longer parse correct (I guess I hardcode commas out of numbers)--anything else?
-* `system:filesize`, `system:ratio`, and `system:num pixels` now render with separators when the number exceeds 999
-
-### file permissions
-
-* there were some file import paths that did not set the standard hydrus file storage 'you can read and write this guy' permission bits (read+write on Windows, 644 otherwise), which I have fixed. this was affecting some downloads and some local file imports for some time in hydrus's past
-* if we try to move a file during larger 'move this directory here' type operations and get a permission error, hydrus now attempts to assign the hydrus-normal read/write permission bits before trying once more (issue #2064)
-* we are dealing with some legacy read-only guys here. I have a file maintenance job that tries to fix this retroactively, which I am considering firing off, sometime, to address this
-
-### embedded metadata
-
-* the test for the presence of file metadata is now more reliable and reflects what you see in the media viewer. previously, the file may not have been loaded the whole way during file import or file maintenance, and sometimes text was being missed, particularly in the new system where I filter out some stuff like DPI. it wasn't being missed in the media viewer since by happenstance it would generally check for EXIF beforehand, which triggers a full load. now, the thing that fetches embedded metadata now checks the file is loaded fully before grabbing the available text
-* when importing files, the embedded metadata test now saves an image load (it re-uses an earlier EXIF load, if one happened) to save a bit of time
-
-### future build
-
-* I am making another future build this week. This is a special build with new libraries that I would like advanced users to test out so I know they are safe to fold into the normal release.
-* in the release post, I will link to this alternate build. if you are experienced and would like to help me, please check it out

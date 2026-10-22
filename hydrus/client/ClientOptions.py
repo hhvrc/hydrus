@@ -147,7 +147,6 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'secret_discord_dnd_fix' : False,
             'show_unmatched_urls_in_media_viewer' : False,
             'set_search_focus_on_page_change' : False,
-            'allow_remove_on_manage_tags_input' : False,
             'yes_no_on_remove_on_manage_tags' : True,
             'activate_window_on_tag_search_page_activation' : False,
             'show_related_tags' : True,
@@ -376,7 +375,7 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'treeview_always_expand_to_current_tab_after_reset' : False,
             'treeview_collapse_all_children_upon_parent_closed' : False,
             'treeview_alternating_row_colours' : False,
-            'treeview_animate_current_node' : True,
+            'treeview_hide_focus_rectangle' : True,
             'treeview_history_box_pinned' : False,
             'allow_comic_book_archive_detection' : True,
             'minimise_client_to_system_tray_bugfix_deferred_state_set' : False,
@@ -388,6 +387,10 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'make_child_frames_qt_tool' : True,
             'copy_notes_quick_click_only_copies_text' : False,
             'do_flock_already_in_use_test_in_posix' : True,
+            'tag_suggestions_related_tags_just_do_local_files_default' : True,
+            'tag_suggestions_related_tags_search_siblings_and_parents_default' : True,
+            'do_new_hide_terminal_subprocess_tech_on_windows' : False,
+            'test_session_exit_signal' : False,
         }
         
         #
@@ -482,8 +485,8 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
         
         from hydrus.client.gui.canvas import ClientGUICanvasMedia
         from hydrus.client.gui.widgets import ClientGUIPainterShapes
-        from hydrus.core.files.images import HydrusImageHandling
         from hydrus.core.files.images import HydrusImageColours
+        from hydrus.core.files.images import HydrusImageThumbnails
         from hydrus.client.metadata import ClientTags
         
         self._dictionary[ 'integers' ] = {
@@ -508,12 +511,11 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'wake_delay_period' : 15,
             'media_viewer_zoom_center' : ClientGUICanvasMedia.ZOOM_CENTERPOINT_MOUSE,
             'last_session_save_period_minutes' : 5,
-            'shutdown_work_period' : 86400,
             'max_network_jobs' : 15,
             'max_network_jobs_per_domain' : 3,
             'max_connection_attempts_allowed' : 5,
             'max_request_attempts_allowed_get' : 5,
-            'thumbnail_scale_type' : HydrusImageHandling.THUMBNAIL_SCALE_DOWN_ONLY,
+            'thumbnail_scale_type' : HydrusImageThumbnails.THUMBNAIL_SCALE_DOWN_ONLY,
             'max_simultaneous_subscriptions' : 1,
             'gallery_page_wait_period_pages' : 15,
             'gallery_page_wait_period_subscriptions' : 5,
@@ -743,6 +745,8 @@ class ClientOptions( HydrusSerialisable.SerialisableBase ):
             'tab_tree_splitter_sizes_left' : [ 200, 1000 ],
             'tab_tree_splitter_sizes_right' : [ 1000, 200 ],
             'treeview_expanding_panel_splitter_size' : [ 700, 150 ],
+            'manage_tags_allowed_actions_ac_paste' : [ HC.CONTENT_UPDATE_ADD, HC.CONTENT_UPDATE_PEND ],
+            'manage_tags_allowed_actions_ac_entry' : [ HC.CONTENT_UPDATE_ADD, HC.CONTENT_UPDATE_PEND, HC.CONTENT_UPDATE_DELETE, HC.CONTENT_UPDATE_PETITION, HC.CONTENT_UPDATE_RESCIND_PEND, HC.CONTENT_UPDATE_RESCIND_PETITION ],
         }
         
         #

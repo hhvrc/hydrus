@@ -186,9 +186,9 @@ def report_content_speed_to_job_status( job_status, rows_done, total_rows, preci
     
     popup_message = 'content row ' + HydrusNumbers.ValueRangeToPrettyString( rows_done, total_rows ) + ': processing ' + row_name + ' at ' + rows_s + ' rows/s'
     
-    CG.client_controller.frame_splash_status.SetText( popup_message, print_to_log = False )
     job_status.SetStatusText( popup_message, 2 )
     
+
 def report_speed_to_job_status( job_status, precise_timestamp, num_rows, row_name ):
     
     it_took = HydrusTime.GetNowPrecise() - precise_timestamp
@@ -197,7 +197,6 @@ def report_speed_to_job_status( job_status, precise_timestamp, num_rows, row_nam
     
     popup_message = 'processing ' + row_name + ' at ' + rows_s + ' rows/s'
     
-    CG.client_controller.frame_splash_status.SetText( popup_message, print_to_log = False )
     job_status.SetStatusText( popup_message, 2 )
     
 
@@ -2597,22 +2596,6 @@ class DB( HydrusDB.HydrusDB ):
         return predicates
         
     
-    def _GetMaintenanceDue( self, stop_time ):
-        
-        jobs_to_do = []
-        
-        # analyze
-        
-        names_to_analyze = self.modules_db_maintenance.GetTableNamesDueAnalysis()
-        
-        if len( names_to_analyze ) > 0:
-            
-            jobs_to_do.append( 'analyze ' + HydrusNumbers.ToHumanInt( len( names_to_analyze ) ) + ' table_names' )
-            
-        
-        return jobs_to_do
-        
-    
     def _GetNumsPending( self ):
         
         services = self.modules_services.GetServices( ( HC.TAG_REPOSITORY, HC.FILE_REPOSITORY, HC.IPFS ) )
@@ -3064,18 +3047,36 @@ class DB( HydrusDB.HydrusDB ):
         return ( results_dict, we_stopped_early )
         
     
-    def _GetRelatedTags( self, file_service_key, tag_context: ClientSearchTagContext.TagContext, search_tags, tag_display_type = ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, max_time_to_take = 0.5, max_results = 100, concurrence_threshold = 0.04, search_tag_slices_weight_dict = None, result_tag_slices_weight_dict = None, other_tags_to_exclude = None ):
+    def _GetRelatedTags(
+        self,
+        file_service_key: bytes,
+        tag_context: ClientSearchTagContext.TagContext,
+        search_tags: collections.abc.Collection[ str ],
+        tag_display_type = ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL,
+        max_time_to_take = 0.5,
+        max_results = 100,
+        concurrence_threshold = 0.04,
+        search_tag_slices_weight_dict = None,
+        result_tag_slices_weight_dict = None
+    ):
         
         # a user provided the basic idea here
         
-        def get_weight_from_dict( tag, d ):
+        # ok hydev is revisiting this in 2026-10. this code is fun but a mess so I suspect we'll want to break it into bits somehow and maybe spin it into its own module
+        # regardless, one persistent tricky thing is that siblings and parents haven't been addressed properly
+        # we'll recommend a search tag or judge a result tag based on itself rather than its ideal, which isn't actually what the user expects and wants
+        # if they say "I don't want no series tags in my results", don't suggest a tag that siblings to one
+        # we had a similar issue where we were suggesting tags that already existed via another sibling, but I'm pretty sure we handled that already
+        # anyway I am fixing it now and further saying this whole guy could do with a modular rethink now it does useful stuff and isn't just a weird experiment
+        
+        def get_weight_from_dict( ideal_tag, d ):
             
             if d is None:
                 
                 return 1.0
                 
             
-            ( n, s ) = HydrusTags.SplitTag( tag )
+            ( n, s ) = HydrusTags.SplitTag( ideal_tag )
             
             if n in d:
                 
@@ -3096,23 +3097,29 @@ class DB( HydrusDB.HydrusDB ):
         
         stop_time_for_finding_results = HydrusTime.GetNowPrecise() + ( max_time_to_take * 0.85 )
         
-        search_tags = [ search_tag for search_tag in search_tags if get_weight_from_dict( search_tag, search_tag_slices_weight_dict ) != 0.0 ]
-        
-        if len( search_tags ) == 0:
-            
-            return ( num_tags_searched, num_tags_to_search, num_skipped, [ ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_TAG, value = 'no search tags to work with!' ) ] )
-            
-        
-        search_tag_service_id = self.modules_services.GetServiceId( search_tag_service_key )
-        display_tag_service_id = self.modules_services.GetServiceId( display_tag_service_key )
-        file_service_id = self.modules_services.GetServiceId( file_service_key )
-        
         if tag_display_type == ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL:
             
             search_tags = self.modules_tag_siblings.GetIdeals( tag_display_type, display_tag_service_key, search_tags )
             
             # I had a thing here that added the parents, but it gave some whack results compared to what you expected
             
+            search_tags_to_ideals = { search_tag : search_tag for search_tag in search_tags }
+            
+        else:
+            
+            search_tags_to_ideals = self.modules_tag_siblings.GetTagsToIdealTags( ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, display_tag_service_key, search_tags )
+            
+        
+        search_tags = [ search_tag for search_tag in search_tags if get_weight_from_dict( search_tags_to_ideals[ search_tag ], search_tag_slices_weight_dict ) != 0.0 ]
+        
+        if len( search_tags ) == 0:
+            
+            return ( num_tags_searched, num_tags_to_search, num_skipped, [ ClientSearchPredicate.Predicate( ClientSearchPredicate.PREDICATE_TYPE_TAG, value = 'no useful search tags to work with!' ) ] )
+            
+        
+        search_tag_service_id = self.modules_services.GetServiceId( search_tag_service_key )
+        display_tag_service_id = self.modules_services.GetServiceId( display_tag_service_key )
+        file_service_id = self.modules_services.GetServiceId( file_service_key )
         
         search_tag_ids_to_search_tags = self.modules_tags_local_cache.GetTagIdsToTags( tags = search_tags )
         
@@ -3130,7 +3137,7 @@ class DB( HydrusDB.HydrusDB ):
         # 2
             # we have an options structure for value of namespace, so we'll do biggest numbers first
         
-        search_tag_ids_flat_sorted_ascending = sorted( search_tag_ids_to_total_counts.items(), key = lambda row: ( - get_weight_from_dict( search_tag_ids_to_search_tags[ row[0] ], search_tag_slices_weight_dict ), row[1] ) )
+        search_tag_ids_flat_sorted_ascending = sorted( search_tag_ids_to_total_counts.items(), key = lambda row: ( - get_weight_from_dict( search_tags_to_ideals[ search_tag_ids_to_search_tags[ row[0] ] ], search_tag_slices_weight_dict ), row[1] ) )
         
         search_tags_sorted_ascending = []
         
@@ -3217,26 +3224,9 @@ class DB( HydrusDB.HydrusDB ):
         
         #
         
-        # now let's filter stuff we don't want
+        # We used to filter stuff we didn't want here, but significant improvements to UI-level filtering meant we could skip it!
         
-        # we don't want to suggest ourselves
-        tag_ids_to_exclude = set( search_tag_ids_to_search_tags.keys() )
-        
-        if other_tags_to_exclude is not None:
-            
-            # this is the list of all tags in the list, don't want them either
-            other_tag_ideals = self.modules_tag_siblings.GetIdeals( ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, display_tag_service_key, other_tags_to_exclude )
-            
-            other_tag_ids = set( self.modules_tags_local_cache.GetTagIdsToTags( tags = other_tag_ideals ).keys() )
-            
-            tag_ids_to_exclude.update( other_tag_ids )
-            
-        
-        for ( search_tag_id, parent_tag_ids ) in self.modules_tag_parents.GetTagsToAncestors( ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, display_tag_service_id, set( tag_ids_to_exclude ) ).items():
-            
-            # we don't want any of their parents either!
-            tag_ids_to_exclude.update( parent_tag_ids )
-            
+        #
         
         unfiltered_search_tag_ids_to_tag_ids_to_matching_counts = search_tag_ids_to_tag_ids_to_matching_counts
         
@@ -3247,11 +3237,6 @@ class DB( HydrusDB.HydrusDB ):
             tag_ids_to_matching_counts = {}
             
             for ( suggestion_tag_id, suggestion_matching_count ) in unfiltered_tag_ids_to_matching_counts.items():
-                
-                if suggestion_tag_id in tag_ids_to_exclude:
-                    
-                    continue
-                    
                 
                 tag_ids_to_matching_counts[ suggestion_tag_id ] = suggestion_matching_count
                 
@@ -3305,7 +3290,7 @@ class DB( HydrusDB.HydrusDB ):
                 matching_count_multiplier = search_tag_count / max_num_files_to_search
                 
             
-            weight = get_weight_from_dict( search_tag_ids_to_search_tags[ search_tag_id ], search_tag_slices_weight_dict )
+            weight = get_weight_from_dict( search_tags_to_ideals[ search_tag_ids_to_search_tags[ search_tag_id ] ], search_tag_slices_weight_dict )
             
             for ( suggestion_tag_id, suggestion_matching_count ) in tag_ids_to_matching_counts.items():
                 
@@ -3348,13 +3333,24 @@ class DB( HydrusDB.HydrusDB ):
         
         predicates = self.modules_tag_display.GeneratePredicatesFromTagIdsAndCounts( tag_display_type, display_tag_service_id, tag_ids_to_full_counts )
         
+        all_predicate_tags = { predicate.GetValue() for predicate in predicates }
+        
+        if tag_display_type == ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL:
+            
+            predicate_tags_to_ideal_tags = { predicate_tag : predicate_tag for predicate_tag in all_predicate_tags }
+            
+        else:
+            
+            predicate_tags_to_ideal_tags = self.modules_tag_siblings.GetTagsToIdealTags( ClientTags.TAG_DISPLAY_DISPLAY_ACTUAL, display_tag_service_key, all_predicate_tags )
+            
+        
         result_predicates = []
         
         for predicate in predicates:
             
-            tag = predicate.GetValue()
+            predicate_tag = predicate.GetValue()
             
-            weight = get_weight_from_dict( tag, result_tag_slices_weight_dict )
+            weight = get_weight_from_dict( predicate_tags_to_ideal_tags[ predicate_tag ], result_tag_slices_weight_dict )
             
             if weight == 0.0:
                 
@@ -3893,7 +3889,6 @@ class DB( HydrusDB.HydrusDB ):
                 'file_system_predicates' : self._GetFileSystemPredicates,
                 'inbox_hashes' : self._FilterInboxHashes,
                 'is_an_orphan' : self._IsAnOrphan,
-                'maintenance_due' : self._GetMaintenanceDue,
                 'migration_filter_pairs_by_count' : self._MigrationFilterPairsByCount,
                 'migration_get_mappings' : self._MigrationGetMappings,
                 'migration_get_pairs' : self._MigrationGetPairs,
@@ -3937,7 +3932,6 @@ class DB( HydrusDB.HydrusDB ):
                 'hash_status' : self.modules_files_metadata_rich.GetHashStatus,
                 'have_hashed_serialised_objects' : self.modules_serialisable.HaveHashedJSONDumps,
                 'ideal_client_files_locations' : self.modules_files_physical_storage.GetIdealClientFilesLocations,
-                'last_shutdown_work_time' : self.modules_db_maintenance.GetLastShutdownWorkTime,
                 'media_predicates' : self.modules_tag_display.GetMediaPredicates,
                 'media_result' : self.modules_media_results.GetMediaResultFromHash,
                 'media_results' : self.modules_media_results.GetMediaResultsFromHashes,
@@ -4076,7 +4070,6 @@ class DB( HydrusDB.HydrusDB ):
                 'regenerate_similar_files_search_count_numbers' : self.modules_similar_files.RegenerateSearchCacheNumbers,
                 'regenerate_tag_siblings_and_parents_cache' : self.modules_tag_display.RegenerateTagSiblingsAndParentsCache,
                 'resync_potential_pairs_to_hydrus_local_file_storage' : self.modules_files_duplicates_updates.ResyncPotentialPairsToHydrusLocalFileStorage,
-                'register_shutdown_work' : self.modules_db_maintenance.RegisterShutdownWork,
                 'relocate_client_files' : self.modules_files_physical_storage.RelocateClientFiles,
                 'remove_alternates_member' : self.modules_files_duplicates_updates.RemoveAlternateMemberFromHashes,
                 'remove_duplicates_member' : self.modules_files_duplicates_updates.RemoveMediaIdMemberFromHashes,
@@ -7136,261 +7129,6 @@ class DB( HydrusDB.HydrusDB ):
         #       v592 PERMISSION CORRECTION UPDATE CODE
         # 
         
-        if version == 619:
-            
-            try:
-                
-                self._controller.frame_splash_status.SetSubtext( f'scheduling some maintenance work' )
-                
-                all_local_hash_ids = self.modules_files_storage.GetCurrentHashIdsList( self.modules_services.hydrus_local_file_storage_service_id )
-                
-                with self._MakeTemporaryIntegerTable( all_local_hash_ids, 'hash_id' ) as temp_hash_ids_table_name:
-                    
-                    hash_ids = self._STS( self._Execute( f'SELECT hash_id FROM {temp_hash_ids_table_name} CROSS JOIN files_info USING ( hash_id ) WHERE mime = ?;', ( HC.ANIMATION_WEBP, ) ) )
-                    self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
-                    
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Some file updates failed to schedule! This is not super important, but hydev would be interested in seeing the error that was printed to the log.'
-                
-                self.pub_initial_message( message )
-                
-            
-            try:
-                
-                auto_resolution_rules = self.modules_serialisable.GetJSONDumpNamed( HydrusSerialisable.SERIALISABLE_TYPE_DUPLICATES_AUTO_RESOLUTION_RULE )
-                
-                ids_to_rules = collections.defaultdict( list )
-                
-                from hydrus.client.duplicates import ClientDuplicatesAutoResolution
-                
-                for rule in auto_resolution_rules:
-                    
-                    rule = typing.cast( ClientDuplicatesAutoResolution.DuplicatesAutoResolutionRule, rule )
-                    
-                    ids_to_rules[ rule.GetId() ].append( rule )
-                    
-                
-                we_had_a_problem = False
-                
-                for ( id, rules ) in ids_to_rules.items():
-                    
-                    if len( rules ) > 1:
-                        
-                        we_had_a_problem = True
-                        
-                        rule_keep = typing.cast( ClientDuplicatesAutoResolution.DuplicatesAutoResolutionRule, rules[0] )
-                        
-                        rules_delete = rules[1:]
-                        
-                        for rule_delete in rules_delete:
-                            
-                            self.modules_serialisable.DeleteJSONDumpNamed( HydrusSerialisable.SERIALISABLE_TYPE_DUPLICATES_AUTO_RESOLUTION_RULE, dump_name = rule_delete.GetName() )
-                            
-                        
-                        rule_keep.SetPaused( True )
-                        
-                        self.modules_serialisable.SetJSONDump( rule_keep )
-                        
-                    
-                
-                if we_had_a_problem:
-                    
-                    message = 'Hey, it looks like you renamed some auto-resolution rules recently. Unfortunately, a bug was causing duplicate entries behind the scenes. I have deleted the duplicates, but your rule may have rolled back to a previous setting. I have paused all rules that were affected by this. Please check your auto-resolution rules to make sure they are named correct and have the correct settings before resuming them to semi-automatic or automatic.'
-                    
-                    self.pub_initial_message( message )
-                    
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Had a problem removing duplicate auto-resolution rules! Please let hydrus dev know.'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 620:
-            
-            try:
-                
-                self._controller.frame_splash_status.SetSubtext( f'scheduling some maintenance work' )
-                
-                all_local_hash_ids = self.modules_files_storage.GetCurrentHashIdsList( self.modules_services.hydrus_local_file_storage_service_id )
-                
-                with self._MakeTemporaryIntegerTable( all_local_hash_ids, 'hash_id' ) as temp_hash_ids_table_name:
-                    
-                    hash_ids = self._STS( self._Execute( f'SELECT hash_id FROM {temp_hash_ids_table_name} CROSS JOIN files_info USING ( hash_id ) WHERE mime = ?;', ( HC.APPLICATION_PSD, ) ) )
-                    self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_ICC_PROFILE )
-                    
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Some file updates failed to schedule! This is not super important, but hydev would be interested in seeing the error that was printed to the log.'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 621:
-            
-            try:
-                
-                from hydrus.client.gui import ClientGUIShortcuts
-                from hydrus.client import ClientApplicationCommand as CAC
-                
-                main_gui_shortcuts_set: ClientGUIShortcuts.ShortcutSet = self.modules_serialisable.GetJSONDumpNamed( HydrusSerialisable.SERIALISABLE_TYPE_SHORTCUT_SET, 'main_gui' )
-                
-                jobs = [
-                    (
-                        ClientGUIShortcuts.Shortcut( ClientGUIShortcuts.SHORTCUT_TYPE_KEYBOARD_CHARACTER, ord( 'O' ), ClientGUIShortcuts.SHORTCUT_PRESS_TYPE_PRESS, [ ClientGUIShortcuts.SHORTCUT_MODIFIER_CTRL, ClientGUIShortcuts.SHORTCUT_MODIFIER_SHIFT ] ),
-                        CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_OPEN_OPTIONS ) 
-                    )
-                ]
-                
-                for ( shortcut, command ) in jobs:
-                    
-                    if not main_gui_shortcuts_set.HasCommand( shortcut ):
-                        
-                        main_gui_shortcuts_set.SetCommand( shortcut, command )
-                        
-                    
-                
-                self.modules_serialisable.SetJSONDump( main_gui_shortcuts_set )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Trying to update some shortcuts failed! Please let hydrus dev know!'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 623:
-            
-            try:
-                
-                from hydrus.client.gui import ClientGUIShortcuts
-                from hydrus.client import ClientApplicationCommand as CAC
-                
-                media_shortcuts_set: ClientGUIShortcuts.ShortcutSet = self.modules_serialisable.GetJSONDumpNamed( HydrusSerialisable.SERIALISABLE_TYPE_SHORTCUT_SET, 'media' )
-                
-                jobs = [
-                    (
-                        ClientGUIShortcuts.Shortcut( ClientGUIShortcuts.SHORTCUT_TYPE_KEYBOARD_CHARACTER, ord( 'C' ), ClientGUIShortcuts.SHORTCUT_PRESS_TYPE_PRESS, [ ClientGUIShortcuts.SHORTCUT_MODIFIER_CTRL ] ),
-                        CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_COPY_FILES ),
-                        CAC.ApplicationCommand.STATICCreateSimpleCommand( CAC.SIMPLE_COPY_FILES, simple_data = CAC.FILE_COMMAND_TARGET_SELECTED_FILES ) 
-                    )
-                ]
-                
-                for ( shortcut, bad_command, good_command ) in jobs:
-                    
-                    if media_shortcuts_set.HasCommand( shortcut ):
-                        
-                        if media_shortcuts_set.GetCommand( shortcut ) == bad_command:
-                            
-                            media_shortcuts_set.SetCommand( shortcut, good_command )
-                            
-                        
-                    
-                
-                self.modules_serialisable.SetJSONDump( media_shortcuts_set )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Trying to update some shortcuts failed! Please let hydrus dev know!'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 625:
-            
-            try:
-                
-                new_options = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_CLIENT_OPTIONS )
-                
-                new_options.SetBoolean( 'allow_remove_on_manage_tags_input', False )
-                
-                self.modules_serialisable.SetJSONDump( new_options )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Trying to update your options failed! Please let hydrus dev know!'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 627:
-            
-            try:
-                
-                new_options = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_CLIENT_OPTIONS )
-                
-                draw_thumbnail_rating_icon_size_px = new_options.GetFloat( 'draw_thumbnail_rating_icon_size_px' )
-                media_viewer_rating_icon_size_px = new_options.GetFloat( 'media_viewer_rating_icon_size_px' )
-                
-                new_options.SetFloat( 'thumbnail_rating_incdec_width_px', draw_thumbnail_rating_icon_size_px * 2 )
-                new_options.SetFloat( 'media_viewer_rating_incdec_width_px', media_viewer_rating_icon_size_px * 2 )
-                
-                new_options.SetFloat( 'preview_window_rating_icon_size_px', media_viewer_rating_icon_size_px )
-                new_options.SetFloat( 'preview_window_rating_incdec_width_px', media_viewer_rating_icon_size_px * 2 )
-                new_options.SetFloat( 'dialog_rating_icon_size_px', draw_thumbnail_rating_icon_size_px )
-                new_options.SetFloat( 'dialog_rating_incdec_width_px', draw_thumbnail_rating_icon_size_px * 2 )
-                
-                new_options.SetBoolean( 'remove_leading_url_double_slashes', False )
-                
-                self.modules_serialisable.SetJSONDump( new_options )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Trying to update your options failed! Please let hydrus dev know!'
-                
-                self.pub_initial_message( message )
-                
-            
-        
-        if version == 628:
-            
-            try:
-                
-                table_join = self.modules_files_storage.GetTableJoinLimitedByFileDomain( self.modules_services.hydrus_local_file_storage_service_id, 'files_info', HC.CONTENT_STATUS_CURRENT )
-                
-                hash_ids = self._STL( self._Execute( 'SELECT hash_id FROM {} WHERE mime IN {};'.format( table_join, HydrusLists.SplayListForDB( [ HC.IMAGE_AVIF ] ) ) ) )
-                
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_EXIF )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_ICC_PROFILE )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_HAS_HUMAN_READABLE_EMBEDDED_METADATA )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FORCE_THUMBNAIL )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_PIXEL_HASH )
-                self.modules_files_maintenance_queue.AddJobs( hash_ids, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_PERCEPTUAL_HASHES )
-                
-            except Exception as e:
-                
-                HydrusData.PrintException( e )
-                
-                message = 'Trying to schedule avif files for some maintenance failed! Please let hydrus dev know!'
-                
-                self.pub_initial_message( message )
-                
-            
-        
         if version == 631:
             
             try:
@@ -8507,7 +8245,7 @@ class DB( HydrusDB.HydrusDB ):
                     
                     if path is None:
                         
-                        call = executable_manager.GetOSCallable( ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_URL )
+                        call = executable_manager.GetOSCallable( ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_SEND_SINGLE_URL )
                         
                     else:
                         
@@ -8557,7 +8295,7 @@ class DB( HydrusDB.HydrusDB ):
                         
                         if path is None:
                             
-                            call = executable_manager.GetOSCallable( ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_OPEN_EXTERNALLY_SINGLE_FILE )
+                            call = executable_manager.GetOSCallable( ClientExecutablePipelines.EXECUTABLE_PIPELINE_TYPE_SEND_SINGLE_FILE )
                             
                         else:
                             
@@ -8641,6 +8379,25 @@ class DB( HydrusDB.HydrusDB ):
             except Exception as e:
                 
                 raise Exception( 'Hey, unfortunately I could not update your import options. Something is wrong. Roll back to v687 and tell hydev about this. There should be more info in the log.' ) from e
+                
+            
+        
+        if version == 689:
+            
+            try:
+                
+                if self._TableExists( 'last_shutdown_work_time' ):
+                    
+                    self._Execute( 'DROP TABLE last_shutdown_work_time;' )
+                    
+                
+            except Exception as e:
+                
+                HydrusData.PrintException( e )
+                
+                message = 'Some old db data failed to delete! This is not super important, but hydev would be interested in seeing the error that was printed to the log.'
+                
+                self.pub_initial_message( message )
                 
             
         #

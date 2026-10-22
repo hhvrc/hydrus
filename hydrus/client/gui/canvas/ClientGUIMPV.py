@@ -142,6 +142,7 @@ def log_message_is_fine_bro( component, message ):
         'rescan-external-files' in message,
         'LZW decode failed' in message, # borked gif headers
         'Too many events queued' in message, # used to be a problem, now no longer a big deal with the async mediator
+        'Your platform doesn\'t support hardware accelerated' in message, # "... AV1 decoding", etc.. not a big deal, file renders fine
     )
     
 
@@ -192,7 +193,7 @@ def log_handler( loglevel, component, message ):
             
             CG.client_controller.CallBlockingToQtTLW( EmergencyDumpOutGlobal, probably_crashy, f'{component}: {message}' )
             
-        except HydrusExceptions.ShutdownException:
+        except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException ):
             
             pass
             

@@ -6,11 +6,13 @@ from hydrus.core import HydrusConstants as HC
 from hydrus.core import HydrusData
 from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusSerialisable
+from hydrus.core import HydrusTemp
 from hydrus.core import HydrusText
 from hydrus.core.processes import HydrusSubprocess
 
 from hydrus.client import ClientStrings
 from hydrus.client.executables import ClientExecutablePipelines
+from hydrus.client.executables import ClientExecutableResponses
 
 def CleanExecutableParameterTemplates( executable_parameter_templates: list[ str ] ):
     
@@ -39,7 +41,7 @@ class ExecutableActualCall( HydrusSerialisable.SerialisableBase ):
     SERIALISABLE_NAME = 'Actual Call Superclass'
     SERIALISABLE_VERSION = 1
     
-    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> dict:
+    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         raise NotImplementedError()
         
@@ -84,12 +86,12 @@ class ExecutableActualCall( HydrusSerialisable.SerialisableBase ):
         raise NotImplementedError()
         
     
-    def Call( self, input_parameters: dict ) -> dict:
+    def Call( self, input_parameters: dict ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         return self._DoCall( input_parameters )
         
     
-    def CallTest( self, input_parameters: dict ) -> dict:
+    def CallTest( self, input_parameters: dict ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         return self._DoCall( input_parameters, for_user_test = True )
         
@@ -176,14 +178,15 @@ class LocalProcessCallInputParameterProcessingRule(HydrusSerialisable.Serialisab
 
 HydrusSerialisable.SERIALISABLE_TYPES_TO_OBJECT_TYPES[ HydrusSerialisable.SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_INPUT_TEMPLATE_PARAM_PROCESSING_RULE ] = LocalProcessCallInputParameterProcessingRule
 
-# TODO: Make a LocalProcessCall that has a list of params, with slightly more complicated UI
-# Instead of the shell parsing, we can do better for difficult situations
+LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_IGNORE = 0
+LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_PIPE = 1
+LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_INPUT_PARAMETER_TEMP_PATH = 2
 
 class ExecutableLocalProcessCall( ExecutableActualCall ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_CALL
     SERIALISABLE_NAME = 'Local Process Call'
-    SERIALISABLE_VERSION = 1
+    SERIALISABLE_VERSION = 3
     
     def __init__( self, executable_path: str | None = None, executable_parameter_templates: list[ str ] | None = None, input_parameter_processing_rules = None ):
         
@@ -209,11 +212,14 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
         self._input_parameter_processing_rules: HydrusSerialisable.SerialisableList[ LocalProcessCallInputParameterProcessingRule ] = HydrusSerialisable.SerialisableList( input_parameter_processing_rules )
         self._timeout: int = 15
         self._this_is_a_potentially_long_lived_external_guy = False
-        self._hide_terminal = True
-        self._text = True
+        self._parsable_response_source_type = LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_IGNORE
+        self._parsable_response_name = ''
+        self._parsable_response_encoding = 'utf-8'
+        self._importable_response_source_type = LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_IGNORE
+        self._importable_response_name = ''
         
     
-    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> dict:
+    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         cmd = self._GetFinalCmd( input_parameters )
         
@@ -226,14 +232,15 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
             ( timeout, this_is_a_potentially_long_lived_external_guy ) = ( self._timeout, self._this_is_a_potentially_long_lived_external_guy )
             
         
+        # text is now always False. we decode the channel we need so a crazy user can import on stdout and parse on stderr
+        
         try:
             
             ( stdout, stderr, returncode ) = HydrusSubprocess.RunSubprocess(
                 cmd,
                 timeout = timeout,
                 this_is_a_potentially_long_lived_external_guy = this_is_a_potentially_long_lived_external_guy,
-                hide_terminal = self._hide_terminal,
-                text = self._text,
+                text = False
             )
             
         except Exception as e:
@@ -247,15 +254,66 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
             HydrusSubprocess.ReportBadReturnCode( cmd, returncode, stdout, stderr )
             
         
-        # if this is a long-lived guy, no stdout/stderr processing
-        # if text, we can do json or whatever parsing on it
-        # if not text, we can eat a file bytes response
-        # can also be no response. maybe we were passed a temp file, the caller cares but we don't
-        # TODO: so yeah expand this guy to eat either text or bytes back and transmogrify that into a dict response that a higher guy will pick up
-        # if bytes, we should stream to a tempdir tbh that the Response can clean up
-        # TODO: consider validity parsing here when we _do_ get text back. standard veto content parser?
+        response = ClientExecutableResponses.ExecutableCallResponse()
         
-        return dict()
+        if this_is_a_potentially_long_lived_external_guy:
+            
+            return response
+            
+        
+        if self._importable_response_source_type == LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_PIPE:
+            
+            ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'executable_call_file_import' )
+            response.temp_file_info = ( os_file_handle, temp_path )
+            
+            with open( temp_path, 'wb' ) as f:
+                
+                if self._importable_response_name == 'stdout':
+                    
+                    f.write( stdout )
+                    
+                elif self._importable_response_name == 'stderr':
+                    
+                    f.write( stderr )
+                    
+                else:
+                    
+                    raise NotImplementedError( f'Unknown importable response name "{self._importable_response_name}"!' )
+                    
+                
+            
+        elif self._importable_response_source_type == LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_INPUT_PARAMETER_TEMP_PATH:
+            
+            # name is the input variable name
+            # handle this situation; does the temp variable entry hold the os_file_handle? it should I guess, which adds a wrinkle
+            # TODO: make input params for a temp_path a little more complicated than just the temp_path string
+            raise NotImplementedError( 'We do not support this yet!' )
+            
+        
+        if self._parsable_response_source_type == LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_PIPE:
+            
+            if self._parsable_response_name == 'stdout':
+                
+                response.raw_parsable_response = stdout.decode( self._parsable_response_encoding, errors = 'replace' )
+                
+            elif self._parsable_response_name == 'stderr':
+                
+                response.raw_parsable_response = stderr.decode( self._parsable_response_encoding, errors = 'replace' )
+                
+            else:
+                
+                raise NotImplementedError( f'Unknown parsable response name "{self._parsable_response_name}"!' )
+                
+            
+        elif self._parsable_response_source_type == LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_INPUT_PARAMETER_TEMP_PATH:
+            
+            # name is the input variable name
+            # handle this situation; does the temp variable entry hold the os_file_handle? it should I guess, which adds a wrinkle
+            # TODO: make input params for a temp_path a little more complicated than just the temp_path string
+            raise NotImplementedError( 'We do not support this yet!' )
+            
+        
+        return response
         
     
     def _GetFinalCmd( self, input_parameters: dict[ int, str | list[ str ] ] ) -> list[ str ]:
@@ -339,8 +397,11 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
             serialisable_input_parameter_processing_rules,
             self._timeout,
             self._this_is_a_potentially_long_lived_external_guy,
-            self._hide_terminal,
-            self._text,
+            self._parsable_response_source_type,
+            self._parsable_response_name,
+            self._parsable_response_encoding,
+            self._importable_response_source_type,
+            self._importable_response_name,
         )
         
     
@@ -352,8 +413,11 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
             serialisable_input_parameter_processing_rules,
             self._timeout,
             self._this_is_a_potentially_long_lived_external_guy,
-            self._hide_terminal,
-            self._text,
+            self._parsable_response_source_type,
+            self._parsable_response_name,
+            self._parsable_response_encoding,
+            self._importable_response_source_type,
+            self._importable_response_name,
         ) = serialisable_info
         
         self._executable_parameter_templates = CleanExecutableParameterTemplates( serialisable_executable_parameter_templates )
@@ -364,6 +428,66 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
     def _TestAvailability( self ):
         
         return shutil.which( self._executable_path ) is not None
+        
+    
+    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+        
+        if version == 1:
+            
+            (
+                executable_path,
+                serialisable_executable_parameter_templates,
+                serialisable_input_parameter_processing_rules,
+                timeout,
+                this_is_a_potentially_long_lived_external_guy,
+                hide_terminal,
+                text,
+            ) = old_serialisable_info
+            
+            new_serialisable_info = (
+                executable_path,
+                serialisable_executable_parameter_templates,
+                serialisable_input_parameter_processing_rules,
+                timeout,
+                this_is_a_potentially_long_lived_external_guy,
+                text,
+            )
+            
+            return ( 2, new_serialisable_info )
+            
+        
+        if version == 2:
+            
+            (
+                executable_path,
+                serialisable_executable_parameter_templates,
+                serialisable_input_parameter_processing_rules,
+                timeout,
+                this_is_a_potentially_long_lived_external_guy,
+                text,
+            ) = old_serialisable_info
+            
+            parsable_response_source_type = LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_IGNORE
+            parsable_response_name = ''
+            parsable_response_encoding = 'utf-8'
+            importable_response_source_type = LOCAL_PROCESS_RESPONSE_SOURCE_TYPE_IGNORE
+            importable_response_name = ''
+            
+            new_serialisable_info = (
+                executable_path,
+                serialisable_executable_parameter_templates,
+                serialisable_input_parameter_processing_rules,
+                timeout,
+                this_is_a_potentially_long_lived_external_guy,
+                parsable_response_source_type,
+                parsable_response_name,
+                parsable_response_encoding,
+                importable_response_source_type,
+                importable_response_name,
+            )
+            
+            return ( 3, new_serialisable_info )
+            
         
     
     def CanTestAvailability( self ):
@@ -420,11 +544,6 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
             
         
     
-    def GetHideTerminal( self ):
-        
-        return self._hide_terminal
-        
-    
     def GetInputParametersUsed( self ):
         
         return [ input_parameter_processing_rule.parameter_type for input_parameter_processing_rule in self._input_parameter_processing_rules ]
@@ -445,9 +564,29 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
         return self._executable_parameter_templates
         
     
-    def GetText( self ):
+    def GetImportableResponseName( self ) -> str:
         
-        return self._text
+        return self._parsable_response_name
+        
+    
+    def GetImportableResponseSourceType( self ) -> int:
+        
+        return self._importable_response_source_type
+        
+    
+    def GetParsableResponseEncoding( self ) -> str:
+        
+        return self._parsable_response_encoding
+        
+    
+    def GetParsableResponseName( self ) -> str:
+        
+        return self._parsable_response_name
+        
+    
+    def GetParsableResponseSourceType( self ) -> int:
+        
+        return self._parsable_response_source_type
         
     
     def GetTimeout( self ):
@@ -460,14 +599,29 @@ class ExecutableLocalProcessCall( ExecutableActualCall ):
         return self._this_is_a_potentially_long_lived_external_guy
         
     
-    def SetHideTerminal( self, value: bool ):
+    def SetImportableResponseName( self, name: str ):
         
-        self._hide_terminal = value
+        self._importable_response_name = name
         
     
-    def SetText( self, value: bool ):
+    def SetImportableResponseSourceType( self, source_type: int ):
         
-        self._text = value
+        self._importable_response_source_type = source_type
+        
+    
+    def SetParsableResponseEncoding( self, parsable_response_encoding: str ):
+        
+        self._parsable_response_encoding = parsable_response_encoding
+        
+    
+    def SetParsableResponseName( self, name: str ):
+        
+        self._parsable_response_name = name
+        
+    
+    def SetParsableResponseSourceType( self, source_type: int ):
+        
+        self._parsable_response_source_type = source_type
         
     
     def SetTimeout( self, value: int ):
@@ -494,7 +648,7 @@ class ExecutableLocalProcessDefaultLaunchFile( ExecutableActualCall ):
         super().__init__()
         
     
-    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> dict:
+    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         try:
             
@@ -533,7 +687,7 @@ class ExecutableLocalProcessDefaultLaunchFile( ExecutableActualCall ):
             HydrusSubprocess.RunSubprocess( cmd, this_is_a_potentially_long_lived_external_guy = not for_user_test )
             
         
-        return dict()
+        return ClientExecutableResponses.ExecutableCallResponse()
         
     
     def _GetSerialisableInfo( self ):
@@ -597,7 +751,7 @@ class ExecutableLocalProcessDefaultLaunchURL( ExecutableActualCall ):
         super().__init__()
         
     
-    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> dict:
+    def _DoCall( self, input_parameters: dict, for_user_test = False ) -> ClientExecutableResponses.ExecutableCallResponse:
         
         try:
             
@@ -610,7 +764,7 @@ class ExecutableLocalProcessDefaultLaunchURL( ExecutableActualCall ):
         
         webbrowser.open( url )
         
-        return dict()
+        return ClientExecutableResponses.ExecutableCallResponse()
         
     
     def _GetSerialisableInfo( self ):

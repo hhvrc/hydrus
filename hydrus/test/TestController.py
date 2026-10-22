@@ -34,6 +34,7 @@ from hydrus.client import ClientServices
 from hydrus.client import ClientStrings
 from hydrus.client import ClientThreading
 from hydrus.client.caches import ClientCaches
+from hydrus.client.caches import ClientCacheThumbnails
 from hydrus.client.duplicates import ClientDuplicatesAutoResolution
 from hydrus.client.executables import ClientExecutableManager
 from hydrus.client.executables import ClientExecutableDefaults
@@ -423,7 +424,8 @@ class Controller( object ):
         
         self.images_cache = ClientCaches.ImageRendererCache( self )
         self.image_tiles_cache = ClientCaches.ImageTileCache( self )
-        self.thumbnails_cache = ClientCaches.ThumbnailCache( self )
+        
+        self.thumbnails_cache = ClientCacheThumbnails.ThumbnailCache( self )
         
         self.server_session_manager = HydrusSessions.HydrusSessionManagerServer()
         
@@ -511,7 +513,7 @@ class Controller( object ):
             
             if HG.model_shutdown:
                 
-                raise HydrusExceptions.ShutdownException( 'Application is shutting down!' )
+                raise HydrusExceptions.ProgramShutdownException( 'Application is shutting down!' )
                 
             
             done_event.wait( 1.0 )
@@ -533,7 +535,7 @@ class Controller( object ):
             raise e
             
         
-        raise HydrusExceptions.ShutdownException()
+        raise Exception( 'Test blocking Qt job finished without a result or error!' )
         
     
     def CallBlockingToQtFireAndForgetNoResponse( self, win, func, *args, **kwargs ) -> None:
@@ -542,7 +544,7 @@ class Controller( object ):
             
             self.CallBlockingToQt( win, func, *args, **kwargs )
             
-        except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ShutdownException, HydrusExceptions.CancelledException ):
+        except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException, HydrusExceptions.CancelledException ):
             
             pass
             
@@ -554,16 +556,16 @@ class Controller( object ):
         
         if main_tlw is None:
             
-            raise HydrusExceptions.ShutdownException( 'Could not find a TLW! I think the program is shutting down or never booted correct!' )
+            raise HydrusExceptions.ProgramShutdownException( 'Could not find a TLW! I think the program is shutting down or never booted correct!' )
             
         
         try:
             
             return self.CallBlockingToQt( main_tlw, func, *args, **kwargs )
             
-        except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ShutdownException ):
+        except ( HydrusExceptions.QtDeadWindowException, HydrusExceptions.ProgramShutdownException ):
             
-            raise HydrusExceptions.ShutdownException( 'Program is shutting down!' )
+            raise HydrusExceptions.ProgramShutdownException( 'Program is shutting down!' )
             
         
     
