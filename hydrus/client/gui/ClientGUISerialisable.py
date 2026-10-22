@@ -15,6 +15,20 @@ from hydrus.client.gui.panels import ClientGUIScrolledPanels
 from hydrus.client.gui.widgets import ClientGUICommon
 from hydrus.client.gui.widgets import ClientGUIPathWidgets
 
+def CreatePNGFormatChoice( parent ):
+
+    choice = ClientGUICommon.BetterChoice( parent )
+
+    choice.addItem( 'greyscale (compatible with all clients)', False )
+    choice.addItem( 'RGB (about a third of the height, needs a newer client to import)', True )
+
+    choice.SetValue( False )
+
+    choice.setToolTip( ClientGUIFunctions.WrapToolTip( 'RGB pngs pack three bytes into every pixel, so the image is much shorter, but older versions of hydrus will not be able to import them.' ) )
+
+    return choice
+
+
 class PNGExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
     
     def __init__( self, parent, payload_obj, title = None, description = None, payload_description = None ):
@@ -37,11 +51,13 @@ class PNGExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._text = QW.QLineEdit( self )
         
         self._width = ClientGUICommon.BetterSpinBox( self, min=100, max=4096 )
-        
+
+        self._rgb = CreatePNGFormatChoice( self )
+
         self._export = ClientGUICommon.BetterButton( self, 'export', self.Export )
-        
+
         #
-        
+
         if payload_description is None:
             
             ( payload_description, payload_bytes ) = ClientSerialisable.GetPayloadDescriptionAndBytes( self._payload_obj )
@@ -103,6 +119,7 @@ class PNGExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         rows.append( ( 'payload description: ', self._payload_description ) )
         rows.append( ( 'your description (optional): ', self._text ) )
         rows.append( ( 'png width: ', self._width ) )
+        rows.append( ( 'png format: ', self._rgb ) )
         rows.append( ( '', self._export ) )
         
         gridbox = ClientGUICommon.WrapInGrid( self, rows )
@@ -176,13 +193,13 @@ class PNGExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
             path += '.png'
             
         
-        ClientSerialisable.DumpToPNG( width, payload_bytes, title, payload_description, text, path )
-        
+        ClientSerialisable.DumpToPNG( width, payload_bytes, title, payload_description, text, path, rgb = self._rgb.GetValue() )
+
         self._export.setText( 'done!' )
-        
+
         CG.client_controller.CallLaterQtSafe( self._export, 2.0, 'png export set text', self._export.setText, 'export' )
-        
-    
+
+
 
 class PNGsExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
     
@@ -199,11 +216,13 @@ class PNGsExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         self._directory_picker.setMinimumWidth( dp_width )
         
         self._width = ClientGUICommon.BetterSpinBox( self, min=100, max=4096 )
-        
+
+        self._rgb = CreatePNGFormatChoice( self )
+
         self._export = ClientGUICommon.BetterButton( self, 'export', self.Export )
-        
+
         #
-        
+
         last_png_export_dir = CG.client_controller.new_options.GetNoneableString( 'last_png_export_dir' )
         
         if last_png_export_dir is not None:
@@ -221,6 +240,7 @@ class PNGsExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
         
         rows.append( ( 'export path: ', self._directory_picker ) )
         rows.append( ( 'png width: ', self._width ) )
+        rows.append( ( 'png format: ', self._rgb ) )
         rows.append( ( '', self._export ) )
         
         gridbox = ClientGUICommon.WrapInGrid( self, rows )
@@ -286,8 +306,8 @@ class PNGsExportPanel( ClientGUIScrolledPanels.ReviewPanel ):
                 path += '.png'
                 
             
-            ClientSerialisable.DumpToPNG( width, payload_bytes, title, payload_description, text, path )
-            
+            ClientSerialisable.DumpToPNG( width, payload_bytes, title, payload_description, text, path, rgb = self._rgb.GetValue() )
+
         
         self._export.setText( 'done!' )
         

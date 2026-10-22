@@ -30,9 +30,18 @@ from hydrus.client.gui import ClientGUIFunctionsImage
 # read that many pixels after that, you got the payload
 # it should be zlib compressed these days and is most likely a dumped hydrus serialisable object, which is a json guy with a whole complicated loading system. utf-8 it into a string and you are half way there :^)
 
+# there is also an optional RGB variant, which packs three bytes into each pixel so the png is about a third of the height
+# the png is RGB, no alpha channel. the data is read left to right in visual pixels, R then G then B. one pixel = three bytes
+# the first pixel is ( top height byte 0, top height byte 1, 0 ), i.e. the same !H top height as before, in the first two bytes
+# the second pixel is the magic marker ( 82, 71, 66 ) ( b'RGB' ), which a greyscale png converted to RGB can never have, since its channels are always equal
+# the data starts at row 'top height', exactly as before, with the !I payload length and then the payload, just three bytes per pixel
+# greyscale pngs, and greyscale pngs that were converted to RGB, still load as before. older clients cannot read the RGB variant, so greyscale stays the default
+
 IMREAD_UNCHANGED = cv2.IMREAD_UNCHANGED
 
-def CreateTopImage( width, title, payload_description, text ):
+RGB_MAGIC = b'RGB'
+
+def CreateTopImage( width, title, payload_description, text, rgb = False ):
     
     text_extent_qt_image = CG.client_controller.bitmap_manager.GetQtImage( 20, 20, 24 )
     
@@ -117,43 +126,70 @@ def CreateTopImage( width, title, payload_description, text ):
     
     top_image_rgb = ClientGUIFunctionsImage.ConvertQtImageToNumPy( top_qt_image )
     
-    top_image = cv2.cvtColor( top_image_rgb, cv2.COLOR_RGB2GRAY )
-    
     top_height_header = struct.pack( '!H', top_height )
-    
+
     byte0 = top_height_header[0:1]
     byte1 = top_height_header[1:2]
-    
-    top_image[0][0] = ord( byte0 )
-    top_image[0][1] = ord( byte1 )
-    
+
+    if rgb:
+
+        top_image = top_image_rgb[:,:,:3].copy()
+
+        top_image[0][0] = ( ord( byte0 ), ord( byte1 ), 0 )
+        top_image[0][1] = tuple( RGB_MAGIC )
+
+    else:
+
+        top_image = cv2.cvtColor( top_image_rgb, cv2.COLOR_RGB2GRAY )
+
+        top_image[0][0] = ord( byte0 )
+        top_image[0][1] = ord( byte1 )
+
+
     return top_image
     
-def DumpToPNG( width, payload_bytes, title, payload_description, text, path ):
-    
+def DumpToPNG( width, payload_bytes, title, payload_description, text, path, rgb = False ):
+
+    bytes_per_pixel = 3 if rgb else 1
+
+    bytes_per_row = width * bytes_per_pixel
+
     payload_bytes_length = len( payload_bytes )
-    
+
     header_and_payload_bytes_length = payload_bytes_length + 4
-    
-    payload_height = int( header_and_payload_bytes_length / width )
-    
-    if ( header_and_payload_bytes_length / width ) % 1.0 > 0:
-        
+
+    payload_height = int( header_and_payload_bytes_length / bytes_per_row )
+
+    if ( header_and_payload_bytes_length / bytes_per_row ) % 1.0 > 0:
+
         payload_height += 1
-        
-    
-    top_image = CreateTopImage( width, title, payload_description, text )
-    
+
+
+    top_image = CreateTopImage( width, title, payload_description, text, rgb = rgb )
+
     payload_length_header = struct.pack( '!I', payload_bytes_length )
-    
-    num_empty_bytes = payload_height * width - header_and_payload_bytes_length
-    
+
+    num_empty_bytes = payload_height * bytes_per_row - header_and_payload_bytes_length
+
     header_and_payload_bytes = payload_length_header + payload_bytes + b'\x00' * num_empty_bytes
-    
-    payload_image = numpy.frombuffer( header_and_payload_bytes, dtype = 'uint8' ).reshape( ( payload_height, width ) )
-    
+
+    if rgb:
+
+        payload_image = numpy.frombuffer( header_and_payload_bytes, dtype = 'uint8' ).reshape( ( payload_height, width, 3 ) )
+
+    else:
+
+        payload_image = numpy.frombuffer( header_and_payload_bytes, dtype = 'uint8' ).reshape( ( payload_height, width ) )
+
+
     finished_image = numpy.concatenate( ( top_image, payload_image ) )
-    
+
+    if rgb:
+
+        # cv2 wants BGR
+        finished_image = cv2.cvtColor( finished_image, cv2.COLOR_RGB2BGR )
+
+
     # this is to deal with unicode paths, which cv2 can't handle
     ( os_file_handle, temp_path ) = HydrusTemp.GetTempPath( 'serialisable_png', suffix = '.png' )
     
@@ -255,10 +291,23 @@ def LoadFromPNG( path ):
             numpy_image = cv2.imread( temp_path, flags = IMREAD_UNCHANGED )
             
             if numpy_image is None:
-                
+
                 raise Exception()
-                
-            
+
+
+            # cv2 gives us BGR, but PIL and Qt give RGB, so let's normalise
+            if len( numpy_image.shape ) > 2:
+
+                if numpy_image.shape[2] == 3:
+
+                    numpy_image = cv2.cvtColor( numpy_image, cv2.COLOR_BGR2RGB )
+
+                elif numpy_image.shape[2] == 4:
+
+                    numpy_image = cv2.cvtColor( numpy_image, cv2.COLOR_BGRA2RGBA )
+
+
+
         except Exception as e:
             
             try:
@@ -300,16 +349,31 @@ def LoadFromNumPyImage( numpy_image: numpy.ndarray ):
         
         height = numpy_image.shape[0]
         width = numpy_image.shape[1]
-        
+
+        bytes_per_pixel = 1
+
         if len( numpy_image.shape ) > 2:
-            
+
             depth = numpy_image.shape[2]
-            
-            if depth != 1:
-                
+
+            if depth >= 3 and width >= 2 and bytes( numpy_image[0][1][:3] ) == RGB_MAGIC:
+
+                numpy_image = numpy_image[:,:,:3].copy()
+
+                bytes_per_pixel = 3
+
+            elif depth >= 3 and width >= 2 and bytes( numpy_image[0][1][2::-1] ) == RGB_MAGIC:
+
+                # we got BGR somehow, let's flip it
+                numpy_image = numpy_image[:,:,2::-1].copy()
+
+                bytes_per_pixel = 3
+
+            else:
+
                 numpy_image = numpy_image[:,:,0].copy() # let's fetch one channel. if the png is a perfect RGB conversion of the original (or, let's say, a Firefox bmp export), this actually works
-                
-            
+
+
         
         try:
             
@@ -319,7 +383,7 @@ def LoadFromNumPyImage( numpy_image: numpy.ndarray ):
             
             ( top_height, ) = struct.unpack( '!H', top_height_header )
             
-            payload_and_header_bytes = complete_data[ width * top_height : ]
+            payload_and_header_bytes = complete_data[ width * top_height * bytes_per_pixel : ]
             
         except Exception as e:
             
