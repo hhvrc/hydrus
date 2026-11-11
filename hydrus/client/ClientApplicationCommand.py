@@ -708,13 +708,22 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
         return ( self._command_type, serialisable_data )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         ( self._command_type, serialisable_data ) = serialisable_info
         
         if self._command_type == APPLICATION_COMMAND_TYPE_SIMPLE:
             
-            data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data )
+            data_dict = HydrusSerialisable.CreateFromSerialisableTuple(
+                serialisable_data,
+                deserialisation_context.DuplicateForNewWhitelist(
+                    {
+                        HydrusSerialisable.SERIALISABLE_TYPE_DICTIONARY,
+                        HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                        HydrusSerialisable.SERIALISABLE_TYPE_FILE_FILTER,
+                    }
+                )
+            )
             
             simple_action = data_dict[ 'simple_action' ]
             simple_data = data_dict[ 'simple_data' ]
@@ -746,7 +755,7 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
             
         elif self._command_type == APPLICATION_COMMAND_TYPE_INTERACTIVE_CONTENT:
             
-            data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data )
+            data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data, deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_DICTIONARY } ) )
             
             service_key = bytes.fromhex( data_dict[ 'service_key' ] )
             content_type = data_dict[ 'content_type' ]
@@ -756,7 +765,7 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
             
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             
@@ -841,7 +850,16 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
             
             if command_type == APPLICATION_COMMAND_TYPE_SIMPLE:
                 
-                data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data )
+                data_dict = HydrusSerialisable.CreateFromSerialisableTuple(
+                    serialisable_data,
+                    deserialisation_context.DuplicateForNewWhitelist(
+                        {
+                            HydrusSerialisable.SERIALISABLE_TYPE_DICTIONARY,
+                            HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                            HydrusSerialisable.SERIALISABLE_TYPE_FILE_FILTER,
+                        }
+                    )
+                )
                 
                 simple_action = data_dict[ 'simple_action' ]
                 
@@ -884,7 +902,16 @@ class ApplicationCommand( HydrusSerialisable.SerialisableBase ):
             
             if command_type == APPLICATION_COMMAND_TYPE_SIMPLE:
                 
-                data_dict = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_data )
+                data_dict = HydrusSerialisable.CreateFromSerialisableTuple(
+                    serialisable_data,
+                    deserialisation_context.DuplicateForNewWhitelist(
+                        {
+                            HydrusSerialisable.SERIALISABLE_TYPE_DICTIONARY,
+                            HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                            HydrusSerialisable.SERIALISABLE_TYPE_FILE_FILTER,
+                        }
+                    )
+                )
                 
                 simple_action = data_dict[ 'simple_action' ]
                 

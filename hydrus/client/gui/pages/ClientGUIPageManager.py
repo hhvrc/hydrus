@@ -224,13 +224,32 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
         self._variables[ 'media_collect' ] = ClientMediaCollect.MediaCollect()
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         ( self._page_name, self._page_type, serialisable_variables ) = serialisable_info
         
         self._InitialiseDefaults()
         
-        self._variables.update( HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables ) )
+        self._variables.update(
+            HydrusSerialisable.CreateFromSerialisableTuple(
+                serialisable_variables,
+                deserialisation_context.DuplicateForNewWhitelist(
+                    {
+                        HydrusSerialisable.SERIALISABLE_TYPE_DICTIONARY,
+                        HydrusSerialisable.SERIALISABLE_TYPE_MEDIA_SORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_MEDIA_COLLECT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_POTENTIAL_DUPLICATES_SEARCH_CONTEXT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_MULTIPLE_GALLERY_IMPORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_SIMPLE_DOWNLOADER_IMPORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_HDD_IMPORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_MULTIPLE_WATCHER_IMPORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_URLS_IMPORT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_FILE_SEARCH_CONTEXT,
+                        HydrusSerialisable.SERIALISABLE_TYPE_LOCATION_CONTEXT, # probably cruft; old top-level "file_service" kind of thing
+                    }
+                )
+            )
+        )
         
     
     def _SerialisableChangeMade( self ):
@@ -238,7 +257,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
         self._last_serialisable_change_timestamp = HydrusTime.GetNow()
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             
@@ -358,7 +377,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if 'watcher_import' in serialisable_serialisables:
                 
-                watcher = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_serialisables[ 'watcher_import' ] )
+                watcher = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_serialisables[ 'watcher_import' ], deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_WATCHER_IMPORT } ) )
                 
                 page_type = ClientGUIPagesCore.PAGE_TYPE_IMPORT_MULTIPLE_WATCHER
                 
@@ -492,7 +511,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             simples = dict( serialisable_simples )
             
-            serialisables = { name : HydrusSerialisable.CreateFromSerialisableTuple( value ) for ( name, value ) in list(serialisable_serialisables.items()) }
+            serialisables = { name : HydrusSerialisable.CreateFromSerialisableTuple( value, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) ) for ( name, value ) in list(serialisable_serialisables.items()) }
             
             variables = HydrusSerialisable.SerialisableDictionary()
             
@@ -544,7 +563,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if page_type == ClientGUIPagesCore.PAGE_TYPE_PETITIONS:
                 
-                variables = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables )
+                variables = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) )
                 
                 variables[ 'petition_type_content_type' ] = None
                 variables[ 'petition_type_status' ] = None
@@ -565,7 +584,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if page_type == ClientGUIPagesCore.PAGE_TYPE_DUPLICATE_FILTER:
                 
-                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables )
+                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) )
                 
                 file_search_context_1 = variables[ 'file_search_context_1' ]
                 file_search_context_2 = variables[ 'file_search_context_2' ]
@@ -615,7 +634,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if page_type == ClientGUIPagesCore.PAGE_TYPE_QUERY:
                 
-                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables )
+                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) )
                 
                 variables[ 'system_hash_locked' ] = False
                 variables[ 'system_hash_locked_syncs_new' ] = True
@@ -635,7 +654,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if page_type == ClientGUIPagesCore.PAGE_TYPE_DUPLICATE_FILTER:
                 
-                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables )
+                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) )
                 
                 variables[ 'duplicate_pair_sort_type' ] = ClientDuplicates.DUPE_PAIR_SORT_MAX_FILESIZE
                 variables[ 'duplicate_pair_sort_asc' ] = False
@@ -654,7 +673,7 @@ class PageManager( HydrusSerialisable.SerialisableBase ):
             
             if page_type == ClientGUIPagesCore.PAGE_TYPE_DUPLICATE_FILTER:
                 
-                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables )
+                variables: HydrusSerialisable.SerialisableDictionary = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_variables, HydrusSerialisable.GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context ) )
                 
                 variables[ 'filter_group_mode' ] = False
                 

@@ -200,7 +200,7 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
         gallery_seed.AddExternalAdditionalServiceKeysToTags( self._external_additional_service_keys_to_tags )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         (
             self.url,
@@ -216,7 +216,10 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
             ) = serialisable_info
         
         self._external_filterable_tags = set( serialisable_external_filterable_tags )
-        self._external_additional_service_keys_to_tags = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_external_additional_service_keys_to_tags )
+        self._external_additional_service_keys_to_tags = HydrusSerialisable.CreateFromSerialisableTuple(
+            serialisable_external_additional_service_keys_to_tags,
+            deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_SERVICE_KEYS_TO_TAGS } )
+        )
         
     
     def _UpdateModified( self ):
@@ -224,7 +227,7 @@ class GallerySeed( HydrusSerialisable.SerialisableBase ):
         self.modified = HydrusTime.GetNow()
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             
@@ -884,11 +887,19 @@ class GallerySeedLog( HydrusSerialisable.SerialisableBase ):
         return statuses_to_counts
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         with self._lock:
             
-            self._gallery_seeds = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_info )
+            self._gallery_seeds = HydrusSerialisable.CreateFromSerialisableTuple(
+                serialisable_info,
+                deserialisation_context.DuplicateForNewWhitelist(
+                    {
+                        HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                        HydrusSerialisable.SERIALISABLE_TYPE_GALLERY_SEED
+                    }
+                )
+            )
             
             self._gallery_seeds_to_indices = { gallery_seed : index for ( index, gallery_seed ) in enumerate( self._gallery_seeds ) }
             

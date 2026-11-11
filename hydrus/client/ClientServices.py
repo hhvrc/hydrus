@@ -240,7 +240,7 @@ class ServiceSpecifier( HydrusSerialisable.SerialisableBase ):
         return ( serialisable_service_types, serialisable_service_keys )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         ( serialisable_service_types, serialisable_service_keys ) = serialisable_info
         
@@ -1205,7 +1205,10 @@ class ServiceRestricted( ServiceRemote ):
         
         ServiceRemote._LoadFromDictionary( self, dictionary )
         
-        self._account = HydrusNetwork.Account.GenerateAccountFromSerialisableTuple( dictionary[ 'account' ] )
+        # in this special case, dictionary has been pre-cleared
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( True, set() )
+        
+        self._account = HydrusNetwork.Account.GenerateAccountFromSerialisableTuple( dictionary[ 'account' ], deserialisation_context )
         self._next_account_sync = dictionary[ 'next_account_sync' ]
         
         if 'network_sync_paused' not in dictionary:
@@ -1365,6 +1368,8 @@ class ServiceRestricted( ServiceRemote ):
             
             if method == HC.GET:
                 
+                method_string = 'GET'
+                
                 query = HydrusNetworkVariableHandling.DumpToGETQuery( request_args )
                 
                 body = ''
@@ -1372,6 +1377,8 @@ class ServiceRestricted( ServiceRemote ):
                 content_type = None
                 
             elif method == HC.POST:
+                
+                method_string = 'POST'
                 
                 query = ''
                 
@@ -1386,6 +1393,10 @@ class ServiceRestricted( ServiceRemote ):
                     body = HydrusNetworkVariableHandling.DumpHydrusArgsToNetworkBytes( request_args )
                     
                 
+            else:
+                
+                raise NotImplementedError( 'Unsupported http method!' )
+                
             
             if query != '':
                 
@@ -1398,22 +1409,14 @@ class ServiceRestricted( ServiceRemote ):
             
             url = self.GetBaseURL() + command_and_query
             
-            if method == HC.GET:
-                
-                method = 'GET'
-                
-            elif method == HC.POST:
-                
-                method = 'POST'
-                
+            network_job = ClientNetworkingJobs.NetworkJobHydrus( self._service_key, method_string, url, body = body, temp_path = temp_path, file_body_path = file_body_path )
             
-            network_job = ClientNetworkingJobs.NetworkJobHydrus( self._service_key, method, url, body = body, temp_path = temp_path, file_body_path = file_body_path )
-            
-            if command not in ( 'update', 'metadata', 'file', 'thumbnail' ):
+            if command not in ( 'update', 'file', 'thumbnail' ):
                 
                 network_job.OverrideBandwidth()
-                network_job.OnlyTryConnectionOnce()
                 
+            
+            network_job.OnlyTryConnectionOnce()
             
             if command in ( '', 'access_key', 'access_key_verification' ):
                 
@@ -1441,7 +1444,48 @@ class ServiceRestricted( ServiceRemote ):
             
             if content_type is not None and content_type.startswith( 'application/json' ):
                 
-                parsed_args = HydrusNetworkVariableHandling.ParseNetworkBytesToParsedHydrusArgs( network_bytes )
+                method_and_commands_to_serialisable_type_whitelist = {
+                    ( HC.GET, 'auto_create_account_types' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_ACCOUNT_TYPE,
+                    },
+                    ( HC.GET, 'account_types' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_ACCOUNT_TYPE,
+                    },
+                    ( HC.GET, 'petition' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_PETITION,
+                    },
+                    ( HC.GET, 'petitions_summary' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_PETITION_HEADER,
+                    },
+                    ( HC.GET, 'tag_filter' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_TAG_FILTER
+                    },
+                    ( HC.GET, 'immediate_update' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_DEFINITIONS_UPDATE,
+                        HydrusSerialisable.SERIALISABLE_TYPE_CONTENT_UPDATE,
+                    },
+                    ( HC.GET, 'metadata' ) : {
+                        HydrusSerialisable.SERIALISABLE_TYPE_HYDRUS_REPOSITORY_METADATA,
+                    }
+                }
+                
+                method_and_commands_that_are_accounts_ok = {
+                    ( HC.GET, 'account' ),
+                    ( HC.GET, 'other_account' ),
+                    ( HC.GET, 'all_accounts' ),
+                }
+                
+                method_and_commands_that_are_services_ok = {
+                    ( HC.GET, 'services' ),
+                }
+                
+                method_and_command = ( method, command )
+                
+                serialisable_type_whitelist = method_and_commands_to_serialisable_type_whitelist.get( method_and_command, set() )
+                accounts_ok = method_and_command in method_and_commands_that_are_accounts_ok
+                services_ok = method_and_command in method_and_commands_that_are_services_ok
+                
+                parsed_args = HydrusNetworkVariableHandling.ParseNetworkBytesToParsedHydrusArgs( network_bytes, serialisable_type_whitelist, accounts_ok, services_ok )
                 
                 if command == 'account' and 'account' in parsed_args:
                     
@@ -1479,6 +1523,10 @@ class ServiceRestricted( ServiceRemote ):
                     
                     self._DealWithAccountError()
                     
+                elif isinstance( e, HydrusExceptions.ConnectionException ):
+                    
+                    self._DelayFutureRequests( 'connection problem' )
+                    
                 elif isinstance( e, HydrusExceptions.NetworkVersionException ):
                     
                     self._DealWithFundamentalNetworkError()
@@ -1488,6 +1536,10 @@ class ServiceRestricted( ServiceRemote ):
                     self._DelayFutureRequests( 'service has exceeded bandwidth', duration_s = ACCOUNT_SYNC_PERIOD )
                     
                 elif isinstance( e, HydrusExceptions.ServerException ):
+                    
+                    self._DelayFutureRequests( str( e ) )
+                    
+                else:
                     
                     self._DelayFutureRequests( str( e ) )
                     
@@ -2015,7 +2067,15 @@ class ServiceRepository( ServiceRestricted ):
                     
                     try:
                         
-                        update = HydrusSerialisable.CreateFromNetworkBytes( update_network_string )
+                        deserialisation_context = HydrusSerialisable.DeserialisationContext(
+                            False,
+                            {
+                                HydrusSerialisable.SERIALISABLE_TYPE_CONTENT_UPDATE,
+                                HydrusSerialisable.SERIALISABLE_TYPE_DEFINITIONS_UPDATE
+                            }
+                        )
+                        
+                        update = HydrusSerialisable.CreateFromNetworkBytes( update_network_string, deserialisation_context )
                         
                     except Exception as e:
                         
@@ -2159,11 +2219,11 @@ class ServiceRepository( ServiceRestricted ):
                         
                         update_path = CG.client_controller.client_files_manager.GetFilePath( definition_hash, HC.APPLICATION_HYDRUS_UPDATE_DEFINITIONS )
                         
-                    except HydrusExceptions.FileMissingException:
+                    except HydrusExceptions.FileMissingException as e:
                         
                         CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_INTEGRITY_PRESENCE_REMOVE_RECORD )
                         
-                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) was missing. Your repository should be paused, and all update files have been scheduled for a presence check. I recommend you run _database->maintenance->clear/fix orphan file records_ too. Please then permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) )
+                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) was missing. Your repository should be paused, and all update files have been scheduled for a presence check. I recommend you run _database->maintenance->clear/fix orphan file records_ too. Please then permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) ) from e
                         
                     
                     with open( update_path, 'rb' ) as f:
@@ -2173,20 +2233,21 @@ class ServiceRepository( ServiceRestricted ):
                     
                     try:
                         
-                        definition_update = HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes )
+                        deserialisation_context = HydrusSerialisable.DeserialisationContext( False, { HydrusSerialisable.SERIALISABLE_TYPE_DEFINITIONS_UPDATE } )
+                        
+                        definition_update = HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes, deserialisation_context )
+                        
+                    except HydrusExceptions.SerialisationWhitelistException as e:
+                        
+                        CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
+                        
+                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) has incorrect metadata. Your repository should be paused, and all update files have been scheduled for a metadata rescan. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) ) from e
                         
                     except Exception as e:
                         
                         CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_INTEGRITY_DATA_REMOVE_RECORD )
                         
-                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) was invalid. Your repository should be paused, and all update files have been scheduled for an integrity check. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) )
-                        
-                    
-                    if not isinstance( definition_update, HydrusNetwork.DefinitionsUpdate ):
-                        
-                        CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
-                        
-                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) has incorrect metadata. Your repository should be paused, and all update files have been scheduled for a metadata rescan. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) )
+                        raise Exception( 'An unusual error has occured during repository processing: a definition update file ({}) was invalid. Your repository should be paused, and all update files have been scheduled for an integrity check. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( definition_hash.hex() ) ) from e
                         
                     
                     rows_in_this_update = definition_update.GetNumRows()
@@ -2284,11 +2345,11 @@ class ServiceRepository( ServiceRestricted ):
                         
                         update_path = CG.client_controller.client_files_manager.GetFilePath( content_hash, HC.APPLICATION_HYDRUS_UPDATE_CONTENT )
                         
-                    except HydrusExceptions.FileMissingException:
+                    except HydrusExceptions.FileMissingException as e:
                         
                         CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_INTEGRITY_PRESENCE_REMOVE_RECORD )
                         
-                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) was missing. Your repository should be paused, and all update files have been scheduled for a presence check. I recommend you run _database->maintenance->clear/fix orphan file records_ too. Please then permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) )
+                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) was missing. Your repository should be paused, and all update files have been scheduled for a presence check. I recommend you run _database->maintenance->clear/fix orphan file records_ too. Please then permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) ) from e
                         
                     
                     with open( update_path, 'rb' ) as f:
@@ -2298,20 +2359,21 @@ class ServiceRepository( ServiceRestricted ):
                     
                     try:
                         
-                        content_update = HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes )
+                        deserialisation_context = HydrusSerialisable.DeserialisationContext( False, { HydrusSerialisable.SERIALISABLE_TYPE_CONTENT_UPDATE } )
+                        
+                        content_update = HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes, deserialisation_context )
+                        
+                    except HydrusExceptions.SerialisationWhitelistException as e:
+                        
+                        CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
+                        
+                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) has incorrect metadata. Your repository should be paused, and all update files have been scheduled for a metadata rescan. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) ) from e
                         
                     except Exception as e:
                         
                         CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_INTEGRITY_DATA_REMOVE_RECORD )
                         
-                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) was invalid. Your repository should be paused, and all update files have been scheduled for an integrity check. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) )
-                        
-                    
-                    if not isinstance( content_update, HydrusNetwork.ContentUpdate ):
-                        
-                        CG.client_controller.WriteSynchronous( 'schedule_repository_update_file_maintenance', self._service_key, ClientFilesMaintenance.REGENERATE_FILE_DATA_JOB_FILE_METADATA )
-                        
-                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) has incorrect metadata. Your repository should be paused, and all update files have been scheduled for a metadata rescan. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) )
+                        raise Exception( 'An unusual error has occured during repository processing: a content update file ({}) was invalid. Your repository should be paused, and all update files have been scheduled for an integrity check. Please permit file maintenance under _database->file maintenance->manage scheduled jobs_ to finish its new work, which should fix this, before unpausing your repository.'.format( content_hash.hex() ) ) from e
                         
                     
                     rows_in_this_update = content_update.GetNumRows( content_types )

@@ -4,6 +4,7 @@ import random
 import unittest
 
 from hydrus.core import HydrusConstants as HC
+from hydrus.core import HydrusSerialisable
 
 from hydrus.client import ClientStrings
 from hydrus.client import ClientTime
@@ -23,7 +24,7 @@ class DummyFormula( ClientParsing.ParseFormula ):
         return None
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         pass
         

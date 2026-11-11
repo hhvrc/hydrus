@@ -1,5 +1,3 @@
-import typing
-
 from qtpy import QtCore as QC
 from qtpy import QtWidgets as QW
 from qtpy import QtGui as QG
@@ -33,6 +31,16 @@ from hydrus.client.networking import ClientNetworkingGUG
 from hydrus.client.networking import ClientNetworkingLogin
 from hydrus.client.networking import ClientNetworkingURLClass
 from hydrus.client.parsing import ClientParsing
+
+forgivable_object_types_in_downloader_system = {
+    ClientNetworkingGUG.GalleryURLGenerator,
+    ClientNetworkingGUG.NestedGalleryURLGenerator,
+    ClientNetworkingURLClass.URLClass,
+    ClientParsing.PageParser,
+    ClientNetworkingDomain.DomainMetadataPackage,
+    ClientNetworkingLogin.LoginScriptDomain,
+    ClientParsing.SimpleDownloaderParsingFormula,
+}
 
 def IngestClipboard():
     
@@ -234,17 +242,48 @@ class ReviewDownloaderImport( ClientGUIScrolledPanels.ReviewPanel ):
         domain_metadatas = []
         login_scripts = []
         
-        num_misc_objects = 0
-        
         bandwidth_manager = self._network_engine.bandwidth_manager
         domain_manager = self._network_engine.domain_manager
         login_manager = self._network_engine.login_manager
+        
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( 
+            False,
+            {
+                HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                HydrusSerialisable.SERIALISABLE_TYPE_GALLERY_URL_GENERATOR,
+                HydrusSerialisable.SERIALISABLE_TYPE_NESTED_GALLERY_URL_GENERATOR,
+                HydrusSerialisable.SERIALISABLE_TYPE_URL_CLASS,
+                HydrusSerialisable.SERIALISABLE_TYPE_PAGE_PARSER,
+                HydrusSerialisable.SERIALISABLE_TYPE_DOMAIN_METADATA_PACKAGE,
+                HydrusSerialisable.SERIALISABLE_TYPE_LOGIN_SCRIPT_DOMAIN,
+                HydrusSerialisable.SERIALISABLE_TYPE_SIMPLE_DOWNLOADER_PARSE_FORMULA,
+            }
+        )
         
         for ( payload_description, payload_text ) in payloads:
             
             try:
                 
-                obj_list = HydrusSerialisable.CreateFromString( payload_text, raise_error_on_future_version = True )
+                obj_list = HydrusSerialisable.CreateFromString( payload_text, deserialisation_context )
+                
+            except HydrusExceptions.SerialisationWhitelistException as e:
+                
+                if not have_shown_load_error:
+                    
+                    message = f'Sorry, at least one of the things you added did not look like a downloader object! It looked like a {e.wrong_object_name}!'
+                    
+                    if len( payloads ) > 1:
+                        
+                        message += '\n' * 2
+                        message += 'If there are more unloadable objects in this import, they will be skipped silently.'
+                        
+                    
+                    ClientGUIDialogsMessage.ShowCritical( self, 'Serialisation Object Load Error!', message )
+                    
+                    have_shown_load_error = True
+                    
+                
+                continue
                 
             except HydrusExceptions.SerialisationException as e:
                 
@@ -274,6 +313,7 @@ class ReviewDownloaderImport( ClientGUIScrolledPanels.ReviewPanel ):
                 continue
                 
             
+            # if it is just one guy, wrap it in a list
             if isinstance( obj_list, ( ClientNetworkingGUG.GalleryURLGenerator, ClientNetworkingGUG.NestedGalleryURLGenerator, ClientNetworkingURLClass.URLClass, ClientParsing.PageParser, ClientNetworkingDomain.DomainMetadataPackage, ClientNetworkingLogin.LoginScriptDomain ) ):
                 
                 obj_list = HydrusSerialisable.SerialisableList( [ obj_list ] )
@@ -281,7 +321,20 @@ class ReviewDownloaderImport( ClientGUIScrolledPanels.ReviewPanel ):
             
             if not isinstance( obj_list, HydrusSerialisable.SerialisableList ):
                 
-                ClientGUIDialogsMessage.ShowWarning( self, 'Unfortunately, {} did not look like a package of download data! Instead, it looked like: {}'.format( payload_description, obj_list.SERIALISABLE_NAME ) )
+                if not have_shown_load_error:
+                    
+                    message = 'Unfortunately, {} did not look like a package of download data I can ingest! Instead, it looked like: {}'.format( payload_description, obj_list.SERIALISABLE_NAME )
+                    
+                    if len( payloads ) > 1:
+                        
+                        message += '\n' * 2
+                        message += 'If there are more unexpected objects in this import, they will be skipped silently.'
+                        
+                    
+                    ClientGUIDialogsMessage.ShowWarning( self, message )
+                    
+                    have_shown_load_error = True
+                    
                 
                 continue
                 
@@ -308,21 +361,7 @@ class ReviewDownloaderImport( ClientGUIScrolledPanels.ReviewPanel ):
                     
                     login_scripts.append( obj )
                     
-                else:
-                    
-                    num_misc_objects += 1
-                    
                 
-            
-        
-        if len( gugs ) + len( url_classes ) + len( parsers ) + len( domain_metadatas ) + len( login_scripts ) == 0:
-            
-            if num_misc_objects > 0:
-                
-                ClientGUIDialogsMessage.ShowWarning( self, 'I found '+HydrusNumbers.ToHumanInt(num_misc_objects)+' misc objects in that png, but nothing downloader related.' )
-                
-            
-            return
             
         
         # url matches first
@@ -687,13 +726,29 @@ class ReviewWhatIsThisObject( ClientGUIScrolledPanels.ReviewPanel ):
         
         win.setCursor( QG.QCursor( QC.Qt.CursorShape.PointingHandCursor ) )
         
-        self._description = QW.QTextEdit( self )
         self._json_content = QW.QTextEdit( self )
+        self._json_content.setReadOnly( True )
         
+        self._parse_button_untrusted = ClientGUICommon.BetterButton( self, 'parse untrusted', self._ParsePayloadsUntrusted )
+        self._parse_button_trusted = ClientGUICommon.BetterButton( self, 'parse trusted', self._ParsePayloadsTrusted )
+        
+        self._description = QW.QTextEdit( self )
+        self._description.setReadOnly( True )
+        
+        self._json_texts = []
+        
+        st = ClientGUICommon.BetterStaticText( self, label = 'THIS DIALOG IS DANGEROUS!!\n\nIF A SKEEZY GUY TOLD YOU TO OPEN THIS DIALOG AND DROP HIS COOL PNG ON IT FOR A TRUSTED PARSE, BACK OFF' )
+        st.setWordWrap( True )
+        st.setObjectName( 'HydrusWarning' )
+        st.setAlignment( QC.Qt.AlignmentFlag.AlignCenter )
+        
+        QP.AddToLayout( vbox, st, CC.FLAGS_CENTER )
         QP.AddToLayout( vbox, win, CC.FLAGS_CENTER )
         QP.AddToLayout( vbox, self._paste_button, CC.FLAGS_ON_RIGHT )
-        QP.AddToLayout( vbox, self._description, CC.FLAGS_EXPAND_BOTH_WAYS )
         QP.AddToLayout( vbox, self._json_content, CC.FLAGS_EXPAND_BOTH_WAYS )
+        QP.AddToLayout( vbox, self._parse_button_untrusted, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._parse_button_trusted, CC.FLAGS_EXPAND_PERPENDICULAR )
+        QP.AddToLayout( vbox, self._description, CC.FLAGS_EXPAND_BOTH_WAYS )
         
         self.widget().setLayout( vbox )
         
@@ -723,16 +778,30 @@ class ReviewWhatIsThisObject( ClientGUIScrolledPanels.ReviewPanel ):
     
     def _ImportPayloads( self, payloads ):
         
-        result_texts = []
-        json_texts = []
+        self._json_texts = []
         
         for ( payload_description, payload_text ) in payloads:
             
-            json_texts.append( payload_text )
+            self._json_texts.append( payload_text )
+            
+        
+        self._json_content.setText( '\n\n'.join( self._json_texts ) )
+        
+        self._description.setText( '' )
+        
+    
+    def _ParsePayloads( self, trusted: bool ):
+        
+        result_texts = []
+        
+        # special case obviously; we just don't know what is coming
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( trusted, set(), log_trusted_whitelist_violations = False )
+        
+        for json_text in self._json_texts:
             
             try:
                 
-                obj = HydrusSerialisable.CreateFromString( payload_text, raise_error_on_future_version = True )
+                obj = HydrusSerialisable.CreateFromString( json_text, deserialisation_context )
                 
                 if not isinstance( obj, HydrusSerialisable.SerialisableBase ):
                     
@@ -740,12 +809,9 @@ class ReviewWhatIsThisObject( ClientGUIScrolledPanels.ReviewPanel ):
                     
                 else:
                     
-                    obj = typing.cast( HydrusSerialisable.SerialisableBase, obj )
-                    
-                    # TODO: let's make a HydrusSerialisable 'DescribeYourself' or similar and have lists and dicts talk about their contents
                     result_text = f'Object Type: {obj.GetSerialisableDescription()}'
                     result_text += '\n'
-                    result_text += f'JSON: {HydrusData.ToHumanBytes( len( payload_text ) )}'
+                    result_text += f'JSON: {HydrusData.ToHumanBytes( len( json_text ) )}'
                     
                 
                 result_texts.append( result_text )
@@ -759,7 +825,25 @@ class ReviewWhatIsThisObject( ClientGUIScrolledPanels.ReviewPanel ):
         ending_description_text = f'{HydrusNumbers.ToHumanInt(len( result_texts ))} items\n\n' + '\n\n'.join( result_texts )
         
         self._description.setText( ending_description_text )
-        self._json_content.setText( '\n\n'.join( json_texts ) )
+        
+    
+    def _ParsePayloadsTrusted( self ):
+        
+        text = 'u wot m8, u r \'avin a laugh'
+        
+        result = ClientGUIDialogsQuick.GetYesNo( self, text, yes_label = 'dillinja', no_label = 'im not starting nothin m8' )
+        
+        if result != QW.QDialog.DialogCode.Accepted:
+            
+            return
+            
+        
+        self._ParsePayloads( True )
+        
+    
+    def _ParsePayloadsUntrusted( self ):
+        
+        self._ParsePayloads( False )
         
     
     def _Paste( self ):

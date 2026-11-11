@@ -7,12 +7,131 @@ title: Changelog
 !!! note
     This is the new changelog, only the most recent builds. For all versions, see the [old changelog](old_changelog.html).
 
+## [Version 694](https://github.com/hydrusnetwork/hydrus/releases/tag/v694)
+
+### misc
+
+* added 'confirm add-undelete tags' to the cog icon on 'manage tags'. if you have been annoyed at the 'confirm your action' popups in the new manage tags dialog when you type in a tag that was previously deleted, please uncheck this and let me know how it feels
+* added 'allowed actions for taglist double-click:' to this menu too. if you don't ever want to see a 'clear deletion record' option, or whatever, you can now turn things on and off here too
+* fixed the 'clear trash' routine to delete more than one old file per run. this was the lagging logic patched last week, now improved back to what it was originally intended to do
+* also made the clear 'trash routine' wait on 'a file was recently deleted' safety delay more intelligently (it doesn't work if a file was deleted in the past sixty seconds, as a grace period for undeletes of accidental giant deletes), and, lmao, it no longer sends this signal itself when it works (blocking itself a bunch when there's a lot of work to do)
+* when you drag-and-drop URLs on the client, and the application source bundles non-URL data in the 'urls' metadata slot (we have evidence of one less-used browser putting the browser tab text in with the url), the hydrus drag-and-drop catcher now filters the urls from the non-urls nicely. if any urls were in there, it silently prints info to the log; if nothing was an url, it puts it in a popup for you to see
+* fixed some login cookie handling when using the `curl_cffi` test. there is more work to do with the curl_cffi test, so please bear with me
+* I fixed some issues with the 'children' tab of tag autocomplete, which looks up children of tag parents in the associated taglist, when the file domain is set to multiple file domains or 'all known files'
+
+### exe manager
+
+* the new Windows 'hide terminal' tech test is now default ON for all users. the test appeared to go fine, so I am making it real. you shouldn't notice any difference, but if you are a Windows user and you suddenly get command line popups every time you import a file or do 'open externally', hit up `options->external programs` to switch it off, and let me know!
+
+### v693a hotfix
+
+* I did a hotfix on Saturday to address some update stuff--
+* in the 'future build' integration, the pyproject.toml accidentally did not get the intended `pyopenssl`, `numpy`, or `pyside6` updates, meaning the builds missed out. it was just a copy/paste transcription failure by me. this is fixed and I'll make a script to do this automatically in future
+* fixed a bitrot issue with the v687-to-v688 update code
+* fixed a typo in deserialisation when updating older metadata routers from v2 to v3 (would hit old import/export folders with sidecars that hadn't been edited in about 18 months)
+* as a side thing here, I now have a nicer test in my weekly build workflow that tests my older db updates better. I'm going to keep an older db and test current code to catch bitrot issues like the above. unfortunately, my best rich test db is currently v693, so I'm going to pin it at that version and let it get older every week until it is 50 weeks old and we have full coverage of all the updates I try to support. so, going forward I guarantee I will test anything after v693 every week
+* I've made a plan for a serialisable update manager too and will be working on that in the future. we'll fix these legacy objects sitting around on the db for years without a resave
+
+### security
+
+* I continued the recent security work. my deserialisation pipeline now has a single clean deserialisation context to hold the various trust information. it is easier to pass this through each stage, and this thing will be easier to extend in future
+* in doing this, I was able to remove a hack that was suppressing some trusted whitelist warning logging, so whitelist warning logging is now true positive in a couple of places it was false negative before. I already fixed a couple small instances of this, although tbh I was surprised that we had so little report of legacy cruft in the local store; it was mostly just a couple of legacy 'current file service is this' on older page objects
+* also generically cleaned some deserialisation unit tests and special deserialisation situations
+* there's more I want to do here, including what I hope will be a big deserialisation typedef solution, so I'll keep pushing
+
+### boring stuff
+
+* added `help->debug->threads and processes->wake mainloops` for various debug testing
+* cleared out the 12 or so 'calling non-callable' linting issues with nicer typedefs and some stub callable juggling
+* cleaned up all Callable type definitions across the program and updated some old deprecated typing stuff
+* fixed some error handling for malformed objects in page session load--it was not recovering properly and raising a new error
+* added unit tests for the new cookie serialisation and deserialisation for requests
+* added unit tests for the new cookie serialisation and deserialisation for curl_cffi
+* fixed an issue with the 'networking' unit test suite when it was run on its own; `tldextract` was not initialised properly in this case, and when it tried to load its suffix list from disk to init its cache inside the first test, the mock http wrapper gonked the load
+
+## [Version 693](https://github.com/hydrusnetwork/hydrus/releases/tag/v693)
+
+### security
+
+* if you missed it, AI discovered an important security flaw in hydrus last week. if you are running v691 or earlier you should update to v692 or later, such as today's release. check here for more details: https://github.com/hydrusnetwork/hydrus/releases/tag/v692
+* I am now starting a project of improving the rigour of hydrus I/O security to shrink the attack surface and reduce the potential severity of future discoveries like this. today's release brings a top-to-bottom overhaul of deserialisation security with a whitelist applied to all untrusted ingresses
+* when the hydrus server takes a POST request, it now applies a whitelist of which serialisable objects it is willing to load, based on the request type. if there is extra stuff, it does 400 Bad Request
+* conversely, when a client receives responses from the hydrus server, it now equally whitelists the serialised response and throws an error if anything doesn't match the whitelist
+* in the client UI, when you paste a bitmap or drop a png onto a list that knows how to import/export, it now applies a similar whitelist before loading; if it is expecting URL Classes, it will recognise anything that _isn't_ an URL class before it tries to load anything and cancel out
+* if an object load _is_ from a trusted source (e.g. you are loading your options object from the database), the whitelist does not apply strictly but the log will write about anything that violates it. we'll see how much cruft we have hanging around from old forgotten things. if you get some messages like `An object of type 26 ("Serialisable List") loaded when the expected serialisable types are: {127}! You can probably ignore this, but if there are a bunch of these, hydev would like to know.`, please pass them on
+* the hydrus serialisation system will no longer deserialise an object that comes from a future version of the client, under any circumstances. we had a hacky path here previously to permit some 'run the client on old software and see if it muddles through the errors' situations, but I would rather be KISS on this question going forward
+
+### misc
+
+* fixed an issue introduced in v689 that was causing increments of 0.5s of wasted CPU work when the trash was cleared for old files. some users have reported unusual freezes that come and go; please let me know how things feel now. thanks to the reporting user who found this with AI
+* hydrus services now take longer breaks (about four hours) when there are connection problems, and similarly when there is any generic problem. previously, a couple of request paths would not generate a delay and they'd try again ~fifteen minutes later. I've also made hydrus requests cancel earlier in all situations--a couple of slow maintenance paths would run the normal cancel/retry system, but this stuff is mostly hidden from UI and it wasn't helping to have quick retry
+* removed some ancient two year old server update code that would no longer be fired anyway because of the bitrot guard
+* improved shutdown code to more promptly cancel ongoing network jobs. if a manager (e.g. 'synchronise repositories' manager) is waiting on a network job to clear but there's a connection retry etc... holding things up, this is now insta-cancelled and shutdown no longer waits
+* the url class parameter edit panel now makes the default-value string processor available when the 'ephemeral token' checkbox is not set on. there is also a textbox to show the output of the string processing on the current example text
+
+### boring security worklist
+
+* added an object type whitelist to all deserialisation code and a trusted/untrusted environment bool; if untrusted (e.g. pasting from clipboard, receiving from a server, POST request to server), the whitelist is adhered to strictly and exceptions raised on violations; if trusted (e.g. loading from local database store), we load whatever comes and accept-but-log legacy cruft that exceeds the whitelist
+* converted default object loading to use the whitelist in all cases (just a couple calls)
+* converted 'noneable' object loading to use the whitelist in all cases (just three calls)
+* converted 'networkbytes' object loading to use the whitelist in all cases (15 calls)
+* converted 'fromstring' object loading to use the whitelist in all cases (48 calls)
+* converted the core 'serialisabletuple' object loading to use the whitelist in all cases (~295 calls aieeeee)
+* propagated the trusted/untrusted environment to the serialisable update routines too
+* updated serverside POST request processing to obey whitelists particular to each command
+* updated client 'Service' request response parsing to obey a similar per-command whitelist
+* the 'what is this?' debug panel now separates the payload ingestion from actual deserialisation, showing a preview of the json content before you parse it. there are also two buttons, for trusted and untrusted parse
+* added unit tests for the new deserialisation whitelisting
+* added a unit test for the new future-object deserialisation error
+* added unit tests for the serverside whitelisting
+* misc cleanup all around here
+
+### more boring cleanup
+
+* removed the legacy subscription object and migration code and import support in the subs dialog. the transition was years ago, so we can drop it
+* similarly removed the legacy bandwidth manager object and migration code
+* amongst the type filtering work this week, discovered that legacy url classes could (harmlessly) insert the incorrect sort of string conversion tool in their parameter definitions, and fixed it
+* Lain now skips erroneous import object reports more efficiently. previously she would give an error window for each unexpected object; now only simple page parsing formulae are even parsed and she'll just give one error and silently skip over them after that
+* the checkbox list that Lain provides, and the same list used across the program, now makes a better expandable layout when it has more than 20 items in it. previously it janked out and wouldn't grow vertically properly
+* extended some lists that accept import/export of hydrus serialisable objects to forgive objects in the same class and give a nicer error. 'import url class' list will eat gugs, ngugs, and such, and say 'hey, not them m8' rather than going nuts. you can drop a bunch of mixed downloader objects on one of these sub-dialogs and it'll pull what it can
+* fixed some thumbnail error handling and 'file report mode' reporting, which missed something in the transition from hashes to media_results
+
+### future build
+
+* This release commits the changes tested with the recent future test build that I did after making v691 last week, which went well
+* the summary for this update is: most python libraries are brought up to latest, and ffmpeg, and the builder, pyinstaller, too
+* there are no special instructions for the update. update as normal
+* since library versions have been bumped, users who run from source will be encouraged to rebuild their venv on update this week. this is particularly important in the current rapid-update climate
+* The changes are--
+* python updates--
+* `PySide6` moved from `6.10.3` to `6.11.2`
+* `opencv-python-headless` moved from `4.13.0.92` to `4.14.0.94`
+* `pillow-heif` moved from `1.4.0` to `1.8.1`
+* `cbor` moved from `6.1.3` to `6.1.5`
+* `chardet` moved from `7.4.3` to `7.7.0`
+* `cryptography` moved from `49.0.0` to `50.0.2`
+* `lxml` from `6.1.1` to `6.1.3`
+* `numpy` moved from `2.4.6` to `2.5.4`
+* `pyopenssl` moved from `26.3.0` to `26.4.0`
+* new library--
+* `curl_cffi` is now included by default, to help testing in built environments, at `0.16.3`
+* build--
+* `pyinstaller` moved from `6.18` to `6.22.3`
+* test versions--
+* `PySide6` moved from `6.11.1` to `6.12.0`
+* misc--
+* ffmpeg updated from `8.1.2` to `9.0.2` on Windows
+* ffmpeg updated from `2026-06-30` to `2026-10-21` on Linux
+* updated the tldextract domain list from `2026-07-15` to `2026-10-20`
+* updated github actions in workflow scripts to latest stable versions
+
 ## [Version 692](https://github.com/hydrusnetwork/hydrus/releases/tag/v692)
 
 ### security hotfix
 
 * An AI scanner has found a remote code execution bug in the hydrus client. This release fixes the issue. All users should update
-* the risk occurred when importing a user-made object like a downloader, when talking to a hydrus server like the PTR, or when anything communicated with the Client API.
+* the risk occurred when importing a user-made object like a downloader or when talking to a hydrus server like the PTR
+* _EDIT: I originally thought the Client API was vulnerable, but additional testing has shown it was not._
 * The hydrus server was not vulnerable
 * After investigating the 5,000+ publicly shared downloaders on the user-run repo and 27,000+ PTR update files, I did not find any use of the exploit and am confident that there was no widespread use of the flaw. This is the time to update, in case the problem becomes real in the near future.
 * to help propagate the notice and make a hard split with unpatched clients, the hydrus network version has been bumped (to 21). Any client that tries to communicate with an updated server (which includes the PTR, which has just been updated) will get a message that they need to update.
@@ -305,97 +424,3 @@ title: Changelog
 
 * did some MainLoop Daemon refactoring, just getting over a hump to move some responsibility to the superclass
 * moved to nicer ui-cleanup calls in a bunch of my async code
-
-## [Version 684](https://github.com/hydrusnetwork/hydrus/releases/tag/v684)
-
-### misc
-
-* every thumb/viewer media menu now has 'show detailed embedded file metadata' in the top-row flyout; this is the same window that opens with the media viewer top hover, to which I've been adding EXIF and stuff
-* there's a new shortcut command to spawn this window under the 'media' set, `open detailed embedded file metadata window`
-* I finally got around to figuring out and adding a `Force that hitting Enter/Return on radio button lists triggers a dialog ok` checkbox to `options->gui`. On Windows, an Enter/Return on a radio button list triggers a dialog ok, but on other OSes, it does not. it is one of those platform policy things and Qt is being good and obeying. this casually annoyed me for years, particularly when doing advanced file delete dialogs where rather than a simple yes/no it has a couple of radio button lists, and since moving to Linux full time I finally got my finger out and figured it out. it is default off so I don't mess with anyone's muscle memory etc.., but if this was annoying you, try it out
-* added `TEST: Set tool flag to child windows` to `options->gui`. this test sets a different flag and hopefully improves some window behaviour--specifically, stuff like "review services" should stay on top of the parent, not get a taskbar/alt+tab entry, but still look ok. let me know how it goes, and if no problems, I'll set everyone to it
-* I gave the 'my auto-resolution rule says it has x pairs to search/resolve but it cannot clear them' issue another push. thanks to a user, we figured out an interesting orphaned pair situation. I fixed the logical hole in the maintenance code and updated the new error handling to A) indefinitely pause a rule that hits this, to stop pause/error loops, and B) run the full orphan-clearing maintenance code rather than just the re-count job
-* noneable string widgets now blank their placeholder text when set to none
-* test result text boxes in exe manager and parsing UI now have monospaced font
-
-### hash-search
-
-* system:hash gets a logical makeover. this thing has always been a bit of a mess as it tried to navigate prefixes like `sha256:abcd...`. I have made it simpler
-* the edit dialog now lets you type or paste whatever, with no instant auto-correct. there are now two buttons underneath, `clean up text and guess hash type` and `clean up text and guess hash type (remove bad lines)`, which do the parsing on demand. the first button moans about any errors at all; the second removes errors, so if you want to post a mix of garbage and have hydrus filter it, go ahead
-* the ok button is plugged into this tech too and, as the parsing is also improved, gives richer errors. if you hit ok and the hashes are fine but the hash type seems wrong, it now gives you a special error text
-* hydrus hash parsing now recognises and removes an `0x` prefix from a hash
-* hydrus hash parsing is now much better about case insensitivity. `MD5:AbCD...` is fine
-* hydrus hash parsing now has an error state for hashes with a non-even number of hex characters
-* hydrus hash parsing no longer attempts to hex filter an incoming line; if a hash includes a non-hex character, this now goes in a new error bucket for reporting
-
-### notes quality of life
-
-* added a 'when you middle-click to copy a note hover, only copy the text (not the title)' setting to `options->notes`
-* added that and the 'put cursor at the end' checkboxes to the cog icon button in the edit notes panel
-* added a 'link' icon button to notes that sucks up all the URLs from the current note text. it isn't perfect, but covers all normal 'http...' situations using a `https?://[^\s<>"\']+` regex
-* in a new test, when you do this 'copy URLs in the note' job, it fires off a '3 URLs!' tooltip micro-notification for feedback. give it a go, let me know how it feels, and I think I'll spam this all over the place
-
-### exe manager
-
-* finished off the core edit UI for my exe manager, which still only advanced users can see under `options->external programs`. you can edit everything, and there's a fullly functional test panel that reports return code and stdout/stderr on failures. it isn't perfect, but I'm happy with it as a first step. I will again ask advanced users to check it out, with these instructions: look at the defaults, pick a call that you should have, and then edit it and put in a sensible file path or URL in the test panel and try it! Let me know if you have any errors and where I need to add help text!
-* the defaults button now asks if you want all the default calls or just those for your platform
-* many many other improvements and finishings-off here, and a touch of misc new subprocess tech
-
-### boring exe manager stuff
-
-* rewangled the 'windows startfile' hardcoded launch call to be a platform-agnostic 'OS launch file'
-* added a 'OS launch URL' hardcoded launch call in the same way
-* improved the hydrus subprocess 'this process has timed out' detection system. in doing exe manager work this week, I realised it was waiting after a kill fallback in a blocking way and only reporting the timeout after the final (indefinite) reap went through
-* improved some subprocess error formatting
-
-## [Version 683](https://github.com/hydrusnetwork/hydrus/releases/tag/v683)
-
-### file metadata
-
-* I am ready to roll out the new file metadata flags. on update, you will be given a yes/no dialog asking if you want to schedule a big file metadata regen on pretty much all your images. I recommend all users click yes, but if you want to handle it yourself, you can click no, no worries
-* it will schedule 'has xmp', 'has iptc', 'has software-source', and new 'has human-readable' flag inspection for all your jpegs and some other image formats depending on the type
-* recall you can look at the maintenance progress under `database->file maintenance->manage scheduled jobs` and tweak the file maintenance background work velocity under `options->maintenance and processing`. as a general principle, I do not recommend you try to hurry huge work; just let it do its thing
-* XMP, IPTC, and software/source values are now stripped of leading/trailing whitespace
-* empty XMP, IPTC, and software/source values/list-items are now skipped
-
-### duplicates auto-resolution
-
-* I have added two new hardcoded comparators: "A has same or better metadata flags to B" and "A has ICC Profile if B does". the auto-suggested rules now use these, and the help talks about them, so we do away with the old and awkward and ugly 'both have same x OR B doesn't' formulation. also added some unit tests for this
-* the metadata comparator tests each of EXIF, XMP, IPTC, software/source, and human-readable flags
-* enthusiastic users of auto-resolution may like to swap over to the new comparators once these new flags populate so they can cover more situations
-* if an auto-resolution rule thinks it wants to do search or resolution work but there is no actual pair in the queue, the database now auto-triggers some maintenance to safely temp-pause the rule, regenerate the cached (and miscounted) numbers, and continue. it makes a popup if this happens
-* auto-resolution rules now stop work quickly when paused during a busy work cycle
-* the maintenance jobs that regen auto-resolution rules numbers and clear all potential duplicate pairs generally now trigger a proper, full reload of any list of auto-resolution rules in UI. previously, these guys needed an explicit refresh button click to catch up
-
-### more UI features
-
-* a user has submitted more UI improvements!
-* the media viewer's 'always on top' transition should now be flickerless for Windows
-* further, we now have a tentative 'always on top (while playing)' option. the always-on-top transition in Linux is still flickery, and if you have mpv up it causes a buzzy-noise crash, so I patched it to simply not happen in this situation, and if you are on Linux, the 'eye' menu in the media viewer has a 'THIS MAY BE BUGGY/CRASHY' warning
-* the new treeview test has several updates: double-clicking on treeview empty tab area opens the new page picker, treeview rows now use alternating colours, some bugs are fixed, the layout signaling is less janky, some code is cleaned, menu code is simplified, and there are several new user-controllable options (row height, indentation, alternating line colours)
-* extra note from hydev: if you have been playing with the treeview, hit up the new cog icon menu and look at the in-menu 'tree row dimensions' sliders and give them a spin. absolute space magic
-
-### audio files with embedded images
-
-* the QtMediaPlayer will now show an embedded image if an audio file has one. I pulled this off with some slightly funky tech, so let me know how it goes IRL
-* the default mpv.conf now has a `audio-display=embedded-first` line (thanks to a user, for this) that shows embedded images for audio files. if you never tweaked your mpv.conf, you might like to hit up `options->media playback` and reset back to the default mpv conf there (just hit the 'browse' button and it should start you in the static/mpv-conf dir)
-
-### misc
-
-* added a link to https://github.com/asadtoast/aether in the Client API help; this is an Android app with a bunch of features, including archive/delete and duplicate filtering
-* fixed an issue that was stopping adding potential duplicate pair relationships to files not already registered in the duplicates system. this broke hydrus video duplicate detector and similar tools. sorry for the trouble--I was too keen last week with the valid pair filtering! (issue #2076)
-* the 'external programs' options page is moved to 'default programs'
-
-### executable manager
-
-* the work on this system continues to go well. I fleshed out my previous skeleton, so most of the spinning wheels are connectable now
-* advanced users will see a new 'external programs (TESTING)' options page. this has the first UI available. edit panel isn't ready yet, but you can load the defaults and see what I'm going for
-* wrote out defaults for common OS file launchers and 'open file in web browser' commands
-* I added 'open multiple files externally' tech in prep for finally actually doing this from thumbnail menu
-* next step is to finish the edit panel for this first local call and start a test for advanced users. I'd like to get an early version of this working pretty soon, and get 'open externally' working on it and migrated over, and then I'll add new tech and pipelines to the live system; stuff like tag suggestions
-
-### boring stuff
-
-* added info to the 'help my db is broke' help page regarding `.clone` crashing/halting, the `.backup` command, and a very clever trick a user discovered regarding editing the `sqlite_schema` table to skip cloning a known-malformed table
-* the Docker package is updated to `Alpine 3.24` and should have improved HEIF support
-* skipped 'software/source' inspection when examining importing pdfs (this was silently failing, previously, because it was trying to load them as images)

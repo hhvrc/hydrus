@@ -46,7 +46,7 @@ class ClientExecutableCallable( HydrusSerialisable.SerialisableBaseNamed ):
         )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         (
             serialisable_callable_key,
@@ -56,11 +56,22 @@ class ClientExecutableCallable( HydrusSerialisable.SerialisableBaseNamed ):
         ) = serialisable_info
         
         self._callable_key = bytes.fromhex( serialisable_callable_key )
-        self._actual_call = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_actual_call )
-        self._page_parser = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_page_parser )
+        
+        self._actual_call = HydrusSerialisable.CreateFromSerialisableTuple(
+            serialisable_actual_call,
+            deserialisation_context.DuplicateForNewWhitelist(
+                {
+                    HydrusSerialisable.SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_CALL,
+                    HydrusSerialisable.SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_DEFAULT_LAUNCH_FILE,
+                    HydrusSerialisable.SERIALISABLE_TYPE_EXECUTABLE_CALL_LOCAL_PROCESS_DEFAULT_LAUNCH_URL,
+                }
+            )
+        )
+        
+        self._page_parser = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_page_parser, deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_PAGE_PARSER } ) )
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             

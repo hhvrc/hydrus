@@ -276,6 +276,8 @@ class ClientFilesManager( object ):
             
             try:
                 
+                CG.client_controller.frame_splash_status.SetSubtext( 'client files - creating file folders' )
+                
                 dirs_to_test = set()
                 
                 for subfolder in self._GetAllSubfolders():
@@ -887,19 +889,28 @@ class ClientFilesManager( object ):
     
     def _RepopulateMissingLocationsReference( self ):
         
-        # this would be faster if we did a scandir on the shared parents, but I tried it and it has bad worst case scenarios if we hit a granularity 2 with granularity 3 expectations
-
-        if self._multi_root_config.IsActive():
-
-            self._missing_subfolders = {
-                subfolder for subfolders in self._prefixes_to_client_files_subfolders.values()
-                for subfolder in subfolders
-                if not subfolder.PathExists( lazy_check_ok = True ) and not self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir )
-            }
-
-        else:
-
-            self._missing_subfolders = { subfolder for subfolders in self._prefixes_to_client_files_subfolders.values() for subfolder in subfolders if not subfolder.PathExists( lazy_check_ok = True ) }
+        self._missing_subfolders = set()
+        
+        all_subfolders = HydrusLists.MassExtend( self._prefixes_to_client_files_subfolders.values() )
+        
+        num_subfolders = len( all_subfolders )
+        
+        multi_root_active = self._multi_root_config.IsActive()
+        
+        for ( i, subfolder ) in enumerate( all_subfolders ):
+            
+            CG.client_controller.frame_splash_status.SetSubtext( f'client files - checking {HydrusNumbers.ValueRangeToPrettyString(i,num_subfolders)}' )
+            
+            if not subfolder.PathExists( lazy_check_ok = True ):
+                
+                if multi_root_active and self._multi_root_config.SubfolderExistsAnywhere( subfolder.path, subfolder.base_location.path, self._db_dir ):
+                    
+                    continue
+                    
+                
+                self._missing_subfolders.add( subfolder )
+                
+            
         
     
     def _WaitOnWakeup( self ):

@@ -50,9 +50,19 @@ class DBCredentialsException( HydrusException ): pass
 class DBVersionException( HydrusException ): pass
 class FileMissingException( HydrusException ): pass
 class DirectoryMissingException( HydrusException ): pass
-class SerialisationException( HydrusException ): pass
 class NameException( HydrusException ): pass
 class QtDeadWindowException( HydrusException ): pass
+
+class SerialisationException( HydrusException ): pass
+class SerialisationWhitelistException( SerialisationException ):
+    
+    def __init__( self, message: str, wrong_object_name: str ):
+        
+        super().__init__( message )
+        
+        self.wrong_object_name = wrong_object_name
+        
+    
 
 class StoppingException( HydrusException ): pass
 class DaemonShutdownException( HydrusException ): pass

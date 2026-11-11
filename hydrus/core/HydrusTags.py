@@ -298,7 +298,7 @@ class TagFilter( HydrusSerialisable.SerialisableBase ):
     
     SERIALISABLE_TYPE = HydrusSerialisable.SERIALISABLE_TYPE_TAG_FILTER
     SERIALISABLE_NAME = 'Tag Filter Rules'
-    SERIALISABLE_VERSION = 1
+    SERIALISABLE_VERSION = 1 # this is used in the network, do not update it casually!
     
     WOAH_TOO_MANY_RULES_THRESHOLD = 12
     
@@ -371,7 +371,7 @@ class TagFilter( HydrusSerialisable.SerialisableBase ):
         return list( self._tag_slices_to_rules.items() )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         self._tag_slices_to_rules = dict( serialisable_info )
         

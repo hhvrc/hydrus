@@ -22,7 +22,7 @@ class NetworkSessionManagerLegacy( HydrusSerialisable.SerialisableBase ):
         return []
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         HydrusData.Print( 'Encountered an old NetworkSessionManagerLegacy initialising its data. You can ignore this message.' )
         

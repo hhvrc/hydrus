@@ -289,7 +289,16 @@ class EditNodes( QW.QWidget ):
         
         try:
             
-            obj = HydrusSerialisable.CreateFromString( raw_text )
+            deserialisation_context = HydrusSerialisable.DeserialisationContext(
+                False,
+                {
+                    HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                    HydrusSerialisable.SERIALISABLE_TYPE_CONTENT_PARSER,
+                    HydrusSerialisable.SERIALISABLE_TYPE_PARSE_NODE_CONTENT_LINK
+                }
+            )
+            
+            obj = HydrusSerialisable.CreateFromString( raw_text, deserialisation_context )
             
             self._ImportObject( obj )
             
@@ -299,6 +308,7 @@ class EditNodes( QW.QWidget ):
             
         
     
+
 class EditParseNodeContentLinkPanel( ClientGUIScrolledPanels.EditPanel ):
     
     def __init__( self, parent, node, referral_url = None, example_data = None ):
@@ -1147,7 +1157,15 @@ class ManageParsingScriptsPanel( ClientGUIScrolledPanels.ManagePanel ):
         
         try:
             
-            obj = HydrusSerialisable.CreateFromString( raw_text )
+            deserialisation_context = HydrusSerialisable.DeserialisationContext( 
+                False,
+                {
+                    HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                    HydrusSerialisable.SERIALISABLE_TYPE_PARSE_ROOT_FILE_LOOKUP
+                }
+            )
+            
+            obj = HydrusSerialisable.CreateFromString( raw_text, deserialisation_context )
             
             self._ImportObject( obj )
             
@@ -1180,7 +1198,24 @@ class ManageParsingScriptsPanel( ClientGUIScrolledPanels.ManagePanel ):
                 
                 try:
                     
-                    obj = HydrusSerialisable.CreateFromNetworkBytes( payload )
+                    try:
+                        
+                        deserialisation_context = HydrusSerialisable.DeserialisationContext( 
+                            False,
+                            {
+                                HydrusSerialisable.SERIALISABLE_TYPE_LIST,
+                                HydrusSerialisable.SERIALISABLE_TYPE_PARSE_ROOT_FILE_LOOKUP
+                            }
+                        )
+                        
+                        obj = HydrusSerialisable.CreateFromNetworkBytes( payload, deserialisation_context )
+                        
+                    except HydrusExceptions.SerialisationWhitelistException as e:
+                        
+                        ClientGUIDialogsMessage.ShowWarning( self, f'That was not a script! It looked like a {e.wrong_object_name}!' )
+                        
+                        return
+                        
                     
                     self._ImportObject( obj )
                     

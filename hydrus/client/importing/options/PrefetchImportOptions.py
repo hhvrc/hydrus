@@ -57,7 +57,7 @@ class PrefetchImportOptions( IOC.ImportOptionsMetatype ):
         )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         (
             self._preimport_hash_check_type,
@@ -68,7 +68,7 @@ class PrefetchImportOptions( IOC.ImportOptionsMetatype ):
         ) = serialisable_info
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             

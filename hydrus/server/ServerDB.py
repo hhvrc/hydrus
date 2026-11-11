@@ -627,7 +627,9 @@ class DB( HydrusDB.HydrusDB ):
         
         account_type = self._GetAccountType( service_id, account_type_id )
         
-        dictionary = HydrusSerialisable.CreateFromString( dictionary_string )
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( True, set(), log_trusted_whitelist_violations = False ) # we trust this and don't care what it has
+        
+        dictionary = HydrusSerialisable.CreateFromString( dictionary_string, deserialisation_context )
         
         return HydrusNetwork.Account.GenerateAccountFromTuple( ( account_key, account_type, created, expires, dictionary ) )
         
@@ -1160,10 +1162,11 @@ class DB( HydrusDB.HydrusDB ):
         
         service_info = self._Execute( 'SELECT service_key, service_type, name, port, dictionary_string FROM services WHERE service_type IN ' + HydrusLists.SplayListForDB( limited_types ) + ';' ).fetchall()
         
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( True, set(), log_trusted_whitelist_violations = False ) # we trust this and don't care what it has
+        
         for ( service_key, service_type, name, port, dictionary_string ) in service_info:
             
-            dictionary = HydrusSerialisable.CreateFromString( dictionary_string )
-            
+            dictionary = HydrusSerialisable.CreateFromString( dictionary_string, deserialisation_context )
             service = HydrusNetwork.GenerateService( service_key, service_type, name, port, dictionary )
             
             services.append( service )
@@ -1772,9 +1775,11 @@ class DB( HydrusDB.HydrusDB ):
         
         data = self._Execute( 'SELECT account_type_id, service_id, dump FROM account_types;' ).fetchall()
         
+        deserialisation_context = HydrusSerialisable.DeserialisationContext( True, set(), log_trusted_whitelist_violations = False ) # we trust this and don't care what it has
+        
         for ( account_type_id, service_id, dump ) in data:
             
-            account_type = HydrusSerialisable.CreateFromString( dump )
+            account_type = HydrusSerialisable.CreateFromString( dump, deserialisation_context )
             
             self._service_ids_to_account_type_ids[ service_id ].add( account_type_id )
             self._account_type_ids_to_account_types[ account_type_id ] = account_type
@@ -4940,86 +4945,7 @@ class DB( HydrusDB.HydrusDB ):
         
         HydrusData.Print( 'The server is updating to version ' + str( version + 1 ) )
         
-        if version == 433:
-            
-            old_data = self._Execute( 'SELECT account_type_id, service_id, account_type_key, title, dictionary_string FROM account_types;' ).fetchall()
-            
-            self._Execute( 'DROP TABLE account_types;' )
-            
-            from hydrus.core.networking import HydrusNetworkLegacy
-            
-            self._Execute( 'CREATE TABLE account_types ( account_type_id INTEGER PRIMARY KEY, service_id INTEGER, dump TEXT );' )
-            
-            for ( account_type_id, service_id, account_type_key, title, dictionary_string ) in old_data:
-                
-                account_type = HydrusNetworkLegacy.ConvertToNewAccountType( account_type_key, title, dictionary_string )
-                
-                dump = account_type.DumpToString()
-                
-                self._Execute( 'INSERT INTO account_types ( account_type_id, service_id, dump ) VALUES ( ?, ?, ? );', ( account_type_id, service_id, dump ) )
-                
-            
-        
-        if version == 445:
-            
-            # ok, time for null account!
-            
-            service_ids = self._GetServiceIds()
-            
-            for service_id in service_ids:
-                
-                service_key = self._GetServiceKey( service_id )
-                
-                service_null_account_type = HydrusNetwork.AccountType.GenerateNullAccountType()
-                
-                service_null_account_type_id = self._AddAccountType( service_id, service_null_account_type )
-                
-                self._RefreshAccountInfoCache()
-                
-                expires = None
-                
-                [ registration_key ] = self._GenerateRegistrationKeys( service_id, 1, service_null_account_type_id, expires )
-                
-                null_access_key = self._GetAccessKey( service_key, registration_key )
-                
-                null_account = self._GetAccountKeyFromAccessKey( service_key, null_access_key )
-                
-                self._RefreshAccountInfoCache()
-                
-            
-        
-        if version == 463:
-            
-            result = self._Execute( 'SELECT 1 FROM sqlite_master WHERE name = ?;', ( 'deferred_physical_file_deletes', ) ).fetchone()
-            
-            if result is None:
-                
-                self._Execute( 'CREATE TABLE deferred_physical_file_deletes ( master_hash_id INTEGER PRIMARY KEY );' )
-                self._Execute( 'CREATE TABLE deferred_physical_thumbnail_deletes ( master_hash_id INTEGER PRIMARY KEY );' )
-                
-                HydrusData.Print( 'Populating deferred physical file delete tables' + HC.UNICODE_ELLIPSIS )
-                
-                for service_id in self._GetServiceIds( ( HC.FILE_REPOSITORY, ) ):
-                    
-                    ( hash_id_map_table_name, tag_id_map_table_name ) = GenerateRepositoryMasterMapTableNames( service_id )
-                    ( current_files_table_name, deleted_files_table_name, pending_files_table_name, petitioned_files_table_name, ip_addresses_table_name ) = GenerateRepositoryFilesTableNames( service_id )
-                    
-                    for ( block_of_master_hash_ids, num_done, num_to_do ) in HydrusDB.ReadLargeIdQueryInSeparateChunks( self._c, 'SELECT master_hash_id FROM {} CROSS JOIN {} USING ( service_hash_id );'.format( deleted_files_table_name, hash_id_map_table_name ), 1024 ):
-                        
-                        self._DeferFilesDeleteIfNowOrphan( block_of_master_hash_ids )
-                        
-                    
-                
-            
-        
-        if version == 497:
-            
-            self._Execute( 'CREATE TABLE IF NOT EXISTS service_info ( service_id INTEGER, info_type INTEGER, info INTEGER, PRIMARY KEY ( service_id, info_type ) );' )
-            
-            HydrusData.Print( 'Populating new cached counts table' + HC.UNICODE_ELLIPSIS )
-            
-            self._RepositoryRegenerateServiceInfo()
-            
+        pass # last one was v497 lol
         
         HydrusData.Print( 'The server has updated to version ' + str( version + 1 ) )
         

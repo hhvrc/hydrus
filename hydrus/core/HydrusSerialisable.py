@@ -49,7 +49,7 @@ SERIALISABLE_TYPE_BYTES_DICT = 33
 SERIALISABLE_TYPE_CONTENT_UPDATE = 34
 SERIALISABLE_TYPE_CREDENTIALS = 35
 SERIALISABLE_TYPE_DEFINITIONS_UPDATE = 36
-SERIALISABLE_TYPE_METADATA = 37
+SERIALISABLE_TYPE_HYDRUS_REPOSITORY_METADATA = 37
 SERIALISABLE_TYPE_BANDWIDTH_RULES = 38
 SERIALISABLE_TYPE_BANDWIDTH_TRACKER = 39
 SERIALISABLE_TYPE_CLIENT_TO_SERVER_UPDATE = 40
@@ -179,14 +179,56 @@ SERIALISABLE_TYPE_EXTERNAL_PROGRAMS_IMPORT_OPTIONS_SINGLE_ENTRY = 163
 
 SERIALISABLE_TYPES_TO_OBJECT_TYPES = {}
 
-def CreateFromNetworkBytes( network_bytes: bytes, raise_error_on_future_version = False ) -> typing.Any:
+class DeserialisationContext( object ):
+    
+    def __init__( self, trusted: bool, serialisable_type_whitelist: set[ int ], log_trusted_whitelist_violations: bool = True ):
+        '''
+        How are we going to deserialise this guy? Are we loading from the trusted db storage, or from a recent download? What are we expecting to see?
+        :param trusted: whether the ingress is trusted or not; controls how strictly whitelist applies
+        :param serialisable_type_whitelist: will raise an exception/print to log if any objects do not match this
+        :param log_trusted_whitelist_violations: set to false on your unit test when you notice logspam on dict duplicate twenty minutes before release time on Wednesday
+        '''
+        
+        self.trusted = trusted
+        self.serialisable_type_whitelist = serialisable_type_whitelist
+        self.log_trusted_whitelist_violations = log_trusted_whitelist_violations
+        
+        if not self.trusted and not self.log_trusted_whitelist_violations:
+            
+            HydrusData.Print( f'Hey, please let hydev know he is a total genius, using the magic information {( self.trusted, self.serialisable_type_whitelist, self.log_trusted_whitelist_violations )}.' )
+            
+        
+    
+    def Duplicate( self ):
+        
+        return DeserialisationContext( self.trusted, set( self.serialisable_type_whitelist ), log_trusted_whitelist_violations = self.log_trusted_whitelist_violations )
+        
+    
+    def DuplicateForNewWhitelist( self, serialisable_type_whitelist: set[ int ] ):
+        
+        return DeserialisationContext( self.trusted, serialisable_type_whitelist, log_trusted_whitelist_violations = self.log_trusted_whitelist_violations )
+        
+    
+
+def GenerateDeserialisationContextForGodKnowsUpdates( deserialisation_context: DeserialisationContext ):
+    
+    # we have no idea what this dude is doing since it is ancient update code. we just let it rip, no logging, while keeping original trusted situation
+    # we simply refuse to do an update on an object like this if not trusted.
+    
+    new_deserialisation_context = deserialisation_context.DuplicateForNewWhitelist( set() )
+    new_deserialisation_context.log_trusted_whitelist_violations = False
+    
+    return new_deserialisation_context
+    
+
+def CreateFromNetworkBytes( network_bytes: bytes, deserialisation_context: DeserialisationContext ) -> typing.Any:
     
     obj_string = HydrusCompression.DecompressBytesToString( network_bytes )
     
-    return CreateFromString( obj_string, raise_error_on_future_version = raise_error_on_future_version )
+    return CreateFromString( obj_string, deserialisation_context )
     
 
-def CreateFromNoneableSerialisableTuple( obj_tuple_or_none, raise_error_on_future_version = False ) -> typing.Any:
+def CreateFromNoneableSerialisableTuple( obj_tuple_or_none, deserialisation_context: DeserialisationContext ) -> typing.Any:
     
     if obj_tuple_or_none is None:
         
@@ -194,18 +236,33 @@ def CreateFromNoneableSerialisableTuple( obj_tuple_or_none, raise_error_on_futur
         
     else:
         
-        return CreateFromSerialisableTuple( obj_tuple_or_none, raise_error_on_future_version = raise_error_on_future_version )
+        return CreateFromSerialisableTuple( obj_tuple_or_none, deserialisation_context )
         
     
 
-def CreateFromString( obj_string: str, raise_error_on_future_version = False ) -> typing.Any:
+def CreateFromString( obj_string: str, deserialisation_context: DeserialisationContext ) -> typing.Any:
     
     obj_tuple = json.loads( obj_string )
     
-    return CreateFromSerialisableTuple( obj_tuple, raise_error_on_future_version = raise_error_on_future_version )
+    return CreateFromSerialisableTuple( obj_tuple, deserialisation_context )
     
 
-def CreateFromSerialisableTuple( obj_tuple: tuple, raise_error_on_future_version = False ) -> typing.Any:
+def CreateFromSerialisableTuple( obj_tuple: tuple, deserialisation_context: DeserialisationContext ) -> typing.Any:
+    """
+    Deserialise a serialised tuple into a HydrusSerialisable object. send a whitelist of 'set()' if you aren't sure--that means it'll only ever work on local, trusted loads
+    :param obj_tuple: 3- or 4- tuple 
+    :param deserialisation_context: Is this trusted? What is allowed? If violations, is it appropriate to log them?
+    :return: the actual object mate
+    """
+    
+    # TODO: Future Ideas:
+    # - swap out serialisable_type for object types
+    # - with that tech in place, do some typing so linters know this guy returns that object. maybe make more than one call here for single type vs union possibles
+    # - make a CreateListFromSerialisableTuple, and perhaps a whole chain, so instead of saying 'list or application command', we ask for a list of such and if it is just one guy it returns a list anyway
+    # - similarly make a dict call that handles things a little different
+    # maybe take the whitelist out of the _InitialiseFrom... calls, since but for list/dict we only need 'trusted'
+    # thus maybe we do the type scanning in here, and for list/dict we have a custom loading routine
+    # when we have 'CreateList...' and friends, have a param there that says just to exclude stuff out the whitelist rather than erroring out. I can use that nicely in listctrl 'forgivable object' gubbins
     
     if len( obj_tuple ) == 3:
         
@@ -220,9 +277,33 @@ def CreateFromSerialisableTuple( obj_tuple: tuple, raise_error_on_future_version
         obj = SERIALISABLE_TYPES_TO_OBJECT_TYPES[ serialisable_type ]( name )
         
     
-    obj.InitialiseFromSerialisableInfo( version, serialisable_info, raise_error_on_future_version = raise_error_on_future_version )
+    obj.InitialiseFromSerialisableInfo( version, serialisable_info, deserialisation_context )
     
     return obj
+    
+
+def DetermineRestrictedSerialisableTypes( permitted_object_types, lists_are_ok: bool ) -> set[ int ]:
+    
+    serialisable_type_whitelist = set()
+    
+    if lists_are_ok:
+        
+        serialisable_type_whitelist.add( SERIALISABLE_TYPE_LIST )
+        
+    
+    for permitted_object_type in permitted_object_types:
+        
+        try:
+            
+            serialisable_type_whitelist.add( permitted_object_type.SERIALISABLE_TYPE )
+            
+        except Exception as e:
+            
+            continue
+            
+        
+    
+    return serialisable_type_whitelist
     
 
 def GetNoneableSerialisableTuple( obj_or_none ):
@@ -260,6 +341,8 @@ def ObjectVersionIsFromTheFuture( obj_tuple ):
 
 SerialisableBaseSubclass = typing.TypeVar( 'SerialisableBaseSubclass', bound = 'SerialisableBase' )
 
+SI = typing.TypeVar( 'SI' )
+
 class SerialisableBase( object ):
     
     SERIALISABLE_TYPE = SERIALISABLE_TYPE_BASE
@@ -268,19 +351,19 @@ class SerialisableBase( object ):
     
     # don't make an __eq__ here without more testing and research, it messes a bunch of things up in sets and hashing and stuff
     
-    def _GetSerialisableInfo( self ):
+    def _GetSerialisableInfo( self ) -> SI:
         
         raise NotImplementedError()
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: SI, deserialisation_context: DeserialisationContext ):
         
         raise NotImplementedError()
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: DeserialisationContext ) -> tuple[ int, object ]:
         
-        return old_serialisable_info
+        return ( version, old_serialisable_info )
         
     
     def DumpToNetworkBytes( self ):
@@ -300,7 +383,15 @@ class SerialisableBase( object ):
     # this magically tells type checkers that this delivers whatever 'self' type is, subclasses whatever
     def Duplicate( self: SerialisableBaseSubclass ) -> SerialisableBaseSubclass:
         
-        return CreateFromString( self.DumpToString() )
+        # this is another special case; when a list or dict duplicates itself, it does not know its contents, but we trust ourselves when loaded, so no worries
+        deserialisation_context = DeserialisationContext(
+            True,
+            { self.SERIALISABLE_TYPE },
+            log_trusted_whitelist_violations = False
+        )
+        
+        # logspam hack because lists and dicts don't know what they should hold
+        return CreateFromString( self.DumpToString(), deserialisation_context )
         
     
     def GetSerialisableDescription( self ):
@@ -331,26 +422,37 @@ class SerialisableBase( object ):
         return ( self.SERIALISABLE_TYPE, self.SERIALISABLE_VERSION, serialisable_info )
         
     
-    def InitialiseFromSerialisableInfo( self, original_version, serialisable_info, raise_error_on_future_version = False ):
+    def InitialiseFromSerialisableInfo( self, original_version, serialisable_info: object, deserialisation_context: DeserialisationContext ):
+        
+        serialisable_type_whitelist = deserialisation_context.serialisable_type_whitelist
+        
+        if serialisable_type_whitelist is not None: # legacy safety check, by God's Grace leave it in for now
+            
+            if self.SERIALISABLE_TYPE not in serialisable_type_whitelist:
+                
+                if deserialisation_context.trusted:
+                    
+                    if deserialisation_context.log_trusted_whitelist_violations:
+                        
+                        HydrusData.Print( f'An object of type {self.SERIALISABLE_TYPE} ("{self.SERIALISABLE_NAME}") loaded when the expected serialisable types are: {serialisable_type_whitelist}! You can probably ignore this, but if there are a bunch of these, hydev would like to know.' )
+                        
+                    
+                else:
+                    
+                    raise HydrusExceptions.SerialisationWhitelistException( f'Was given an object with a type of {self.SERIALISABLE_TYPE} ("{self.SERIALISABLE_NAME}"), but the allowed serialisable types are: {serialisable_type_whitelist}!', self.SERIALISABLE_NAME )
+                    
+                
+            
         
         object_is_newer = original_version > self.SERIALISABLE_VERSION
         
         if object_is_newer:
             
-            if raise_error_on_future_version:
-                
-                message = 'Unfortunately, an object of type {} could not be loaded because it was created in a client/server that uses an updated version of that object! We support up to version {}, but the object was version {}.'.format( self.SERIALISABLE_NAME, self.SERIALISABLE_VERSION, original_version )
-                message += '\n' * 2
-                message += 'Please update your client/server to import this object.'
-                
-                raise HydrusExceptions.SerialisationException( message )
-                
-            else:
-                
-                message = 'An object of type {} was created in a client/server that uses an updated version of that object! We support versions up to {}, but the object was version {}. For now, we will try to continue work, but things may break. If you know why this has occured, please correct it. If you do not, please let hydrus dev know.'.format( self.SERIALISABLE_NAME, self.SERIALISABLE_VERSION, original_version )
-                
-                HydrusData.ShowText( message )
-                
+            message = 'Unfortunately, an object of type {} could not be loaded because it was created in a client/server that uses an updated version of that object! We support up to version {}, but the object was version {}.'.format( self.SERIALISABLE_NAME, self.SERIALISABLE_VERSION, original_version )
+            message += '\n' * 2
+            message += 'Please update your client/server to import this object.'
+            
+            raise HydrusExceptions.SerialisationException( message )
             
         
         try:
@@ -359,7 +461,7 @@ class SerialisableBase( object ):
             
             while current_version < self.SERIALISABLE_VERSION:
                 
-                ( current_version, serialisable_info ) = self._UpdateSerialisableInfo( current_version, serialisable_info )
+                ( current_version, serialisable_info ) = self._UpdateSerialisableInfo( current_version, serialisable_info, deserialisation_context )
                 
             
         except Exception as e:
@@ -369,18 +471,15 @@ class SerialisableBase( object ):
         
         try:
             
-            self._InitialiseFromSerialisableInfo( serialisable_info )
+            self._InitialiseFromSerialisableInfo( serialisable_info, deserialisation_context )
+            
+        except HydrusExceptions.SerialisationException as e:
+            
+            raise
             
         except Exception as e:
             
-            if object_is_newer:
-                
-                raise HydrusExceptions.SerialisationException( 'An object of type {} was created in a client/server that uses an updated version of that object! We support versions up to {}, but the object was version {}. I tried to load it, but the initialisation failed. You probably need to update your client/server.'.format( self.SERIALISABLE_NAME, self.SERIALISABLE_VERSION, original_version ) )
-                
-            else:
-                
-                raise HydrusExceptions.SerialisationException( 'Could not initialise this object of type {}!'.format( self.SERIALISABLE_NAME ) )
-                
+            raise HydrusExceptions.SerialisationException( 'Could not initialise this object of type {}!'.format( self.SERIALISABLE_NAME ) ) from e
             
         
     
@@ -406,13 +505,13 @@ def ConvertObjectToMetaSerialisableTuple( obj ):
     return ( metatype, serialisable )
     
 
-def ConvertMetaSerialisableTupleToObject( meta_tuple ):
+def ConvertMetaSerialisableTupleToObject( meta_tuple, deserialisation_context: DeserialisationContext ):
     
     ( metatype, serialisable ) = meta_tuple
     
     if metatype == META_SERIALISABLE_TYPE_HYDRUS_SERIALISABLE:
         
-        obj = CreateFromSerialisableTuple( serialisable )
+        obj = CreateFromSerialisableTuple( serialisable, deserialisation_context )
         
     elif metatype == META_SERIALISABLE_TYPE_JSON_BYTES:
         
@@ -443,7 +542,7 @@ class SerialisableBaseNamed( SerialisableBase ):
         raise NotImplementedError()
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         raise NotImplementedError()
         
@@ -507,7 +606,11 @@ class SerialisableDictionary( SerialisableBase, dict[ K, V ] ):
         return meta_keys_and_meta_values
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: DeserialisationContext ):
+        
+        # I convert normal lists to serialisable list on serialisation, so we have to implicitly allow them on deserialisation here
+        new_deserialisation_context = deserialisation_context.Duplicate()
+        new_deserialisation_context.serialisable_type_whitelist.add( SERIALISABLE_TYPE_LIST )
         
         have_shown_load_error = False
         
@@ -517,14 +620,18 @@ class SerialisableDictionary( SerialisableBase, dict[ K, V ] ):
             
             try:
                 
-                key = ConvertMetaSerialisableTupleToObject( meta_key )
+                key = ConvertMetaSerialisableTupleToObject( meta_key, deserialisation_context )
                 
                 if isinstance( key, list ):
                     
                     key = tuple( key )
                     
                 
-                value = ConvertMetaSerialisableTupleToObject( meta_value )
+                value = ConvertMetaSerialisableTupleToObject( meta_value, deserialisation_context )
+                
+            except HydrusExceptions.SerialisationWhitelistException as e:
+                
+                raise # this only occurs if we are in untrusted territory
                 
             except HydrusExceptions.SerialisationException as e:
                 
@@ -543,7 +650,7 @@ class SerialisableDictionary( SerialisableBase, dict[ K, V ] ):
             
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         if version == 1:
             
@@ -682,7 +789,7 @@ class SerialisableBytesDictionary( SerialisableBase, dict[ int | bytes, V_bytes 
         return pairs
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         for ( encoded_key, encoded_value ) in serialisable_info:
             
@@ -790,7 +897,7 @@ class SerialisableList( SerialisableBase, list[ T ] ):
         return meta_tuples
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         have_shown_load_error = False
         
@@ -800,7 +907,11 @@ class SerialisableList( SerialisableBase, list[ T ] ):
             
             try:
                 
-                obj = ConvertMetaSerialisableTupleToObject( meta_tuple )
+                obj = ConvertMetaSerialisableTupleToObject( meta_tuple, deserialisation_context )
+                
+            except HydrusExceptions.SerialisationWhitelistException as e:
+                
+                raise # this only occurs if we are in untrusted territory
                 
             except HydrusExceptions.SerialisationException as e:
                 
@@ -819,7 +930,7 @@ class SerialisableList( SerialisableBase, list[ T ] ):
             
         
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         if version == 1:
             
@@ -936,7 +1047,7 @@ class IdAndName( SerialisableBase ):
         return ( id_serialisable, self.name )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: DeserialisationContext ):
         
         ( id_serialisable, self.name ) = serialisable_info
         

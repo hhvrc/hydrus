@@ -233,7 +233,7 @@ When hydrus updates a database through several versions, it does it one version 
 
 If you narrow the gap down to just one version and still get an error, please let me know. If the problem is ever quick to appear and ugly/serious-looking, and perhaps talking about a "bootloader" or "dll" issue, then try doing a clean install as above. I am very interested in these sorts of problems and will be happy to help figure out a fix with you (and everyone else who might be affected).
 
-_All that said, and while updating is complex and every client is different, various user reports over the years suggest this route works and is efficient: 204 > 238 > 246 > 291 > 328 > 335 (clean install) > 376 > 421 > 466 (clean install) > 474 > 480 > 521 (maybe clean install) > 527 (special clean install) > 535 > 558 > 571 (clean install) > 603 > 652 > 662 (clean install)_ 
+_All that said, and while updating is complex and every client is different, various user reports over the years suggest this route works well: [204](https://github.com/hydrusnetwork/hydrus/releases/tag/v204) > [238](https://github.com/hydrusnetwork/hydrus/releases/tag/v238) > [246](https://github.com/hydrusnetwork/hydrus/releases/tag/v246) > [291](https://github.com/hydrusnetwork/hydrus/releases/tag/v291) > [328](https://github.com/hydrusnetwork/hydrus/releases/tag/v328) > [335](https://github.com/hydrusnetwork/hydrus/releases/tag/v335) (clean install) > [376](https://github.com/hydrusnetwork/hydrus/releases/tag/v376) > [421](https://github.com/hydrusnetwork/hydrus/releases/tag/v421) > [466](https://github.com/hydrusnetwork/hydrus/releases/tag/v466) (clean install) > [474](https://github.com/hydrusnetwork/hydrus/releases/tag/v474) > [480](https://github.com/hydrusnetwork/hydrus/releases/tag/v480) > [521](https://github.com/hydrusnetwork/hydrus/releases/tag/v521) (maybe clean install) > [527](https://github.com/hydrusnetwork/hydrus/releases/tag/v527) (special clean install) > [535](https://github.com/hydrusnetwork/hydrus/releases/tag/v535) > [558](https://github.com/hydrusnetwork/hydrus/releases/tag/v558) > [571](https://github.com/hydrusnetwork/hydrus/releases/tag/v571) (clean install) > [603](https://github.com/hydrusnetwork/hydrus/releases/tag/v603) > [652](https://github.com/hydrusnetwork/hydrus/releases/tag/v652) > [662](https://github.com/hydrusnetwork/hydrus/releases/tag/v662) (clean install) > [692](https://github.com/hydrusnetwork/hydrus/releases/tag/v692)._ 
 
 ??? note "334->335"
     We moved from python 2 to python 3.
@@ -291,7 +291,8 @@ _All that said, and while updating is complex and every client is different, var
 ??? note "691 vulnerability"
     At release of v691, an AI scanner discovered that hydrus had an important security flaw allowing remote code execution when loading a certain type of object from storage. Certain network and UI I/O used the vulnerable routine.
     
-    * For a client, the risk occurred when importing a user-made object like a downloader, when talking to a hydrus server like the PTR, or when anything communicated with the Client API.
+    * For a client, the risk occurred when importing a user-made object like a downloader or when talking to a hydrus server like the PTR
+    * _EDIT: I originally thought the Client API was vulnerable, but additional testing has shown it was not._
     * The server was not affected by the vulnerability.
     
     After investigating the 5,000+ publicly shared downloaders and 27,000+ PTR update files, I did not find any use of the exploit and am confident that there was no widespread use of the flaw.

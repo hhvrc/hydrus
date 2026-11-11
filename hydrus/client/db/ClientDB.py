@@ -1660,7 +1660,7 @@ class DB( HydrusDB.HydrusDB ):
         self.modules_media_results.ForceRefreshFileInfoManagers( hash_ids_to_hashes )
         
     
-    def _GetBonedStats( self, file_search_context: ClientSearchFileSearchContext.FileSearchContext = None, job_status = None ):
+    def _GetBonedStats( self, file_search_context: ClientSearchFileSearchContext.FileSearchContext | None = None, job_status = None ):
         
         if job_status is None:
             
@@ -1987,7 +1987,7 @@ class DB( HydrusDB.HydrusDB ):
         return boned_stats
         
     
-    def _GetFileHistory( self, num_steps: int, file_search_context: ClientSearchFileSearchContext.FileSearchContext = None, job_status = None ):
+    def _GetFileHistory( self, num_steps: int, file_search_context: ClientSearchFileSearchContext.FileSearchContext | None = None, job_status = None ):
         
         # TODO: clean this up. it is a mess cribbed from the boned work, and I'm piping similar nonsense down to the db tables
         # don't supply deleted timestamps for 'all files deleted' and all that gubbins, it is a mess
@@ -3847,7 +3847,22 @@ class DB( HydrusDB.HydrusDB ):
         
         try:
             
-            HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes )
+            if mime == HC.APPLICATION_HYDRUS_UPDATE_DEFINITIONS:
+                
+                serialisable_type_whitelist = { HydrusSerialisable.SERIALISABLE_TYPE_DEFINITIONS_UPDATE }
+                
+            elif mime == HC.APPLICATION_HYDRUS_UPDATE_CONTENT:
+                
+                serialisable_type_whitelist = { HydrusSerialisable.SERIALISABLE_TYPE_CONTENT_UPDATE }
+                
+            else:
+                
+                raise NotImplementedError( 'Unknown incoming update mime!' )
+                
+            
+            deserialisation_context = HydrusSerialisable.DeserialisationContext( False, serialisable_type_whitelist )
+            
+            HydrusSerialisable.CreateFromNetworkBytes( update_network_bytes, deserialisation_context )
             
         except Exception as e:
             
@@ -4519,8 +4534,6 @@ class DB( HydrusDB.HydrusDB ):
                     
                     self.modules_content_updates.ProcessContentUpdatePackage( content_update_package )
                     
-                    still_work_to_do = True
-                    
                 else:
                     
                     self._DeleteServiceInfo( CC.TRASH_SERVICE_KEY, [ HC.SERVICE_INFO_TOTAL_SIZE ] )
@@ -4528,9 +4541,12 @@ class DB( HydrusDB.HydrusDB ):
                 
                 if HydrusTime.TimeHasPassedFloat( time_to_stop ):
                     
+                    still_work_to_do = True
+                    
                     return still_work_to_do
                     
                 
+            
             
         
         if HC.options[ 'trash_max_age' ] is not None:
@@ -4547,9 +4563,17 @@ class DB( HydrusDB.HydrusDB ):
                 
                 self.modules_content_updates.ProcessContentUpdatePackage( content_update_package )
                 
-                still_work_to_do = True
+                old_hashes = set( hashes )
+                hashes = self._GetTrashHashes( limit = 1, minimum_age = max_age )
+                
+                if old_hashes == set( hashes ):
+                    
+                    raise Exception( f'The trash maintenance system seems to have failed to delete a to-be-physically-deleted file. You likely have gaps or confusions in your file store. Please let hydev know about this. The hash involved is: {old_hashes}' )
+                    
                 
                 if HydrusTime.TimeHasPassedFloat( time_to_stop ):
+                    
+                    still_work_to_do = True
                     
                     return still_work_to_do
                     
@@ -8364,6 +8388,8 @@ class DB( HydrusDB.HydrusDB ):
             
             try:
                 
+                from hydrus.client.importing.options import ImportOptionsManager
+                
                 import_options_manager = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_IMPORT_OPTIONS_MANAGER )
                 
                 from hydrus.client.importing.options import ImportOptionsConstants as IOC
@@ -8485,6 +8511,29 @@ class DB( HydrusDB.HydrusDB ):
                 
             
         
+        if version == 693:
+            
+            try:
+                
+                from hydrus.client import ClientOptions
+                
+                new_options: ClientOptions.ClientOptions = self.modules_serialisable.GetJSONDump( HydrusSerialisable.SERIALISABLE_TYPE_CLIENT_OPTIONS )
+                
+                # making this test real across the board
+                new_options.SetBoolean( 'do_new_hide_terminal_subprocess_tech_on_windows', True )
+                
+                self.modules_serialisable.SetJSONDump( new_options )
+                
+            except Exception as e:
+                
+                HydrusData.PrintException( e )
+                
+                message = 'Trying to update your options failed! Please let hydrus dev know!'
+                
+                self.pub_initial_message( message )
+                
+            
+        
         #
         
         self._controller.frame_splash_status.SetTitleText( 'updated db to v{}'.format( HydrusNumbers.ToHumanInt( version + 1 ) ) )
@@ -8493,7 +8542,8 @@ class DB( HydrusDB.HydrusDB ):
         
         self._Execute( 'UPDATE version SET version = ?;', ( current_version, ) )
         
-        versions_that_could_do_with_a_new_venv = { 670, 681 }
+        # careful; since we just incremented, this is the _current_ version we are testing
+        versions_that_could_do_with_a_new_venv = { 670, 681, 693 }
         
         if HC.RUNNING_FROM_SOURCE and HC.GOT_A_NORMAL_LOOKING_VENV and current_version in versions_that_could_do_with_a_new_venv:
             

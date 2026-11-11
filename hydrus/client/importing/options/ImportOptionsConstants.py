@@ -128,7 +128,7 @@ class ImportOptionsMetatype( HydrusSerialisable.SerialisableBase ):
         raise NotImplementedError()
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         raise NotImplementedError()
         

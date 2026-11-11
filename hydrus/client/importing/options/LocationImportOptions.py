@@ -54,7 +54,7 @@ class LocationImportOptions( IOC.ImportOptionsMetatype ):
         )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         (
             serialisable_import_destination_location_context,
@@ -65,7 +65,7 @@ class LocationImportOptions( IOC.ImportOptionsMetatype ):
             self._do_import_destinations_on_already_in_db_files
         ) = serialisable_info
         
-        self._import_destination_location_context = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_import_destination_location_context )
+        self._import_destination_location_context = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_import_destination_location_context, deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_LOCATION_CONTEXT } ) )
         
     
     def AutomaticallyArchives( self ) -> bool:

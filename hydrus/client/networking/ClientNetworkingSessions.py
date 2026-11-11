@@ -5,11 +5,13 @@ import threading
 import typing
 
 from hydrus.core import HydrusData
+from hydrus.core import HydrusExceptions
 from hydrus.core import HydrusSerialisable
 from hydrus.core import HydrusTime
 
 from hydrus.client import ClientConstants as CC
 from hydrus.client import ClientGlobals as CG
+from hydrus.client import ClientStrings
 from hydrus.client.networking import ClientNetworkingCurlCFFI
 from hydrus.client.networking import ClientNetworkingContexts
 from hydrus.client.networking import ClientNetworkingFunctions
@@ -78,7 +80,7 @@ def ClearExpiredCookies( ambiguous_session ):
     EnsureSessionCookiesAreSynced( ambiguous_session, cookies )
     
 
-def ConvertCookieToTuple( cookie: http.cookiejar.Cookie ):
+def ConvertCookieToTuple( cookie: http.cookiejar.Cookie ) -> tuple[ str, str | None, str, str, int | None ]:
     
     name = cookie.name
     value = cookie.value
@@ -89,16 +91,13 @@ def ConvertCookieToTuple( cookie: http.cookiejar.Cookie ):
     return ( name, value, domain, path, expires )
     
 
-def ConvertRequestsCookieJarToSerialisable( cookie_jar: requests.sessions.RequestsCookieJar ):
+def ConvertRequestsCookieJarToSerialisable( cookie_jar: requests.sessions.RequestsCookieJar ) -> list[ tuple[ str, str | None, str, str, int | None ] ]:
     
     serialisable_cookie_tuples = []
     
     try:
         
-        for cookie in list( cookie_jar ):
-            
-            cookie = typing.cast( object, cookie )
-            cookie = typing.cast( http.cookiejar.Cookie, cookie )
+        for cookie in GetCookiesFromRequestsCookieJar( cookie_jar ):
             
             serialisable_cookie_tuples.append( ConvertCookieToTuple( cookie ) )
             
@@ -110,6 +109,20 @@ def ConvertRequestsCookieJarToSerialisable( cookie_jar: requests.sessions.Reques
         
     
     return serialisable_cookie_tuples
+    
+
+def ConvertSerialisableCookiesToRequestsCookieJar( serialisable_cookie_tuples: list[ tuple[ str, str | None, str, str, int | None ] ] ) -> requests.sessions.RequestsCookieJar:
+    
+    cookie_jar = requests.sessions.RequestsCookieJar()
+    
+    for ( name, value, domain, path, expires ) in serialisable_cookie_tuples:
+        
+        cookie = CreateCookie( name, value, domain, path, expires )
+        
+        cookie_jar.set_cookie( cookie )
+        
+    
+    return cookie_jar
     
 
 def CreateCookie( name, value, domain, path, expires ) -> http.cookiejar.Cookie:
@@ -140,6 +153,53 @@ def EnsureSessionCookiesAreSynced( ambiguous_session, requests_cookies: requests
         
         ClientNetworkingCurlCFFI.SetCURLCFFISessionCookiesWithRequestsCookieJar( ambiguous_session, requests_cookies )
         
+    
+
+def CookieDomainMatches( cookie: http.cookiejar.Cookie, search_domain: str ):
+    
+    cookie_domain = cookie.domain
+    
+    # blah.com is viewable by blah.com
+    matches_exactly = cookie_domain == search_domain
+    
+    # .blah.com is viewable by blah.com
+    matches_dot = cookie_domain == '.' + search_domain
+    
+    # .blah.com applies to subdomain.blah.com, blah.com does not
+    valid_subdomain = cookie_domain.startswith( '.' ) and search_domain.endswith( cookie_domain )
+    
+    return matches_exactly or matches_dot or valid_subdomain
+    
+
+def GetCookie( cookie_jar: requests.sessions.RequestsCookieJar, search_domain: str, cookie_name_string_match: ClientStrings.StringMatch ):
+    
+    for cookie in GetCookiesFromRequestsCookieJar( cookie_jar ):
+        
+        if CookieDomainMatches( cookie, search_domain ) and cookie_name_string_match.Matches( cookie.name ):
+            
+            return cookie
+            
+        
+    
+    raise HydrusExceptions.DataMissing( 'Cookie "' + cookie_name_string_match.ToString() + '" not found for domain ' + search_domain + '!' )
+    
+
+def GetCookiesFromRequestsCookieJar( cookie_jar: requests.sessions.RequestsCookieJar ) -> list[ http.cookiejar.Cookie ]:
+    
+    # a linter thinks cookie_jar gives up strs on iter; it does not
+    # we force it here
+    
+    cookies_list = []
+    
+    for cookie in cookie_jar:
+        
+        cookie = typing.cast( object, cookie )
+        cookie = typing.cast( http.cookiejar.Cookie, cookie )
+        
+        cookies_list.append( cookie )
+        
+    
+    return cookies_list
     
 
 def GetRequestsSessionCookieJar( ambiguous_session ) -> requests.sessions.RequestsCookieJar:
@@ -293,24 +353,17 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
         return ( serialisable_network_context, serialisable_cookie_tuples )
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         ( serialisable_network_context, serialisable_cookie_tuples ) = serialisable_info
         
-        self.network_context = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_network_context )
+        self.network_context = HydrusSerialisable.CreateFromSerialisableTuple( serialisable_network_context, deserialisation_context.DuplicateForNewWhitelist( { HydrusSerialisable.SERIALISABLE_TYPE_NETWORK_CONTEXT } ) )
         
         self.session = self._CreateEmptySession()
         
         try:
             
-            cookie_jar = requests.sessions.RequestsCookieJar()
-            
-            for ( name, value, domain, path, expires ) in serialisable_cookie_tuples:
-                
-                cookie = CreateCookie( name, value, domain, path, expires )
-                
-                cookie_jar.set_cookie( cookie )
-                
+            cookie_jar = ConvertSerialisableCookiesToRequestsCookieJar( serialisable_cookie_tuples )
             
             if ClientNetworkingCurlCFFI.SessionIsCurlCFFI( self.session ):
                 
@@ -321,15 +374,15 @@ class NetworkSessionManagerSessionContainer( HydrusSerialisable.SerialisableBase
                 self.session.cookies = cookie_jar
                 
             
-            ClearExpiredCookies( self.session )
-            
         except Exception as e:
             
             HydrusData.Print( "Could not load and set cookies for session {}".format( self.network_context ) )
             
         
+        ClearExpiredCookies( self.session )
+        
     
-    def _UpdateSerialisableInfo( self, version, old_serialisable_info ):
+    def _UpdateSerialisableInfo( self, version: int, old_serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         if version == 1:
             
@@ -492,7 +545,7 @@ class NetworkSessionManager( HydrusSerialisable.SerialisableBase ):
         return network_context
         
     
-    def _InitialiseFromSerialisableInfo( self, serialisable_info ):
+    def _InitialiseFromSerialisableInfo( self, serialisable_info: object, deserialisation_context: HydrusSerialisable.DeserialisationContext ):
         
         self._session_container_names = set( serialisable_info )
         
